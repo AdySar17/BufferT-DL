@@ -63,7 +63,7 @@ function useLiveData() {
           "u",
           "return import(u)"
         ) as any;
-        const auth = await dynImport("/auth.js");
+        const auth = await import("/auth.js");
         const fs = await dynImport(
           "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
         );
