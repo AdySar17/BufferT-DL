@@ -1,0 +1,187 @@
+rules_version = '2';
+
+/* ============================================================================
+ *  BFT Demon List — Reglas de Firestore  (archivo V9)
+ *
+ *  CÓMO PUBLICAR:
+ *    1. Firebase Console → proyecto bufferteam-a95b3
+ *    2. Firestore Database → pestaña "Rules"
+ *    3. Borra TODO lo que haya y pega este archivo entero
+ *    4. Pulsa "Publish"
+ *
+ *  Cambios respecto a V8:
+ *    - El reclamo de NUEVO NIVEL ahora identifica el nivel por su
+ *      ID de Geometry Dash (numérico, único) en lugar del autor.
+ *        · campo renombrado:  claimedLevelAuthor  →  claimedLevelId
+ *        · validación:  string solo dígitos, 1..20 caracteres.
+ *      Así, cambiar solo el nombre o el autor ya NO permite reclamar
+ *      el mismo nivel dos veces — el ID es la huella única.
+ *    - /levels admite el campo opcional gdLevelId (string) para
+ *      guardar el ID de GD del nivel (lo escribe el staff al aceptar
+ *      un reclamo desde el panel).
+ *    - Resto de reglas (perfiles, /users, moderación de records,
+ *      historial de posiciones, roles) sin cambios respecto a V8.
+ *
+ *  Roles soportados:
+ *    Owner   — control total. Puede aceptar reclamos de Nuevo nivel.
+ *    Admin   — modera records y puede aceptar reclamos de Nuevo nivel.
+ *    Mod     — modera records normales; puede rechazar reclamos pero
+ *              NO puede aceptar reclamos de Nuevo nivel.
+ *    Booster — sin permisos extra; solo prioridad en el panel + badge.
+ *    Default — usuario normal.
+ * ========================================================================== */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ─── Helpers ───────────────────────────────────────────────── */
+    function isSignedIn() { return request.auth != null; }
+    function isOwnerOf(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    function myDoc()  { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function myRole() { return myDoc().data.role; }
+
+    function isStaff()    { return isSignedIn() && myRole() in ['Mod','Admin','Owner']; }
+    function isAdminish() { return isSignedIn() && myRole() in ['Admin','Owner']; }
+    function isOwnerRole(){ return isSignedIn() && myRole() == 'Owner'; }
+
+    function isValidRole(r) {
+      return r in ['Default','Mod','Admin','Owner','Booster'];
+    }
+
+    /* Valida que la cadena sea solo dígitos 0-9, longitud 1..20.       *
+     * Sirve para el ID de un nivel de Geometry Dash.                   */
+    function isGdId(s) {
+      return s is string
+             && s.size() > 0
+             && s.size() <= 20
+             && s.matches('^[0-9]+$');
+    }
+
+    /* ─── Perfiles públicos ─────────────────────────────────────── */
+    match /profiles/{uid} {
+      allow read:   if true;
+      allow create: if isOwnerOf(uid);
+      allow update: if isOwnerOf(uid) || isStaff();
+      allow delete: if isAdminish();
+    }
+
+    /* ─── Niveles públicos ──────────────────────────────────────── *
+     *  Campos: name, author, creators[], position, value, thumbnail,
+     *  background, video, glow, is2P, description, difficulty,
+     *  minPercent, tags[], y opcionalmente gdLevelId (string numérico
+     *  con el ID de Geometry Dash, lo escribe el staff).              */
+    match /levels/{id} {
+      allow read:  if true;
+      allow write: if isStaff();
+    }
+
+    /* ─── Historial de posiciones (público, escribe staff) ─────── */
+    match /positionHistory/{id} {
+      allow read:  if true;
+      allow write: if isStaff();
+    }
+
+    /* ─── Records públicos ──────────────────────────────────────── *
+     *  Campos básicos: userId, player2Id?, levelId, percent (1-100),
+     *  video, video2?, mobile, mobile2P, mode2P, rawFootage, extraNotes,
+     *  status ("Pending"|"Accepted"|"Rejected"),
+     *  createdAt, updatedAt, acceptedAt,
+     *  staffnotes (string opcional, hasta 500 chars),
+     *  moderatedAt (serverTimestamp), moderatedBy (uid del staff).
+     *
+     *  Campos para reclamo de "Nuevo nivel":
+     *    isNewLevelClaim  : bool   (opcional, default false)
+     *    claimedLevelName : string (≤ 100 chars)
+     *    claimedLevelId   : string numérico (ID de Geometry Dash, 1..20)
+     *  Cuando isNewLevelClaim == true, levelId puede ser null mientras
+     *  el record esté en Pending.                                       */
+    match /records/{id} {
+      allow read: if true;
+
+      /* Crear: solo el propio usuario, en estado Pending.
+       * Si es reclamo de Nuevo nivel se exige nombre + ID de GD. */
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status == "Pending"
+                    && (
+                      /* Caso normal */
+                      ( !("isNewLevelClaim" in request.resource.data)
+                        || request.resource.data.isNewLevelClaim == false )
+                      ||
+                      /* Caso reclamo de Nuevo nivel */
+                      ( request.resource.data.isNewLevelClaim == true
+                        && request.resource.data.claimedLevelName is string
+                        && request.resource.data.claimedLevelName.size() > 0
+                        && request.resource.data.claimedLevelName.size() <= 100
+                        && isGdId(request.resource.data.claimedLevelId)
+                      )
+                    );
+
+      /* Update:
+       *   - Aceptar un reclamo de Nuevo nivel (poner status=Accepted
+       *     SOBRE un doc cuyo isNewLevelClaim era true) → solo Admin/Owner.
+       *   - Resto de moderaciones (Accept normal, Reject de cualquier tipo)
+       *     → cualquier staff (Mod/Admin/Owner).
+       *   - El dueño puede editar SUS records (sin cambiar userId) y
+       *     el record vuelve a Pending. */
+      allow update: if
+        /* Aceptación de reclamo: Admin/Owner únicamente */
+        ( isAdminish()
+          && resource.data.isNewLevelClaim == true
+          && request.resource.data.status == "Accepted" )
+        ||
+        /* Cualquier otra acción de staff */
+        ( isStaff()
+          && !( resource.data.isNewLevelClaim == true
+                && request.resource.data.status == "Accepted"
+                && !isAdminish() )
+        )
+        ||
+        /* Dueño edita su propio record (sin tocar userId, vuelve a Pending) */
+        ( isOwnerOf(resource.data.userId)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.status == "Pending" );
+
+      /* Delete: staff siempre; dueño solo si NO está Accepted. */
+      allow delete: if isStaff()
+                    || (isOwnerOf(resource.data.userId)
+                        && resource.data.status != "Accepted");
+    }
+
+    /* ─── /users : datos de cuenta + ROL (igual que V8) ──────────── */
+    match /users/{uid} {
+      allow read:   if isOwnerOf(uid) || isStaff();
+      allow create: if isOwnerOf(uid);
+
+      allow update: if
+        /* (A) self-update sin tocar role ni banned */
+        ( isOwnerOf(uid)
+          && !( "role"   in request.resource.data.diff(resource.data).affectedKeys() )
+          && !( "banned" in request.resource.data.diff(resource.data).affectedKeys() )
+        )
+        ||
+        /* (B) Owner: control total */
+        ( isOwnerRole()
+          && ( !( "role" in request.resource.data.diff(resource.data).affectedKeys() )
+               || isValidRole(request.resource.data.role) )
+        )
+        ||
+        /* (C) Admin: cambia roles de no-staff a no-staff, y no a sí mismo */
+        ( myRole() == 'Admin'
+          && uid != request.auth.uid
+          && resource.data.role != 'Owner'
+          && !( "banned" in request.resource.data.diff(resource.data).affectedKeys() )
+          && (
+               !( "role" in request.resource.data.diff(resource.data).affectedKeys() )
+               || (
+                    isValidRole(request.resource.data.role)
+                    && !(request.resource.data.role in ['Admin','Owner'])
+                  )
+             )
+        );
+
+      allow delete: if isOwnerRole();
+    }
+  }
+}

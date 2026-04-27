@@ -1,0 +1,125 @@
+rules_version = '2';
+
+/* ============================================================================
+ *  BFT Demon List — Reglas de Firestore  (archivo V4)
+ *
+ *  CÓMO PUBLICAR:
+ *    1. Firebase Console → proyecto bufferteam-a95b3
+ *    2. Firestore Database → pestaña "Rules"
+ *    3. Borra TODO lo que haya y pega este archivo entero
+ *    4. Pulsa "Publish"
+ *
+ *  Cambios respecto a V3:
+ *    - Soporta el nuevo campo opcional `minPercent` en /levels (escritura libre
+ *      para staff; lectura pública).
+ *    - Mantiene explícitamente la posibilidad de que el staff escriba
+ *      `acceptedAt` (serverTimestamp) en /records al aceptar — necesario para
+ *      que la página level.html ordene los records al 100% por fecha de
+ *      aceptación más reciente arriba.
+ *    - Permite que el dueño de un record actualice su contenido (nuevo %, video,
+ *      mobile, mode2P, rawFootage, extraNotes, etc.) y vuelva a quedar como
+ *      Pending; el staff sigue moderando libremente y reseteando acceptedAt.
+ *
+ *  Lectura PÚBLICA (sin login):  levels, profiles, records, positionHistory
+ *  Escritura segura:
+ *    - profiles/{uid} : sólo el dueño (o staff)
+ *    - records        : el dueño crea/edita/elimina los suyos; staff modera
+ *    - levels         : sólo staff (Mod/Admin/Owner) — incluye minPercent
+ *    - users/{uid}    : sólo el dueño (sin tocar role/banned) o admin
+ * ========================================================================== */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ─── Helpers ───────────────────────────────────────────────── */
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isStaff() {
+      return isSignedIn() && role() in ['Mod','Admin','Owner'];
+    }
+    function isAdmin() {
+      return isSignedIn() && role() in ['Admin','Owner'];
+    }
+
+    /* ─── Perfiles públicos ─────────────────────────────────────── */
+    match /profiles/{uid} {
+      allow read:   if true;
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isStaff();
+      allow delete: if isAdmin();
+    }
+
+    /* ─── Niveles públicos ──────────────────────────────────────── *
+     *  Campos soportados (todos opcionales salvo name/position):
+     *    name, author, creators (array|string), thumbnail, background,
+     *    video, glow (bool), is2P (bool), description (string),
+     *    difficulty (string), minPercent (number 1-100, default 100),
+     *    tags (array), position (number), value (number).
+     *  Toda la escritura está limitada a staff.                      */
+    match /levels/{id} {
+      allow read:  if true;
+      allow write: if isStaff();
+    }
+
+    /* ─── Historial de posiciones (público, escribe staff) ─────── */
+    match /positionHistory/{id} {
+      allow read:  if true;
+      allow write: if isStaff();
+    }
+
+    /* ─── Records públicos ──────────────────────────────────────── *
+     *  Campos esperados:
+     *    userId (string, dueño), player2Id (string|null), levelId,
+     *    percent (1-100), video, video2, mobile, mobile2P,
+     *    mode2P ("same-device"|"separate"|null), rawFootage, extraNotes,
+     *    status ("Pending"|"Accepted"|"Rejected"),
+     *    createdAt, updatedAt, acceptedAt (serverTimestamp en aceptación).
+     *
+     *  El staff DEBE poder escribir `acceptedAt` al aceptar — sin esto,
+     *  la página level.html no puede ordenar los 100% por fecha.       */
+    match /records/{id} {
+      allow read: if true;
+
+      /* Crear: solo el propio usuario, en estado Pending */
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status   == "Pending";
+
+      /* Update:
+       *   - Staff: puede moderar libremente (incluye fijar acceptedAt
+       *            como serverTimestamp y resetear a null al rechazar /
+       *            volver a Pending).
+       *   - Dueño: puede editar SUS records siempre que no cambie userId
+       *            y vuelva a quedar como Pending. */
+      allow update: if isStaff()
+                    || (isOwner(resource.data.userId)
+                        && request.resource.data.userId == resource.data.userId
+                        && request.resource.data.status == "Pending");
+
+      /* Delete:
+       *   - Staff: siempre puede.
+       *   - Dueño: solo si el record NO está Accepted. */
+      allow delete: if isStaff()
+                    || (isOwner(resource.data.userId)
+                        && resource.data.status != "Accepted");
+    }
+
+    /* ─── Datos de usuario (rol, email, lastLogin) ─────────────── */
+    match /users/{uid} {
+      allow read:   if isOwner(uid) || isStaff();
+      allow create: if isOwner(uid);
+
+      /* El propio usuario puede actualizar su doc, pero no su 'role'
+       * ni el flag 'banned'. Solo Admin/Owner pueden cambiarlos. */
+      allow update: if (isOwner(uid)
+                        && !( "role"   in request.resource.data.diff(resource.data).affectedKeys() )
+                        && !( "banned" in request.resource.data.diff(resource.data).affectedKeys() ))
+                    || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+  }
+}
