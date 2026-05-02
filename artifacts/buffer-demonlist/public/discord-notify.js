@@ -1,5 +1,5 @@
 /* Helper que envía un mensaje (texto y/o embeds) a Discord a través del
-   endpoint del API server. Mantiene la URL del webhook en el servidor. */
+   endpoint serverless. Mantiene la URL del webhook en el servidor. */
 
 /**
  * @param {object|string} payload
@@ -18,7 +18,10 @@ export async function notifyDiscord(payload) {
       body: JSON.stringify(body),
     });
     if (!r.ok) {
-      console.warn("[discord] webhook devolvió", r.status);
+      const text = await r.text().catch(() => "");
+      console.warn("[discord] /api/discord/notify devolvió", r.status, "—", text.slice(0, 300));
+    } else {
+      console.log("[discord] notificación enviada correctamente", { target: body.target ?? "levels" });
     }
   } catch (e) {
     console.warn("[discord] fallo al notificar:", e);
