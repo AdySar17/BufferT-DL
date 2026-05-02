@@ -1,1 +1,6 @@
-{ "buildCommand": "npm run build", "installCommand": "npm ci --frozen-lockfile", "framework": "vite" }
+{
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci --frozen-lockfile",
+  "framework": "vite",
+  "outputDirectory": "dist/public"
+}
