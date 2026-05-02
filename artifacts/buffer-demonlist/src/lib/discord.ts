@@ -1,5 +1,5 @@
-import { Router, type IRouter } from "express";
-import { logger } from "../lib/logger";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { logger } from "./logger";
 
 const router: IRouter = Router();
 
@@ -13,7 +13,7 @@ const router: IRouter = Router();
  *
  * Las URLs viven en variables de entorno y NUNCA se envían al cliente.
  */
-router.post("/discord/notify", async (req, res) => {
+router.post("/discord/notify", async (req: Request, res: Response) => {
   const body = (req.body ?? {}) as {
     content?: unknown;
     embeds?: unknown;
@@ -27,7 +27,8 @@ router.post("/discord/notify", async (req, res) => {
   const url = process.env[envKey];
   if (!url) {
     logger.warn({ envKey }, "Webhook de Discord no configurado");
-    return res.status(503).json({ ok: false, error: "webhook_not_configured" });
+    res.status(503).json({ ok: false, error: "webhook_not_configured" });
+    return;
   }
 
   const rawContent = typeof body.content === "string"
@@ -36,7 +37,8 @@ router.post("/discord/notify", async (req, res) => {
   const embeds = Array.isArray(body.embeds) ? body.embeds.slice(0, 10) : undefined;
 
   if (!rawContent && !embeds) {
-    return res.status(400).json({ ok: false, error: "empty_payload" });
+    res.status(400).json({ ok: false, error: "empty_payload" });
+    return;
   }
 
   const payload: Record<string, unknown> = {
@@ -54,12 +56,13 @@ router.post("/discord/notify", async (req, res) => {
     if (!r.ok) {
       const text = await r.text().catch(() => "");
       logger.warn({ status: r.status, text, target }, "Discord webhook respondió con error");
-      return res.status(502).json({ ok: false, status: r.status });
+      res.status(502).json({ ok: false, status: r.status });
+      return;
     }
-    return res.json({ ok: true });
+    res.json({ ok: true });
   } catch (err) {
     logger.error({ err, target }, "Fallo al reenviar al webhook de Discord");
-    return res.status(500).json({ ok: false, error: "forward_failed" });
+    res.status(500).json({ ok: false, error: "forward_failed" });
   }
 });
 
