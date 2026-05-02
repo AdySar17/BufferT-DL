@@ -9,29 +9,29 @@ type DiscordNotifyBody = {
 };
 
 /**
- * Build the set of hostnames we allow Origin/Referer to come from.
- * We trust:
- *   - All entries in REPLIT_DOMAINS (the deployed/published domains)
- *   - The dev host itself (so the iframe preview works in development)
- *   - localhost (for local curl-style smoke tests in development only)
+ * Returns true if the hostname is trusted:
+ *   - *.vercel.app / vercel.app
+ *   - *.replit.app / *.repl.co  (Replit published + dev domains)
+ *   - Entries in APP_DOMAINS env var (comma-separated)
+ *   - localhost / 127.0.0.1 in non-production
  */
-function getAllowedHosts(): Set<string> {
-  const hosts = new Set<string>();
-  const domains = process.env["REPLIT_DOMAINS"];
-  if (domains) {
-    for (const d of domains.split(",")) {
-      const trimmed = d.trim();
-      if (trimmed) hosts.add(trimmed.toLowerCase());
-    }
-  }
-  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
-  if (devDomain) hosts.add(devDomain.toLowerCase());
+function isTrustedHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().split(":")[0] ?? "";
+  if (!h) return false;
+
+  if (h === "vercel.app" || h.endsWith(".vercel.app")) return true;
+  if (h.endsWith(".replit.app") || h.endsWith(".repl.co")) return true;
+
   if (process.env["NODE_ENV"] !== "production") {
-    hosts.add("localhost");
-    hosts.add("127.0.0.1");
-    hosts.add("0.0.0.0");
+    if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0") return true;
   }
-  return hosts;
+
+  const appDomains = process.env["APP_DOMAINS"] ?? "";
+  for (const d of appDomains.split(",")) {
+    if (d.trim().toLowerCase() === h) return true;
+  }
+
+  return false;
 }
 
 function hostFromUrl(value: string | undefined): string | null {
@@ -43,44 +43,33 @@ function hostFromUrl(value: string | undefined): string | null {
   }
 }
 
-function isSameOrigin(req: Request): boolean {
-  const allowed = getAllowedHosts();
-  if (allowed.size === 0) {
-    // No allowlist configured -> fail closed in production, open in dev.
-    return process.env["NODE_ENV"] !== "production";
-  }
+function isAllowedOrigin(req: Request): boolean {
   const originHost = hostFromUrl(req.get("origin") ?? undefined);
   const refererHost = hostFromUrl(req.get("referer") ?? undefined);
-
-  // Strip the optional :port suffix from a Host header before comparing.
   const hostHeader = (req.get("host") ?? "").split(":")[0]?.toLowerCase() ?? "";
 
-  if (originHost && allowed.has(originHost)) return true;
-  if (refererHost && allowed.has(refererHost)) return true;
-
-  // If neither Origin nor Referer were sent, accept only when the request
-  // arrived through one of our allowed hosts (i.e. via the shared proxy).
-  if (!originHost && !refererHost && hostHeader && allowed.has(hostHeader)) {
-    return true;
-  }
-  return false;
+  if (originHost) return isTrustedHost(originHost);
+  if (refererHost) return isTrustedHost(refererHost);
+  if (hostHeader) return isTrustedHost(hostHeader);
+  return process.env["NODE_ENV"] !== "production";
 }
 
 /**
  * Tiny in-memory token bucket per IP. Resets each window.
  * 30 requests / minute / IP is plenty for the panel UI and well below
- * Discord's own webhook rate limits, so abuse is bounded.
+ * Discord's own webhook rate limits.
  */
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 30;
 const ipHits = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimit(req: Request): { ok: boolean; retryAfter?: number } {
-  const ip =
-    (req.ip ||
-      (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress ||
-      "unknown").toString();
+  const ip = (
+    req.ip ||
+    (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    "unknown"
+  ).toString();
   const now = Date.now();
   const entry = ipHits.get(ip);
   if (!entry || entry.resetAt <= now) {
@@ -94,7 +83,6 @@ function rateLimit(req: Request): { ok: boolean; retryAfter?: number } {
   return { ok: true };
 }
 
-// Periodic cleanup so the map doesn't grow unbounded.
 setInterval(() => {
   const now = Date.now();
   for (const [ip, entry] of ipHits) {
@@ -103,13 +91,9 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW_MS).unref?.();
 
 router.post("/discord/notify", async (req: Request, res: Response) => {
-  if (!isSameOrigin(req)) {
+  if (!isAllowedOrigin(req)) {
     req.log.warn(
-      {
-        origin: req.get("origin"),
-        referer: req.get("referer"),
-        host: req.get("host"),
-      },
+      { origin: req.get("origin"), referer: req.get("referer"), host: req.get("host") },
       "Rejected Discord notify from disallowed origin",
     );
     res.status(403).json({ ok: false, error: "Forbidden origin" });
@@ -128,18 +112,12 @@ router.post("/discord/notify", async (req: Request, res: Response) => {
 
   const webhookUrl =
     target === "records"
-      ? process.env["DISCORD_WEBHOOKRECORDS_URL"] ||
-        process.env["DISCORD_WEBHOOK_URL"]
+      ? process.env["DISCORD_WEBHOOKRECORDS_URL"] || process.env["DISCORD_WEBHOOK_URL"]
       : process.env["DISCORD_WEBHOOK_URL"];
 
   if (!webhookUrl) {
-    req.log.warn(
-      { target },
-      "Discord webhook not configured; dropping notification",
-    );
-    res
-      .status(503)
-      .json({ ok: false, error: "Discord webhook not configured" });
+    req.log.warn({ target }, "Discord webhook not configured; dropping notification");
+    res.status(503).json({ ok: false, error: "Discord webhook not configured" });
     return;
   }
 
@@ -151,9 +129,7 @@ router.post("/discord/notify", async (req: Request, res: Response) => {
       : undefined;
 
   if (!content && !embeds) {
-    res
-      .status(400)
-      .json({ ok: false, error: "Either content or embeds is required" });
+    res.status(400).json({ ok: false, error: "Either content or embeds is required" });
     return;
   }
 
@@ -174,21 +150,17 @@ router.post("/discord/notify", async (req: Request, res: Response) => {
         { status: response.status, target, body: text.slice(0, 500) },
         "Discord webhook returned non-2xx",
       );
-      res
-        .status(502)
-        .json({
-          ok: false,
-          error: `Discord webhook responded with ${response.status}`,
-        });
+      res.status(502).json({
+        ok: false,
+        error: `Discord webhook responded with ${response.status}`,
+      });
       return;
     }
 
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err, target }, "Failed to forward Discord notification");
-    res
-      .status(502)
-      .json({ ok: false, error: "Failed to forward notification to Discord" });
+    res.status(502).json({ ok: false, error: "Failed to forward notification to Discord" });
   }
 });
 
