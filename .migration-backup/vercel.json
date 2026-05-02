@@ -1,5 +1,5 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm ci --frozen-lockfile",
+  "installCommand": "npm ci",
   "outputDirectory": "dist/public"
 }
