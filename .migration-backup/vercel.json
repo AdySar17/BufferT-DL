@@ -1,4 +1,4 @@
 {
   "buildCommand": "cd buffer-demonlist && npm install && npm run build",
-  "outputDirectory": "buffer-demonlist/dist/public"
+  "outputDirectory": "buffer-demonlist/dist"
 }
