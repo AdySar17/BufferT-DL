@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "bash"]
+modules = ["nodejs-24"]
 
 [deployment]
 router = "application"
@@ -25,36 +25,8 @@ externalPort = 8080
 
 [[ports]]
 localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 21611
 externalPort = 80
-
-[[ports]]
-localPort = 8082
-externalPort = 3001
-
-[[ports]]
-localPort = 8083
-externalPort = 3003
-
-[[ports]]
-localPort = 8084
-externalPort = 4200
-
-[[ports]]
-localPort = 22333
-externalPort = 3000
-
-[[ports]]
-localPort = 22334
-externalPort = 3002
-
-[[ports]]
-localPort = 22335
-externalPort = 5000
-
-[[ports]]
-localPort = 22336
-externalPort = 5173
-
-[nix]
-packages = ["zip"]
-channel = "stable-25_05"
