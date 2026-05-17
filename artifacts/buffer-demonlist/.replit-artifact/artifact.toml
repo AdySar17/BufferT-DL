@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "BufferTeam Demon List"
+version = "1.0.0"
+id = "artifacts/buffer-demonlist"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21611
+
+[services.development]
+run = "pnpm --filter @workspace/buffer-demonlist run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/buffer-demonlist", "run", "build" ]
+publicDir = "artifacts/buffer-demonlist/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21611"
+BASE_PATH = "/"
