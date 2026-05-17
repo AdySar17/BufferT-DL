@@ -187,6 +187,50 @@ function useLiveData() {
   return { stats, top10, records, loading };
 }
 
+/* ─── Tipo Changelog ─── */
+type ChangelogEntry = {
+  id: string;
+  type: "NEW" | "MOVED";
+  levelId: string;
+  levelName: string;
+  newPosition: number;
+  oldPosition: number | null;
+  createdAt?: any;
+};
+
+/* ─── Hook que carga los últimos 5 eventos del changelog ─── */
+function useChangelog() {
+  const [entries, setEntries] = useState<ChangelogEntry[]>([]);
+  const [loadingCl, setLoadingCl] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
+        const auth = await dynImport("/auth.js");
+        const fs   = await dynImport("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        const { db } = auth as any;
+        const { collection, query, orderBy, limit, getDocs } = fs as any;
+
+        const snap = await getDocs(
+          query(collection(db, "changelog"), orderBy("createdAt", "desc"), limit(5))
+        );
+        const rows: ChangelogEntry[] = [];
+        snap.forEach((d: any) => rows.push({ id: d.id, ...d.data() }));
+        if (!cancelled) setEntries(rows);
+      } catch (e) {
+        console.warn("[home] changelog load failed:", e);
+      } finally {
+        if (!cancelled) setLoadingCl(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { entries, loadingCl };
+}
+
 /* ─── Helpers ─── */
 function timeAgo(ts: any): string {
   if (!ts) return "";
@@ -228,6 +272,7 @@ const HEADER_STYLE: React.CSSProperties = {
 export default function Home() {
   useAuthWidget();
   const { stats, top10, records, loading } = useLiveData();
+  const { entries: changelogEntries, loadingCl } = useChangelog();
 
   /* Inyectar fuente Montserrat (como hace demonlist.html) */
   useEffect(() => {
@@ -396,6 +441,114 @@ export default function Home() {
           <a href="/submit.html" style={btnSecondary}>
             Enviar Record
           </a>
+        </div>
+      </section>
+
+      {/* ───────── CHANGELOG ───────── */}
+      <section
+        style={{
+          maxWidth: 1100,
+          margin: "40px auto 0",
+          padding: "0 20px",
+        }}
+      >
+        <SectionTitle>Últimos cambios en la lista</SectionTitle>
+
+        {loadingCl && (
+          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
+            Cargando…
+          </p>
+        )}
+
+        {!loadingCl && changelogEntries.length === 0 && (
+          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "0.9rem" }}>
+            Aún no hay cambios registrados.
+          </p>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {changelogEntries.map((entry) => {
+            const isNew = entry.type === "NEW";
+            return (
+              <a
+                key={entry.id}
+                href={`/level.html?id=${entry.levelId}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  background: "rgba(15,25,15,0.75)",
+                  border: `1px solid ${isNew ? "rgba(124,252,0,0.22)" : "rgba(199,255,59,0.18)"}`,
+                  borderRadius: 12,
+                  padding: "12px 16px",
+                  textDecoration: "none",
+                  color: "inherit",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = isNew
+                    ? "rgba(124,252,0,0.5)"
+                    : "rgba(199,255,59,0.45)";
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 0 14px rgba(124,252,0,0.18)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.borderColor = isNew
+                    ? "rgba(124,252,0,0.22)"
+                    : "rgba(199,255,59,0.18)";
+                  (e.currentTarget as HTMLAnchorElement).style.boxShadow = "";
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: isNew
+                      ? "linear-gradient(135deg,#1a4d1a,#7cfc00)"
+                      : "linear-gradient(135deg,#2a2a00,#c7ff3b)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1rem",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isNew ? "★" : "↕"}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {entry.levelName}
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.6)", marginTop: 2 }}>
+                    {isNew
+                      ? `Añadido en #${entry.newPosition}`
+                      : `Movido de #${entry.oldPosition ?? "?"} → #${entry.newPosition}`}
+                    {" · "}{timeAgo(entry.createdAt)}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                    color: isNew ? "#7cfc00" : "#c7ff3b",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isNew ? "NUEVO" : "MOVIDO"}
+                </div>
+              </a>
+            );
+          })}
         </div>
       </section>
 

@@ -812,11 +812,17 @@
     import { difficultyImage } from "/difficulty.js";
     import {
       collection, getDocs, addDoc, deleteDoc, doc, updateDoc,
-      writeBatch, serverTimestamp
+      writeBatch, serverTimestamp, query, orderBy, limit, startAfter
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    /* Cache local de la lista ordenada (lo último cargado de Firestore) */
-    let nivelesActuales = [];
+    /* ── PAGINACIÓN ─────────────────────────────────────────────── */
+    const PAGE_SIZE    = 150;
+    let nivelesActuales = [];   // niveles ya cargados en el DOM (crece con scroll)
+    let lastDoc         = null; // cursor Firestore para siguiente página
+    let hasMore         = true; // ¿quedan más niveles en Firestore?
+    let loadingMore     = false;
+    let allLevelsCache  = null; // caché completa (carga perezosa, para búsqueda)
+    let searchMode      = false;
 
     /* ========== HELPERS DE REORGANIZACIÓN ========== */
 
@@ -874,17 +880,100 @@
       return updates;
     }
 
-    /* ========== CARGAR NIVELES ========== */
+    /* ── FETCH COMPLETO (búsqueda + operaciones admin) ─────────── */
+    async function fetchAllLevels() {
+      const snap = await getDocs(
+        query(collection(db, "levels"), orderBy("position", "asc"))
+      );
+      const all = [];
+      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      return all;
+    }
+
+    /* ── CREAR TARJETA ─────────────────────────────────────────── */
+    function crearCard(nivel) {
+      const pos  = Number(nivel.position) || 1;
+      const card = document.createElement("div");
+      card.className = "level-card " + (nivel.glow || "");
+      card.style.backgroundImage = nivel.background ? `url('${nivel.background}')` : "";
+
+      card.innerHTML = `
+        <div class="card-admin">
+          <button class="btn-edit"   data-id="${nivel.id}">Editar</button>
+          <button class="btn-delete" data-id="${nivel.id}" data-name="${nivel.name}">Eliminar</button>
+        </div>
+        <a href="${nivel.video || '#'}" target="_blank" style="z-index:2;position:relative;">
+          <img class="level-thumbnail" src="${nivel.thumbnail || ''}" alt="${nivel.name}">
+        </a>
+        <div class="level-content">
+          <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Extreme Demon'}">
+          <div class="level-info">
+            <div class="level-title">#${pos} - ${nivel.name}</div>
+            <div class="level-author">By ${nivel.author} · ${nivel.value || computePoints(pos)} pts</div>
+            <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
+          </div>
+        </div>
+      `;
+
+      card.querySelector(".level-button").addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        window.location.href = `/level.html?id=${nivel.id}`;
+      });
+      card.querySelector(".btn-edit").addEventListener("click", (e) => {
+        e.stopPropagation(); abrirEdicion(nivel);
+      });
+      card.querySelector(".btn-delete").addEventListener("click", (e) => {
+        e.stopPropagation(); abrirConfirmar(nivel.id, nivel.name);
+      });
+      return card;
+    }
+
+    /* ── SENTINEL para infinite scroll ─────────────────────────── */
+    function getSentinel() {
+      let s = document.getElementById("scroll-sentinel");
+      if (!s) {
+        s = document.createElement("div");
+        s.id = "scroll-sentinel";
+        s.style.cssText = "height:1px;width:100%;margin-top:12px;";
+        document.getElementById("levelContainer").insertAdjacentElement("afterend", s);
+      }
+      return s;
+    }
+
+    let _observer = null;
+    function setupObserver() {
+      if (_observer) _observer.disconnect();
+      _observer = new IntersectionObserver(async (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !searchMode) {
+          await cargarMas();
+        }
+      }, { rootMargin: "250px" });
+      _observer.observe(getSentinel());
+    }
+
+    /* ── CARGAR PRIMERA PÁGINA ──────────────────────────────────── */
     async function cargarNiveles() {
       const container  = document.getElementById("levelContainer");
       const loadingMsg = document.getElementById("loadingMsg");
+      nivelesActuales = [];
+      lastDoc         = null;
+      hasMore         = true;
+      allLevelsCache  = null;
+      searchMode      = false;
 
       try {
-        const snapshot = await getDocs(collection(db, "levels"));
-        let niveles = [];
-        snapshot.forEach(docSnap => niveles.push({ id: docSnap.id, ...docSnap.data() }));
-        niveles = ordenarNiveles(niveles);
+        const q = query(
+          collection(db, "levels"),
+          orderBy("position", "asc"),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        const niveles = [];
+        snap.forEach(d => niveles.push({ id: d.id, ...d.data() }));
+
         nivelesActuales = niveles;
+        lastDoc  = snap.docs[snap.docs.length - 1] || null;
+        hasMore  = snap.size === PAGE_SIZE;
 
         loadingMsg.style.display = "none";
         container.innerHTML = "";
@@ -895,53 +984,8 @@
           return;
         }
 
-        niveles.forEach((nivel, index) => {
-          const pos  = Number(nivel.position) || (index + 1);
-          const card = document.createElement("div");
-          card.className = "level-card " + (nivel.glow || "");
-          card.style.backgroundImage = nivel.background ? `url('${nivel.background}')` : "";
-
-          card.innerHTML = `
-            <div class="card-admin">
-              <button class="btn-edit"   data-id="${nivel.id}">Editar</button>
-              <button class="btn-delete" data-id="${nivel.id}" data-name="${nivel.name}">Eliminar</button>
-            </div>
-
-            <a href="${nivel.video || '#'}" target="_blank" style="z-index:2;position:relative;">
-              <img class="level-thumbnail" src="${nivel.thumbnail || ''}" alt="${nivel.name}">
-            </a>
-
-            <div class="level-content">
-              <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Extreme Demon'}">
-              <div class="level-info">
-                <div class="level-title">#${pos} - ${nivel.name}</div>
-                <div class="level-author">By ${nivel.author} · ${nivel.value || computePoints(pos)} pts</div>
-                <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
-              </div>
-            </div>
-          `;
-
-          /* Ver nivel */
-          card.querySelector(".level-button").addEventListener("click", (e) => {
-            e.preventDefault(); e.stopPropagation();
-            window.location.href = `/level.html?id=${nivel.id}`;
-          });
-
-          /* Editar */
-          card.querySelector(".btn-edit").addEventListener("click", (e) => {
-            e.stopPropagation();
-            abrirEdicion(nivel);
-          });
-
-          /* Eliminar */
-          card.querySelector(".btn-delete").addEventListener("click", (e) => {
-            e.stopPropagation();
-            abrirConfirmar(nivel.id, nivel.name);
-          });
-
-          container.appendChild(card);
-        });
-
+        niveles.forEach(nivel => container.appendChild(crearCard(nivel)));
+        setupObserver();
         aplicarBuscador();
       } catch (err) {
         loadingMsg.textContent = "Error al cargar: " + err.message;
@@ -949,6 +993,88 @@
         console.error(err);
       }
     }
+
+    /* ── CARGAR MÁS (infinite scroll) ──────────────────────────── */
+    async function cargarMas() {
+      if (!hasMore || loadingMore || !lastDoc) return;
+      loadingMore = true;
+      const sentinel = getSentinel();
+      sentinel.textContent = "Cargando más niveles…";
+      sentinel.style.cssText = "padding:14px;text-align:center;color:rgba(255,255,255,0.5);font-family:Montserrat,sans-serif;";
+
+      try {
+        const q = query(
+          collection(db, "levels"),
+          orderBy("position", "asc"),
+          startAfter(lastDoc),
+          limit(PAGE_SIZE)
+        );
+        const snap = await getDocs(q);
+        const nuevos = [];
+        snap.forEach(d => nuevos.push({ id: d.id, ...d.data() }));
+
+        nivelesActuales = [...nivelesActuales, ...nuevos];
+        lastDoc  = snap.docs[snap.docs.length - 1] || lastDoc;
+        hasMore  = snap.size === PAGE_SIZE;
+
+        const container = document.getElementById("levelContainer");
+        nuevos.forEach(nivel => container.appendChild(crearCard(nivel)));
+      } catch (err) {
+        console.error("[demonlist] cargarMas error:", err);
+      } finally {
+        loadingMore = false;
+        sentinel.textContent = "";
+        sentinel.style.cssText = "height:1px;width:100%;margin-top:12px;";
+      }
+    }
+
+    /* ── BUSCADOR ─────────────────────────────────────────────── */
+    function aplicarBuscador() {
+      const bar = document.getElementById("searchBar");
+      if (bar._searchHandler) bar.removeEventListener("input", bar._searchHandler);
+
+      bar._searchHandler = async () => {
+        const term = bar.value.toLowerCase().trim();
+
+        if (!term) {
+          searchMode = false;
+          if (_observer) _observer.disconnect();
+          const container = document.getElementById("levelContainer");
+          container.innerHTML = "";
+          nivelesActuales.forEach(nivel => container.appendChild(crearCard(nivel)));
+          setupObserver();
+          return;
+        }
+
+        searchMode = true;
+        if (_observer) _observer.disconnect();
+
+        if (!allLevelsCache) {
+          const prev = bar.placeholder;
+          bar.placeholder = "Cargando lista completa…";
+          try {
+            allLevelsCache = await fetchAllLevels();
+          } catch (e) {
+            console.error("[search] fetchAllLevels error:", e);
+            allLevelsCache = [...nivelesActuales];
+          }
+          bar.placeholder = prev;
+        }
+
+        const filtrados = allLevelsCache.filter(lv => {
+          const t = (lv.name   || "").toLowerCase();
+          const a = (lv.author || "").toLowerCase();
+          return t.includes(term) || a.includes(term);
+        });
+
+        const container = document.getElementById("levelContainer");
+        container.innerHTML = "";
+        filtrados.forEach(nivel => container.appendChild(crearCard(nivel)));
+      };
+
+      bar.addEventListener("input", bar._searchHandler);
+    }
+    window.aplicarBuscador = aplicarBuscador;
 
     /* ---- utilidad: poner botón en modo ocupado / libre ---- */
     function setBusy(btn, busy, labelNormal) {
@@ -962,15 +1088,30 @@
       }
     }
 
-    /* ========== HISTORIAL ========== */
+    /* ── HISTORIAL DE POSICIONES ────────────────────────────────── */
     async function logHistory(entries) {
-      /* entries = [{ levelId, oldPosition, newPosition, change, reason }] */
       await Promise.all(entries.map(e =>
         addDoc(collection(db, "positionHistory"), {
           ...e,
           createdAt: serverTimestamp()
         })
       ));
+    }
+
+    /* ── CHANGELOG (solo NEW + movimientos manuales) ────────────── */
+    async function logChangelog(type, levelId, levelName, newPosition, oldPosition) {
+      try {
+        await addDoc(collection(db, "changelog"), {
+          type,
+          levelId,
+          levelName,
+          newPosition,
+          oldPosition: oldPosition ?? null,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn("[changelog] write failed:", e);
+      }
     }
 
     /* Preview de puntos en vivo cuando se escribe la posición */
@@ -1021,9 +1162,10 @@
 
       setBusy(btn, true);
       try {
-        /* 1. Insertar el nuevo nivel temporal en memoria, en la posición pedida */
-        const originalById = new Map(nivelesActuales.map(l => [l.id, { position: l.position, value: l.value }]));
-        const ordered      = ordenarNiveles(nivelesActuales);
+        /* Siempre trabajamos con la lista completa para garantizar coherencia */
+        const allLvls      = await fetchAllLevels();
+        const originalById = new Map(allLvls.map(l => [l.id, { position: l.position, value: l.value }]));
+        const ordered      = ordenarNiveles(allLvls);
         const insertAt     = Math.min(reqPos, ordered.length + 1);
         const placeholder  = { id: "__NEW__", name, author };
         ordered.splice(insertAt - 1, 0, placeholder);
@@ -1060,6 +1202,7 @@
           });
         });
         await logHistory(history);
+        await logChangelog("NEW", newRef.id, name, newPos, null);
 
         cerrarModal("formModal");
         cargarNiveles();
@@ -1135,7 +1278,9 @@
 
       setBusy(btn, true);
       try {
-        const original = nivelesActuales.find(l => l.id === id);
+        /* Siempre trabajamos con la lista completa */
+        const allLvls  = await fetchAllLevels();
+        const original = allLvls.find(l => l.id === id);
         const oldPos   = Number(original && original.position) || null;
         const positionChanged = oldPos !== reqPos;
 
@@ -1153,8 +1298,8 @@
         }
 
         /* 2. Cambia posición → reorganizar todos */
-        const originalById = new Map(nivelesActuales.map(l => [l.id, { position: l.position, value: l.value }]));
-        const ordered      = ordenarNiveles(nivelesActuales).filter(l => l.id !== id);
+        const originalById = new Map(allLvls.map(l => [l.id, { position: l.position, value: l.value }]));
+        const ordered      = ordenarNiveles(allLvls).filter(l => l.id !== id);
         const insertAt     = Math.min(reqPos, ordered.length + 1);
         const movingLevel  = { ...original, name, author };
         ordered.splice(insertAt - 1, 0, movingLevel);
@@ -1188,6 +1333,7 @@
           });
         });
         await logHistory(history);
+        await logChangelog("MOVED", id, name, insertAt, oldPos);
 
         /* Aviso al webhook de Discord — vecinos en el orden ya reordenado.
              "por encima de" = top con número MAYOR (más fácil),
@@ -1239,7 +1385,9 @@
 
       setBusy(btn, true);
       try {
-        const removed     = nivelesActuales.find(l => l.id === id);
+        /* Fetch completo para garantizar coherencia en el reorder */
+        const allLvls     = await fetchAllLevels();
+        const removed     = allLvls.find(l => l.id === id);
         const removedPos  = Number(removed && removed.position) || null;
         const removedName = (removed && removed.name) || "?";
 
@@ -1256,9 +1404,9 @@
         await deleteDoc(doc(db, "levels", id));
 
         /* 2. Reordenar el resto y persistir */
-        const originalById = new Map(nivelesActuales.filter(l => l.id !== id)
+        const originalById = new Map(allLvls.filter(l => l.id !== id)
           .map(l => [l.id, { position: l.position, value: l.value }]));
-        const ordered      = ordenarNiveles(nivelesActuales).filter(l => l.id !== id);
+        const ordered      = ordenarNiveles(allLvls).filter(l => l.id !== id);
         const updates      = diffReorder(originalById, ordered);
         await commitInChunks(updates);
 
@@ -1402,19 +1550,6 @@
     }
     window.toggleMenu = toggleMenu;
 
-    /* BUSCADOR */
-    function aplicarBuscador() {
-      const bar = document.getElementById("searchBar");
-      bar.addEventListener("input", () => {
-        const f = bar.value.toLowerCase();
-        document.querySelectorAll(".level-card").forEach(card => {
-          const t = card.querySelector(".level-title")?.textContent.toLowerCase()  || "";
-          const a = card.querySelector(".level-author")?.textContent.toLowerCase() || "";
-          card.style.display = (t.includes(f) || a.includes(f)) ? "flex" : "none";
-        });
-      });
-    }
-    window.aplicarBuscador = aplicarBuscador;
   </script>
 
 </body>
