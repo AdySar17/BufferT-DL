@@ -488,8 +488,8 @@
   /* ── Cuerpo colapsable ── */
   .hist-body {
     overflow: hidden;
-    transition: max-height .3s ease, opacity .25s ease;
-    max-height: 2000px;
+    transition: max-height .35s ease, opacity .25s ease;
+    /* max-height is set dynamically by JS so content is never clipped */
     opacity: 1;
   }
   .hist-collapsed {
@@ -971,13 +971,27 @@
   histToggle.addEventListener("click", () => {
     const isOpen = !histBody.classList.contains("hist-collapsed");
     if (isOpen) {
-      histBody.classList.add("hist-collapsed");
+      /* Collapse: pin current height first, then animate to 0 */
+      histBody.style.maxHeight = histBody.scrollHeight + "px";
+      requestAnimationFrame(() => {
+        histBody.classList.add("hist-collapsed");
+        histBody.style.maxHeight = "";
+      });
       histArrow.classList.remove("open");
       histToggle.setAttribute("aria-expanded", "false");
     } else {
+      /* Expand: remove collapsed, animate to real content height */
       histBody.classList.remove("hist-collapsed");
+      histBody.style.maxHeight = histBody.scrollHeight + "px";
       histArrow.classList.add("open");
       histToggle.setAttribute("aria-expanded", "true");
+      /* After animation, lift the cap so dynamic content never gets clipped */
+      histBody.addEventListener("transitionend", function onEnd() {
+        if (!histBody.classList.contains("hist-collapsed")) {
+          histBody.style.maxHeight = "none";
+        }
+        histBody.removeEventListener("transitionend", onEnd);
+      });
     }
   });
   histToggle.addEventListener("keydown", e => {
