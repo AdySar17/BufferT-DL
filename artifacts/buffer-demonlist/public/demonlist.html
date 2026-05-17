@@ -1283,6 +1283,9 @@
         nivel.position
           ? `Puntos automáticos: ${computePoints(nivel.position)} (posición #${nivel.position})`
           : "Puntos automáticos: —";
+      /* Aplicar bloqueo de min% según la posición actual */
+      document.getElementById("edit-position").dispatchEvent(new Event("input"));
+
       document.getElementById("editModal").classList.add("open");
     };
 
