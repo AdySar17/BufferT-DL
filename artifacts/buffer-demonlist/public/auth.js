@@ -497,6 +497,8 @@ function escapeHtml(s) {
     .admin-only { display: none !important; }
     body.is-staff .staff-only { display: revert !important; }
     body.is-admin .admin-only { display: revert !important; }
+    .owner-only { display: none !important; }
+    body.is-owner .owner-only { display: revert !important; }
 
     @media (max-width:680px){
       .auth-menu { width:230px; right:-8px; }

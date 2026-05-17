@@ -47,8 +47,8 @@ service cloud.firestore {
 
     // ── /users/{uid} ────────────────────────────────────────────
     match /users/{uid} {
-      // Lectura: el propio usuario o cualquier staff
-      allow read: if isOwnerOf(uid) || isStaff();
+      // Lectura: cualquier usuario autenticado (permite listar staff en home/control)
+      allow read: if isAuth();
 
       // Creación: solo el propio usuario
       allow create: if isOwnerOf(uid);

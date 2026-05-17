@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Control Staff – BFT Demon List</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Montserrat', sans-serif;
+      color: #fff;
+      background: black url('https://iili.io/BrsOUyG.jpg') repeat top left fixed;
+      background-size: auto;
+      padding-top: 70px;
+    }
+
+    /* ── Header ── */
+    .top-header {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 15px; z-index: 9999;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+    }
+    .left { display: flex; align-items: center; gap: 10px; }
+    .logo-img { width: 38px; height: 38px; }
+    .logo-text { color: white; font-weight: bold; font-size: 1.1rem; }
+    .nav-links { display: flex; gap: 15px; align-items: center; }
+    .nav-links a { color: white; text-decoration: none; font-size: 0.95rem; font-family: 'Montserrat', sans-serif; }
+    .nav-links a:hover { color: #7cfc00; }
+    .menu-toggle {
+      display: none; font-size: 28px; color: white;
+      width: 40px; height: 40px;
+      align-items: center; justify-content: center;
+      cursor: pointer; user-select: none;
+    }
+    .auth-slot { display: flex; align-items: center; }
+
+    @media (max-width: 768px) {
+      .menu-toggle { display: flex; }
+      .nav-links {
+        display: none; flex-direction: column;
+        position: absolute; top: 60px; right: 10px;
+        background: rgba(0,0,0,0.92);
+        padding: 10px; border-radius: 10px; gap: 8px;
+        min-width: 180px;
+      }
+      .nav-links.open { display: flex; }
+    }
+
+    /* ── Page ── */
+    .page-wrap {
+      max-width: 1100px; margin: 0 auto; padding: 30px 20px 70px;
+    }
+    .page-title {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 900; margin-bottom: 6px;
+      background: linear-gradient(135deg,#7fff3b,#ffd700);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-subtitle {
+      color: rgba(255,255,255,0.5); font-size: 0.88rem; margin-bottom: 28px;
+    }
+
+    /* ── State messages ── */
+    .state-msg {
+      text-align: center; padding: 60px 20px;
+      color: rgba(255,255,255,0.55); font-size: 1rem;
+    }
+    .state-msg.error { color: #ff9a9a; }
+
+    /* ── Sort bar ── */
+    .sort-bar {
+      display: flex; gap: 8px; margin-bottom: 22px;
+      flex-wrap: wrap; align-items: center;
+    }
+    .sort-label {
+      font-size: 0.78rem; color: rgba(255,255,255,0.45);
+      margin-right: 2px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .sort-btn {
+      padding: 5px 13px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: transparent; color: rgba(255,255,255,0.55);
+      font-family: 'Montserrat', sans-serif; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; transition: all 0.18s;
+    }
+    .sort-btn.active {
+      background: rgba(124,252,0,0.14);
+      border-color: rgba(124,252,0,0.4); color: #c7ff3b;
+    }
+    .sort-btn:hover { border-color: rgba(124,252,0,0.28); color: #c7ff3b; }
+
+    /* ── Grid ── */
+    .staff-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 18px;
+    }
+
+    /* ── Card ── */
+    .sc-card {
+      background: rgba(8,16,8,0.88);
+      border: 1px solid rgba(124,252,0,0.12);
+      border-radius: 18px; padding: 20px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .sc-card:hover {
+      border-color: rgba(124,252,0,0.32);
+      box-shadow: 0 0 22px rgba(124,252,0,0.08);
+    }
+
+    /* Card top row: avatar + name/role */
+    .sc-card-top { margin-bottom: 16px; }
+    .sc-profile-link {
+      display: flex; align-items: center; gap: 14px;
+      text-decoration: none; color: inherit;
+      transition: opacity 0.2s;
+    }
+    .sc-profile-link:hover { opacity: 0.85; }
+    .sc-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      object-fit: cover; flex-shrink: 0;
+      border: 2px solid rgba(199,255,59,0.45);
+    }
+    .sc-avatar-fb {
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg,#1a4d1a,#7fff3b);
+      color: #000; font-weight: 800; font-size: 1rem;
+    }
+    .sc-info { min-width: 0; flex: 1; }
+    .sc-name {
+      font-weight: 700; font-size: 1rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sc-rank {
+      display: inline-block; margin-top: 5px;
+      padding: 2px 9px; border-radius: 999px;
+      font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .sc-rank.owner { background: linear-gradient(90deg,#7fff3b,#ffd700); color: #0a1a00; }
+    .sc-rank.admin { background: rgba(199,255,59,0.18); color: #c7ff3b; }
+    .sc-rank.mod   { background: rgba(0,180,255,0.18);  color: #7fd8ff; }
+
+    /* Stats */
+    .sc-stats {
+      display: flex; gap: 8px; margin-bottom: 14px;
+    }
+    .sc-stat {
+      flex: 1; text-align: center;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px; padding: 10px 4px;
+    }
+    .sc-stat-val {
+      font-size: 1.5rem; font-weight: 900;
+      color: #c7ff3b; line-height: 1;
+    }
+    .sc-stat-val.zero { color: rgba(255,255,255,0.3); }
+    .sc-stat-lbl {
+      font-size: 0.62rem; color: rgba(255,255,255,0.45);
+      margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* Last review */
+    .sc-last {
+      font-size: 0.78rem; color: rgba(255,255,255,0.5);
+      margin-bottom: 14px;
+    }
+    .sc-last strong { color: rgba(255,255,255,0.82); }
+
+    /* History */
+    .sc-history-title {
+      font-size: 0.66rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: rgba(255,255,255,0.3); margin-bottom: 7px;
+    }
+    .sc-history { display: flex; flex-direction: column; gap: 4px; }
+    .review-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.78rem; color: rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px; padding: 6px 10px;
+    }
+    .review-status { font-weight: 800; font-size: 0.82rem; flex-shrink: 0; }
+    .review-status.acc { color: #7cfc00; }
+    .review-status.rej { color: #ff6b6b; }
+    .review-level {
+      flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .review-date {
+      color: rgba(255,255,255,0.38); font-size: 0.7rem; flex-shrink: 0;
+    }
+    .review-empty {
+      font-size: 0.78rem; color: rgba(255,255,255,0.28); font-style: italic;
+      padding: 4px 0;
+    }
+
+    /* Loading spinner */
+    .spinner-wrap {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 50px 0; color: rgba(255,255,255,0.5); font-size: 0.9rem;
+    }
+    .spinner {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(199,255,59,0.2);
+      border-top-color: #c7ff3b;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header class="top-header">
+    <div class="left">
+      <img src="https://iili.io/BN3Yhpp.png" class="logo-img" alt="Logo">
+      <div class="logo-text">BFT Demon List</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <nav class="nav-links" id="navLinks">
+        <a href="/">Home</a>
+        <a href="/demonlist.html">Demon List</a>
+        <a href="/leaderboards.html">Leaderboards</a>
+        <a href="/notifications.html">✉ Notificaciones</a>
+        <a href="/submit.html">Enviar Record</a>
+        <a href="/guidelines.html">Guidelines</a>
+        <a href="/panel.html" class="staff-only">Panel de Records</a>
+        <a href="/staff-control.html" class="owner-only">Control Staff</a>
+      </nav>
+      <div class="auth-slot" id="authSlot"></div>
+      <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
+    </div>
+  </header>
+
+  <div class="page-wrap">
+    <h1 class="page-title">⚙ Control Staff</h1>
+    <p class="page-subtitle">Actividad y métricas del equipo de moderación — solo visible para Owners.</p>
+
+    <div id="stateMsg" class="state-msg">
+      <div class="spinner-wrap"><div class="spinner"></div> Verificando permisos…</div>
+    </div>
+
+    <div id="mainContent" style="display:none;">
+      <div class="sort-bar">
+        <span class="sort-label">Ordenar por:</span>
+        <button class="sort-btn active" onclick="sortStaff('total')">Total revisados</button>
+        <button class="sort-btn" onclick="sortStaff('accepted')">Aceptados</button>
+        <button class="sort-btn" onclick="sortStaff('recent')">Más reciente</button>
+        <button class="sort-btn" onclick="sortStaff('role')">Rango</button>
+      </div>
+      <div class="staff-grid" id="staffGrid">
+        <div class="spinner-wrap"><div class="spinner"></div> Cargando datos…</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db, onAuthChange, isOwner, mountAuthUI } from "/auth.js";
+    import {
+      collection, query, where, getDocs, doc, getDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    mountAuthUI("authSlot");
+
+    const stateMsg    = document.getElementById("stateMsg");
+    const mainContent = document.getElementById("mainContent");
+    const staffGrid   = document.getElementById("staffGrid");
+
+    let allStaff     = [];
+    let currentSort  = "total";
+
+    /* ── Auth guard ─────────────────────────────────── */
+    let authHandled = false;
+    onAuthChange((user, data, loading) => {
+      if (loading) return;
+      if (authHandled) return;
+      authHandled = true;
+
+      if (!user) {
+        stateMsg.innerHTML = `<div class="state-msg error">Debes iniciar sesión para acceder a esta página.</div>`;
+        return;
+      }
+      if (!isOwner()) {
+        stateMsg.innerHTML = `<div class="state-msg error">Acceso restringido. Solo los Owners pueden ver esta página.</div>`;
+        return;
+      }
+
+      stateMsg.style.display = "none";
+      mainContent.style.display = "block";
+      loadStaffControl();
+    });
+
+    /* ── Data loading ───────────────────────────────── */
+    async function loadStaffControl() {
+      staffGrid.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div> Cargando datos del staff…</div>`;
+      try {
+        /* 1. Staff users */
+        const staffSnap = await getDocs(
+          query(collection(db, "users"), where("role", "in", ["Owner", "Admin", "Mod"]))
+        );
+        const staffMap = {};
+        staffSnap.forEach(d => {
+          staffMap[d.id] = {
+            uid: d.id, ...d.data(),
+            acceptedCount: 0, rejectedCount: 0,
+            lastReviewedAt: null, recentReviews: [],
+            _profile: null
+          };
+        });
+
+        /* 2. Profiles (custom name/photo) */
+        await Promise.all(Object.keys(staffMap).map(async uid => {
+          try {
+            const p = await getDoc(doc(db, "profiles", uid));
+            if (p.exists()) staffMap[uid]._profile = p.data();
+          } catch {}
+        }));
+
+        /* 3. All moderated records — single query */
+        const recSnap = await getDocs(
+          query(collection(db, "records"), where("status", "in", ["Accepted", "Rejected"]))
+        );
+        const levelIds = new Set();
+        const modRecs  = [];
+        recSnap.forEach(d => {
+          const r = { id: d.id, ...d.data() };
+          modRecs.push(r);
+          if (r.levelId) levelIds.add(r.levelId);
+        });
+
+        /* 4. Level names (batch) */
+        const levelNames = {};
+        await Promise.all([...levelIds].map(async lid => {
+          try {
+            const lv = await getDoc(doc(db, "levels", lid));
+            if (lv.exists()) levelNames[lid] = lv.data().name || "Nivel desconocido";
+          } catch {}
+        }));
+
+        /* 5. Group reviews per staff member */
+        modRecs.forEach(r => {
+          const uid = r.moderatedBy;
+          if (!uid || !staffMap[uid]) return;
+          const sm = staffMap[uid];
+          const ts = r.moderatedAt?.toMillis?.() ?? 0;
+          if (r.status === "Accepted") sm.acceptedCount++;
+          else sm.rejectedCount++;
+          if (!sm.lastReviewedAt || ts > sm.lastReviewedAt) sm.lastReviewedAt = ts;
+          sm.recentReviews.push({
+            levelName: levelNames[r.levelId] || "Nivel desconocido",
+            status: r.status, ts
+          });
+        });
+
+        /* 6. Sort recent reviews per member, keep top 5 */
+        Object.values(staffMap).forEach(sm => {
+          sm.recentReviews.sort((a, b) => b.ts - a.ts);
+          sm.recentReviews = sm.recentReviews.slice(0, 5);
+        });
+
+        allStaff = Object.values(staffMap);
+        renderSorted();
+
+      } catch (err) {
+        console.error("[control-staff]", err);
+        staffGrid.innerHTML = `<div class="state-msg error">Error al cargar datos: ${escHtml(err.message || "")}</div>`;
+      }
+    }
+
+    /* ── Sorting ────────────────────────────────────── */
+    const ROLE_ORDER = { Owner: 0, Admin: 1, Mod: 2 };
+
+    function sortStaff(mode) {
+      currentSort = mode;
+      document.querySelectorAll(".sort-btn").forEach(b => b.classList.remove("active"));
+      document.querySelector(`.sort-btn[onclick="sortStaff('${mode}')"]`)?.classList.add("active");
+      renderSorted();
+    }
+    window.sortStaff = sortStaff;
+
+    function renderSorted() {
+      const sorted = [...allStaff].sort((a, b) => {
+        if (currentSort === "total")    return (b.acceptedCount + b.rejectedCount) - (a.acceptedCount + a.rejectedCount);
+        if (currentSort === "accepted") return b.acceptedCount - a.acceptedCount;
+        if (currentSort === "recent")   return (b.lastReviewedAt || 0) - (a.lastReviewedAt || 0);
+        if (currentSort === "role")     return (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9);
+        return 0;
+      });
+      renderCards(sorted);
+    }
+
+    /* ── Render ─────────────────────────────────────── */
+    function renderCards(members) {
+      if (!members.length) {
+        staffGrid.innerHTML = `<div class="state-msg">No hay miembros de staff registrados.</div>`;
+        return;
+      }
+      staffGrid.innerHTML = members.map(renderCard).join("");
+    }
+
+    function renderCard(m) {
+      const name  = m._profile?.name     || m.name    || "Sin nombre";
+      const photo = m._profile?.photoURL || m.photoURL || "";
+      const role  = m.role || "Mod";
+      const total = m.acceptedCount + m.rejectedCount;
+
+      const avatar = photo
+        ? `<img src="${escHtml(photo)}" class="sc-avatar" alt="${escHtml(name)}" referrerpolicy="no-referrer">`
+        : `<div class="sc-avatar sc-avatar-fb">${escHtml(name.slice(0, 2).toUpperCase())}</div>`;
+
+      const recentHtml = m.recentReviews.length
+        ? m.recentReviews.map(r => `
+            <div class="review-row">
+              <span class="review-status ${r.status === "Accepted" ? "acc" : "rej"}">${r.status === "Accepted" ? "✓" : "✗"}</span>
+              <span class="review-level">${escHtml(r.levelName)}</span>
+              <span class="review-date">${fmtDate(r.ts)}</span>
+            </div>`).join("")
+        : `<div class="review-empty">Sin revisiones registradas</div>`;
+
+      return `
+        <div class="sc-card">
+          <div class="sc-card-top">
+            <a href="/profile.html?id=${escHtml(m.uid)}" class="sc-profile-link">
+              ${avatar}
+              <div class="sc-info">
+                <div class="sc-name">${escHtml(name)}</div>
+                <span class="sc-rank ${role.toLowerCase()}">${role}</span>
+              </div>
+            </a>
+          </div>
+          <div class="sc-stats">
+            <div class="sc-stat">
+              <div class="sc-stat-val${m.acceptedCount === 0 ? " zero" : ""}">${m.acceptedCount}</div>
+              <div class="sc-stat-lbl">Aceptados</div>
+            </div>
+            <div class="sc-stat">
+              <div class="sc-stat-val${m.rejectedCount === 0 ? " zero" : ""}">${m.rejectedCount}</div>
+              <div class="sc-stat-lbl">Rechazados</div>
+            </div>
+            <div class="sc-stat">
+              <div class="sc-stat-val${total === 0 ? " zero" : ""}">${total}</div>
+              <div class="sc-stat-lbl">Total</div>
+            </div>
+          </div>
+          <div class="sc-last">Última revisión: <strong>${timeAgo(m.lastReviewedAt)}</strong></div>
+          <div class="sc-history-title">Últimas revisiones</div>
+          <div class="sc-history">${recentHtml}</div>
+        </div>`;
+    }
+
+    /* ── Helpers ─────────────────────────────────────── */
+    function escHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+    function fmtDate(ts) {
+      if (!ts) return "–";
+      return new Date(ts).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
+    function timeAgo(ts) {
+      if (!ts) return "Nunca";
+      const diff = (Date.now() - ts) / 1000;
+      if (diff < 60)     return "hace un momento";
+      if (diff < 3600)   return `hace ${Math.floor(diff / 60)} min`;
+      if (diff < 86400)  return `hace ${Math.floor(diff / 3600)} h`;
+      if (diff < 604800) return `hace ${Math.floor(diff / 86400)} d`;
+      return fmtDate(ts);
+    }
+  </script>
+</body>
+</html>

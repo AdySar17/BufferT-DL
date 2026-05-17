@@ -187,6 +187,58 @@ function useLiveData() {
   return { stats, top10, records, loading };
 }
 
+/* ─── Tipos Staff ─── */
+type StaffMember = {
+  uid: string;
+  name: string;
+  role: "Owner" | "Admin" | "Mod";
+  photoURL?: string;
+  _profile: { name?: string; photoURL?: string } | null;
+};
+
+/* ─── Hook que carga los miembros del staff ─── */
+function useStaffMembers() {
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
+        const auth = await dynImport("/auth.js");
+        const fs   = await dynImport("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        const { db } = auth as any;
+        const { collection, query, where, getDocs, doc, getDoc } = fs as any;
+
+        const snap = await getDocs(
+          query(collection(db, "users"), where("role", "in", ["Owner", "Admin", "Mod"]))
+        );
+        const members: StaffMember[] = [];
+        snap.forEach((d: any) => members.push({ uid: d.id, _profile: null, ...d.data() }));
+
+        await Promise.all(
+          members.map(async (m) => {
+            try {
+              const p = await getDoc(doc(db, "profiles", m.uid));
+              m._profile = p.exists() ? (p.data() as any) : null;
+            } catch {}
+          })
+        );
+
+        if (!cancelled) setStaffMembers(members);
+      } catch (e) {
+        console.warn("[home] staff load failed:", e);
+      } finally {
+        if (!cancelled) setLoadingStaff(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { staffMembers, loadingStaff };
+}
+
 /* ─── Tipo Changelog ─── */
 type ChangelogEntry = {
   id: string;
@@ -273,6 +325,7 @@ export default function Home() {
   useAuthWidget();
   const { stats, top10, records, loading } = useLiveData();
   const { entries: changelogEntries, loadingCl } = useChangelog();
+  const { staffMembers, loadingStaff } = useStaffMembers();
 
   /* Inyectar fuente Montserrat (como hace demonlist.html) */
   useEffect(() => {
@@ -323,6 +376,10 @@ export default function Home() {
 
       /* Top 10 cards: forzar Montserrat */
       .home-top-card, .home-top-card * { font-family: 'Montserrat', sans-serif; }
+
+      /* Role-based visibility (mirrors auth.js CSS for React context) */
+      .owner-only { display: none !important; }
+      body.is-owner .owner-only { display: revert !important; }
 
       @media (max-width: 768px) {
         .top-header .menu-toggle { display: flex; }
@@ -375,6 +432,7 @@ export default function Home() {
             <a href="/submit.html">Enviar Record</a>
             <a href="/guidelines.html">Guidelines</a>
             <a href="/panel.html" className="staff-only">Panel de Records</a>
+            <a href="/staff-control.html" className="owner-only">Control Staff</a>
           </nav>
           <div className="auth-slot" id="authSlot"></div>
           <div
@@ -550,6 +608,159 @@ export default function Home() {
             );
           })}
         </div>
+      </section>
+
+      {/* ───────── STAFF ───────── */}
+      <section
+        style={{
+          maxWidth: 1100,
+          margin: "48px auto 0",
+          padding: "0 20px",
+        }}
+      >
+        <SectionTitle>Nuestro Staff</SectionTitle>
+
+        {loadingStaff && (
+          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.55)" }}>
+            Cargando staff…
+          </p>
+        )}
+
+        {!loadingStaff && staffMembers.length === 0 && (
+          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: "0.9rem" }}>
+            Sin miembros de staff registrados.
+          </p>
+        )}
+
+        {(["Owner", "Admin", "Mod"] as const).map((role) => {
+          const group = staffMembers.filter((m) => m.role === role);
+          if (!group.length) return null;
+          const roleLabel =
+            role === "Owner" ? "Owners" : role === "Admin" ? "Administradores" : "Moderadores";
+          const roleColor =
+            role === "Owner" ? "#ffd700" : role === "Admin" ? "#c7ff3b" : "#7fd8ff";
+          return (
+            <div key={role} style={{ marginBottom: 30 }}>
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 1.4,
+                  color: roleColor,
+                  marginBottom: 14,
+                  opacity: 0.9,
+                }}
+              >
+                {roleLabel}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                {group.map((m) => {
+                  const name =
+                    (m._profile as any)?.name || m.name || "Sin nombre";
+                  const photo =
+                    (m._profile as any)?.photoURL || m.photoURL || "";
+                  const initials = name.slice(0, 2).toUpperCase();
+                  return (
+                    <a
+                      key={m.uid}
+                      href={`/profile.html?id=${m.uid}`}
+                      style={{
+                        textDecoration: "none",
+                        color: "inherit",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 9,
+                        background: "rgba(8,16,8,0.8)",
+                        border: "1px solid rgba(255,255,255,0.09)",
+                        borderRadius: 14,
+                        padding: "16px 14px 12px",
+                        minWidth: 96,
+                        maxWidth: 110,
+                        transition: "border-color 0.2s, box-shadow 0.2s",
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor =
+                          roleColor + "55";
+                        (e.currentTarget as HTMLAnchorElement).style.boxShadow =
+                          `0 0 16px ${roleColor}18`;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLAnchorElement).style.borderColor =
+                          "rgba(255,255,255,0.09)";
+                        (e.currentTarget as HTMLAnchorElement).style.boxShadow =
+                          "";
+                      }}
+                    >
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt={name}
+                          referrerPolicy="no-referrer"
+                          style={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            border: `2px solid ${roleColor}77`,
+                            display: "block",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background:
+                              "linear-gradient(135deg,#1a4d1a,#7fff3b)",
+                            fontWeight: 800,
+                            color: "#000",
+                            fontSize: "1rem",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {initials}
+                        </div>
+                      )}
+                      <div style={{ textAlign: "center" }}>
+                        <div
+                          style={{
+                            fontWeight: 700,
+                            fontSize: "0.78rem",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 82,
+                          }}
+                        >
+                          {name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "0.62rem",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                            color: roleColor,
+                            marginTop: 4,
+                          }}
+                        >
+                          {role}
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </section>
 
       {/* ───────── STATS ───────── */}
