@@ -1154,6 +1154,10 @@
         wrap.remove();
         if (!listBox.querySelector(".record-card")) renderEmpty();
       }, 260);
+      /* Limpiar el active claim: el record fue aceptado como nuevo nivel */
+      if (alContext && window.__myActiveClaim && window.__myActiveClaim.recordId === alContext.rec.id) {
+        window.__myActiveClaim = null;
+      }
       showToast(`Nivel "${name}" añadido y record aceptado.`);
       closeAddLevelModal();
     } catch (err) {
@@ -1273,6 +1277,11 @@
       base.moderatedAt     = serverTimestamp();
       base.moderatedBy     = (window.__currentUser && window.__currentUser.uid) || null;
       await updateDoc(doc(db, "records", recordId), base);
+
+      /* Limpiar el active claim: el record ya fue moderado */
+      if (window.__myActiveClaim && window.__myActiveClaim.recordId === recordId) {
+        window.__myActiveClaim = null;
+      }
 
       /* Aviso al webhook de Discord de records */
       try {

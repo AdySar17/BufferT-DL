@@ -16,6 +16,16 @@
     background-size: cover;
     -webkit-font-smoothing: antialiased;
   }
+  /* Overlay oscuro sobre la imagen de fondo — igual al resto de páginas */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.88) 100%);
+    pointer-events: none;
+  }
+  .top-header, .page-wrap { position: relative; z-index: 1; }
 
   /* NAV — igual al resto */
   .top-header {

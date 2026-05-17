@@ -271,6 +271,8 @@
     border: 1px solid rgba(255,255,255,0.04);
     margin-bottom: 7px;
     transition: background .15s;
+    overflow: hidden;
+    min-width: 0;
   }
   .record:hover { background: rgba(255,255,255,0.05); }
 
@@ -278,7 +280,7 @@
   .rec-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
   .rec-flag  { width: 34px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
-  .rec-name  { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec-name  { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
 
   .rec-mobile { width: 18px; height: 18px; object-fit: contain; opacity: .85; }
   .rec-percent { font-size: 0.88rem; color: var(--text); white-space: nowrap; }
