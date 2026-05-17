@@ -9,26 +9,31 @@ type DiscordNotifyBody = {
 };
 
 /**
- * Returns true if the hostname is trusted:
- *   - *.vercel.app / vercel.app
- *   - *.replit.app / *.repl.co  (Replit published + dev domains)
- *   - Entries in APP_DOMAINS env var (comma-separated)
- *   - localhost / 127.0.0.1 in non-production
+ * Returns true if the hostname is explicitly trusted.
+ *
+ * Trusted sources (evaluated in order):
+ *   1. APP_DOMAINS env var  — comma-separated exact-match list (required in production)
+ *   2. REPLIT_DEV_DOMAIN    — the Replit workspace preview domain (set automatically)
+ *   3. localhost / 127.0.0.1 — only in non-production environments
+ *
+ * Broad wildcard patterns (*.replit.app, *.vercel.app) are intentionally NOT used
+ * to prevent open-relay abuse from other apps on shared hosting.
  */
 function isTrustedHost(hostname: string): boolean {
   const h = hostname.toLowerCase().split(":")[0] ?? "";
   if (!h) return false;
 
-  if (h === "vercel.app" || h.endsWith(".vercel.app")) return true;
-  if (h.endsWith(".replit.app") || h.endsWith(".repl.co")) return true;
+  const appDomains = process.env["APP_DOMAINS"] ?? "";
+  for (const d of appDomains.split(",")) {
+    const trimmed = d.trim().toLowerCase();
+    if (trimmed && trimmed === h) return true;
+  }
+
+  const replitDev = (process.env["REPLIT_DEV_DOMAIN"] ?? "").toLowerCase().split(":")[0];
+  if (replitDev && h === replitDev) return true;
 
   if (process.env["NODE_ENV"] !== "production") {
     if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0") return true;
-  }
-
-  const appDomains = process.env["APP_DOMAINS"] ?? "";
-  for (const d of appDomains.split(",")) {
-    if (d.trim().toLowerCase() === h) return true;
   }
 
   return false;
