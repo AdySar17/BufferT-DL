@@ -451,13 +451,14 @@
 
       <!-- Historial de posiciones -->
       <div class="card">
-        <div class="records-head">
+        <div class="records-head hist-toggle" id="histToggle" role="button" tabindex="0" aria-expanded="false">
           <div>
             <div class="records-title">HISTORIAL DE POSICIONES</div>
             <div class="records-min">Cambios registrados en este nivel</div>
           </div>
+          <span class="hist-arrow" id="histArrow">▼</span>
         </div>
-        <div id="historyList">
+        <div id="historyList" class="hist-body hist-collapsed">
           <div class="rec-loading">Cargando historial...</div>
         </div>
       </div>
@@ -468,6 +469,34 @@
 
 <!-- ESTILOS DEL HISTORIAL -->
 <style>
+  /* ── Toggle del historial ── */
+  .hist-toggle {
+    cursor: pointer;
+    user-select: none;
+    border-radius: 8px;
+    transition: background .15s;
+  }
+  .hist-toggle:hover { background: rgba(255,255,255,0.04); }
+  .hist-arrow {
+    font-size: 0.85rem;
+    color: rgba(199,255,59,0.7);
+    transition: transform .25s;
+    flex-shrink: 0;
+  }
+  .hist-arrow.open { transform: rotate(180deg); }
+
+  /* ── Cuerpo colapsable ── */
+  .hist-body {
+    overflow: hidden;
+    transition: max-height .3s ease, opacity .25s ease;
+    max-height: 2000px;
+    opacity: 1;
+  }
+  .hist-collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+  }
+
   .ph-row {
     display:grid;
     grid-template-columns: 1.2fr 0.6fr 0.6fr 2fr;
@@ -876,11 +905,11 @@
       const snap = await getDocs(q);
       const rows = [];
       snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-      /* Orden ASC por createdAt: el más antiguo arriba (primer registro = gris) */
+      /* Orden DESC por createdAt: el más reciente arriba */
       rows.sort((a, b) => {
         const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
         const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-        return ta - tb;
+        return tb - ta;
       });
 
       if (!rows.length) {
@@ -895,7 +924,7 @@
           <div>Nueva pos.</div>
           <div>Razón</div>
         </div>`;
-      const body = rows.map((r, i) => renderHistoryRow(r, i === 0)).join("");
+      const body = rows.map(r => renderHistoryRow(r)).join("");
       wrap.innerHTML = head + body;
     } catch (err) {
       wrap.innerHTML = `<div class="ph-empty">Error al cargar historial: ${err.message}</div>`;
@@ -903,15 +932,15 @@
     }
   }
 
-  function renderHistoryRow(r, isFirst) {
+  function renderHistoryRow(r) {
     const date = r.createdAt && r.createdAt.toDate
       ? r.createdAt.toDate().toLocaleDateString("es-ES",
           { day:"2-digit", month:"2-digit", year:"numeric" })
       : "—";
 
     let rowClass = "ph-neutral", changeClass = "neutral", changeTxt = "—";
-    if (isFirst) {
-      changeTxt = (r.change === "NEW") ? "NEW" : (r.change === "REMOVED" ? "REMOVED" : "—");
+    if (r.change === "NEW") {
+      changeTxt = "NEW";
     } else if (r.change === "REMOVED") {
       rowClass = "ph-down"; changeClass = "down"; changeTxt = "REMOVED";
     } else if (typeof r.change === "number") {
@@ -933,6 +962,27 @@
   }
 
   init();
+
+  /* ── Toggle historial de posiciones ────────────────── */
+  const histToggle = document.getElementById("histToggle");
+  const histArrow  = document.getElementById("histArrow");
+  const histBody   = document.getElementById("historyList");
+
+  histToggle.addEventListener("click", () => {
+    const isOpen = !histBody.classList.contains("hist-collapsed");
+    if (isOpen) {
+      histBody.classList.add("hist-collapsed");
+      histArrow.classList.remove("open");
+      histToggle.setAttribute("aria-expanded", "false");
+    } else {
+      histBody.classList.remove("hist-collapsed");
+      histArrow.classList.add("open");
+      histToggle.setAttribute("aria-expanded", "true");
+    }
+  });
+  histToggle.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); histToggle.click(); }
+  });
 </script>
 
 </body>
