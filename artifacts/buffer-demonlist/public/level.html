@@ -536,11 +536,20 @@
       const gid = (nivel.gdLevelId || "").toString().trim();
       lvlGdIdEl.textContent = gid || "—";
     }
-    /* Tier (todavía no configurable; se muestra "—" por ahora) */
+    /* Tier calculado automáticamente según la posición */
     const lvlTierEl = document.getElementById("lvlTier");
     if (lvlTierEl) {
-      const tier = (nivel.tier ?? "").toString().trim();
-      lvlTierEl.textContent = tier || "—";
+      const tierPos = Number(nivel.position);
+      let tier = "—";
+      if (Number.isFinite(tierPos) && tierPos > 0) {
+        if (tierPos <= 50)        tier = "Main List";
+        else if (tierPos <= 150)  tier = "Extended List";
+        else if (tierPos <= 300)  tier = "Advanced List";
+        else if (tierPos <= 450)  tier = "Contender List";
+        else if (tierPos <= 750)  tier = "Intermediate List";
+        else                      tier = "Beginner List";
+      }
+      lvlTierEl.textContent = tier;
     }
 
     /* Dificultad: imagen (cabecera) + texto en stat-list.

@@ -1,0 +1,154 @@
+// ============================================================
+// BFT Demon List — Firestore Security Rules
+// Versión: V17 (ban system + changelog + tier system)
+// ============================================================
+//
+// CAMBIOS RESPECTO A V16:
+//
+//  1. /users/{uid} — Admin ahora PUEDE escribir el campo "banned"
+//     (excepto en perfiles con rol Owner).
+//     Reemplaza la Regla (C) de V16.
+//
+//  2. /changelog/{id} — Nueva colección para el mini-changelog
+//     de la homepage.
+//     - Lectura pública (allow read: if true).
+//     - Solo staff puede crear entradas.
+//
+// ============================================================
+// INSTRUCCIONES DE DESPLIEGUE:
+//
+// Ve a Firebase Console → Firestore Database → Reglas
+// y reemplaza el contenido completo por el de este archivo.
+// Luego pulsa "Publicar".
+//
+// ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────
+    function isAuth()       { return request.auth != null; }
+    function meUid()        { return request.auth.uid; }
+    function isOwnerOf(uid) { return isAuth() && meUid() == uid; }
+
+    // Lee el rol del usuario autenticado desde /users/{uid}
+    function myRole() {
+      return isAuth()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("role","Default")
+        : "Default";
+    }
+
+    function isMod()    { return myRole() == "Mod";   }
+    function isAdmin()  { return myRole() == "Admin";  }
+    function isOwner()  { return myRole() == "Owner";  }
+    function isAdminish() { return isAdmin() || isOwner(); }
+    function isStaff()  { return isMod() || isAdmin() || isOwner(); }
+
+    // ── /users/{uid} ────────────────────────────────────────────
+    match /users/{uid} {
+      // Lectura: el propio usuario o cualquier staff
+      allow read: if isOwnerOf(uid) || isStaff();
+
+      // Creación: solo el propio usuario
+      allow create: if isOwnerOf(uid);
+
+      // Actualización — tres niveles de permisos:
+      //
+      // (A) El propio usuario: puede actualizar todo EXCEPTO role y banned
+      allow update: if isOwnerOf(uid) &&
+        !("role"   in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !("banned" in request.resource.data.diff(resource.data).affectedKeys());
+
+      // (B) Owner: puede actualizar cualquier campo, incluidos role y banned
+      allow update: if isOwner();
+
+      // (C) Admin: puede actualizar role (no a Admin/Owner) Y puede escribir
+      //     "banned" — PERO NO en cuentas con rol Owner.
+      allow update: if isAdmin() &&
+        (
+          !("role" in request.resource.data.diff(resource.data).affectedKeys()) ||
+          !(request.resource.data.role in ["Admin","Owner"])
+        ) &&
+        (
+          // Si toca el campo "banned", bloquear si el target es Owner
+          !("banned" in request.resource.data.diff(resource.data).affectedKeys()) ||
+          resource.data.get("role","Default") != "Owner"
+        );
+
+      // (D) Mod: no puede tocar role ni banned
+      allow update: if isMod() &&
+        !("role"   in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !("banned" in request.resource.data.diff(resource.data).affectedKeys());
+
+      // Eliminación: solo Admin/Owner
+      allow delete: if isAdminish();
+    }
+
+    // ── /profiles/{uid} ─────────────────────────────────────────
+    match /profiles/{uid} {
+      allow read: if true;
+
+      allow create: if isOwnerOf(uid) || isStaff();
+
+      // El propio usuario y cualquier staff pueden actualizar
+      // (el campo "banned" puede escribirlo staff Admin+Owner via client,
+      //  lo que refleja la acción de ban en la UI pública).
+      allow update: if isOwnerOf(uid) || isStaff();
+
+      allow delete: if isAdminish();
+    }
+
+    // ── /levels/{id} ────────────────────────────────────────────
+    match /levels/{id} {
+      allow read:   if true;
+      allow create: if isStaff();
+      allow update: if isAdminish();
+      allow delete: if isAdminish();
+    }
+
+    // ── /records/{id} ───────────────────────────────────────────
+    match /records/{id} {
+      allow read: if true;
+
+      // Crear record: usuario autenticado y no baneado
+      allow create: if isAuth() &&
+        !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("banned", false);
+
+      // Actualizar: el dueño (solo ciertos campos) o staff
+      allow update: if isStaff() ||
+        (isAuth() && resource.data.userId == meUid());
+
+      allow delete: if isStaff() ||
+        (isAuth() && resource.data.userId == meUid() && resource.data.status != "Accepted");
+    }
+
+    // ── /positionHistory/{id} ───────────────────────────────────
+    match /positionHistory/{id} {
+      allow read:   if true;
+      allow create: if isStaff();
+      allow update: if isAdminish();
+      allow delete: if isAdminish();
+    }
+
+    // ── /changelog/{id} ─────────────────────────────────────────
+    // Mini-changelog mostrado en la homepage (últimas 5 entradas).
+    match /changelog/{id} {
+      allow read:   if true;       // lectura pública
+      allow create: if isStaff();  // solo staff puede escribir
+      allow update: if isAdminish();
+      allow delete: if isAdminish();
+    }
+
+    // ── /notifications/{id} ─────────────────────────────────────
+    match /notifications/{id} {
+      allow read:   if isAuth() && resource.data.userId == meUid();
+      allow create: if isStaff();
+      allow update: if isStaff() ||
+        (isAuth() && resource.data.userId == meUid());
+      allow delete: if isAdminish() ||
+        (isAuth() && resource.data.userId == meUid());
+    }
+
+  }
+}

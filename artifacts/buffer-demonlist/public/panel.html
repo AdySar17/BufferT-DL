@@ -960,6 +960,25 @@
     $("alPointsPreview").textContent = (p > 0)
       ? `Puntos automáticos: ${computePoints(p)} (posición #${p})`
       : "Puntos automáticos: —";
+    /* Solo Top 50 puede tener minPercent < 100 */
+    const locked = p > 50;
+    $("alMinPercent").disabled = locked;
+    $("alMinPercent").style.opacity = locked ? "0.45" : "";
+    $("alMinPercent").title = locked ? "Solo niveles Top 50 pueden tener % mínimo < 100" : "";
+    if (locked) {
+      $("alMinPercent").value = "";
+      $("alMinPercent").placeholder = "100 (solo Top 50)";
+    } else {
+      $("alMinPercent").placeholder = "100";
+    }
+    let hintEl = $("alMinPercentHint");
+    if (!hintEl) {
+      hintEl = document.createElement("div");
+      hintEl.id = "alMinPercentHint";
+      hintEl.style.cssText = "font-size:.72rem;color:#ff9a9a;margin-top:3px;";
+      $("alMinPercent").insertAdjacentElement("afterend", hintEl);
+    }
+    hintEl.textContent = locked ? "% mínimo bloqueado para niveles fuera del Top 50." : "";
   });
 
   $("alConfirm").onclick = async () => {
@@ -975,7 +994,8 @@
     const video     = $("alVideo").value.trim();
     const difficulty= $("alDifficulty").value || "Extreme Demon";
     const minRaw    = parseInt($("alMinPercent").value, 10);
-    const minPercent= Number.isFinite(minRaw) ? Math.min(100, Math.max(1, minRaw)) : 100;
+    /* Solo Top 50 puede tener minPercent < 100 */
+    const minPercent= (reqPos <= 50 && Number.isFinite(minRaw)) ? Math.min(100, Math.max(1, minRaw)) : 100;
     const description = $("alDescription").value.trim();
     const staffnotes  = $("alStaffNotes").value.trim().slice(0, 500);
     const glow        = $("alGlow").value || "";

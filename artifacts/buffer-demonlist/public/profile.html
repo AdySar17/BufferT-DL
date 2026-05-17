@@ -482,6 +482,87 @@
   }
   .lvl-link:hover { text-decoration: underline; }
 
+  /* ========== BANEADO BADGE ========== */
+  .role-badge.role-banned {
+    background: rgba(255,50,50,0.22);
+    color: #ff8a8a;
+    border-color: rgba(255,80,80,0.55);
+  }
+
+  /* ========== STAFF BAN BUTTONS ========== */
+  .btn-ban {
+    background: rgba(255,70,70,0.16);
+    border: 1px solid rgba(255,80,80,0.42);
+    color: #ff9a9a;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: .8px; text-transform: uppercase;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-ban:hover { background: rgba(255,70,70,0.28); color: #ffd0d0; }
+  .btn-ban.unban {
+    background: rgba(124,252,0,0.12);
+    border-color: rgba(124,252,0,0.4);
+    color: #c7ff3b;
+  }
+  .btn-ban.unban:hover { background: rgba(124,252,0,0.22); }
+  .btn-delete-acc {
+    background: rgba(200,0,0,0.2);
+    border: 1px solid rgba(220,0,0,0.5);
+    color: #ff6060;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: .8px; text-transform: uppercase;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-delete-acc:hover { background: rgba(200,0,0,0.32); color: #ffb0b0; }
+
+  /* ========== TIER SECTION HEADERS ========== */
+  .tier-section-header {
+    color: rgba(199,255,59,0.65);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 10px 2px 5px;
+    margin-top: 14px;
+    border-bottom: 1px solid rgba(199,255,59,0.12);
+    margin-bottom: 8px;
+  }
+  .tier-section-header:first-child { margin-top: 0; }
+  .pending-section-header {
+    color: rgba(255,200,0,0.65);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 10px 2px 5px;
+    margin-top: 18px;
+    border-bottom: 1px solid rgba(255,200,0,0.15);
+    margin-bottom: 8px;
+  }
+  .lvl-tier-badge {
+    font-size: .6rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(199,255,59,0.1);
+    color: rgba(199,255,59,0.65);
+    letter-spacing: .3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .lvl-pos-badge {
+    font-size: .7rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.55);
+    white-space: nowrap;
+  }
+
   /* ========== DIFFICULTY BREAKDOWN ========== */
   .diff-stats-wrap {
     display: grid;
@@ -643,6 +724,7 @@
             </svg>
           </a>
           <span id="pRoleBadge" class="role-badge" style="display:none;"></span>
+          <span id="pBannedBadge" class="role-badge role-banned" style="display:none;">BANEADO</span>
           <button id="pRoleEditBtn" class="role-edit-btn" style="display:none;" type="button">Cambiar rol</button>
         </div>
         <div class="profile-meta">
@@ -680,9 +762,16 @@
       <div id="pBio" class="profile-bio"></div>
     </div>
 
-    <!-- ACCIONES (solo el dueño) -->
+    <!-- ACCIONES (solo el dueño / Owner puede editar perfil ajeno) -->
     <div id="ownerActions" class="btn-row" style="display:none;">
       <button id="btnEdit" class="btn btn-primary">Editar perfil</button>
+    </div>
+
+    <!-- ACCIONES DE STAFF: ban / unban / eliminar cuenta (Admin+Owner) -->
+    <div id="staffActions" class="btn-row" style="display:none; margin-top:8px;">
+      <button id="btnBan"           class="btn-ban"            type="button" style="display:none;">Banear usuario</button>
+      <button id="btnUnban"         class="btn-ban unban"      type="button" style="display:none;">Quitar ban</button>
+      <button id="btnDeleteAccount" class="btn-delete-acc"     type="button" style="display:none;">⚠ Eliminar cuenta</button>
     </div>
 
     <!-- FORM EDIT -->
@@ -911,6 +1000,9 @@
       bioEl.textContent = "Este usuario aún no ha escrito una biografía.";
       bioEl.classList.add("empty");
     }
+    /* Badge BANEADO */
+    const bannedEl = $("pBannedBadge");
+    if (bannedEl) bannedEl.style.display = d.banned ? "inline-flex" : "none";
   }
 
   let targetUserRole = "Default";   // rol actual del perfil mostrado
@@ -963,6 +1055,28 @@
       if (targetUid === currentUser.uid) return;
     }
     btn.style.display = "inline-flex";
+
+    /* ── Botones ban/unban/delete: Admin+Owner sobre perfiles ajenos ── */
+    const staffDiv = $("staffActions");
+    const banBtn   = $("btnBan");
+    const unbanBtn = $("btnUnban");
+    const delBtn   = $("btnDeleteAccount");
+    if (staffDiv && banBtn) {
+      staffDiv.style.display = "none";
+      banBtn.style.display   = "none";
+      if (unbanBtn) unbanBtn.style.display = "none";
+      if (delBtn)   delBtn.style.display   = "none";
+      if (currentUser && targetUid && targetUid !== currentUser.uid) {
+        const canBan = meIsOwner || (meIsAdmin && targetUserRole !== "Owner");
+        if (canBan) {
+          staffDiv.style.display = "flex";
+          const isBanned = !!(profileData && profileData.banned);
+          banBtn.style.display = isBanned ? "none" : "inline-block";
+          if (unbanBtn) unbanBtn.style.display = isBanned ? "inline-block" : "none";
+          if (delBtn)   delBtn.style.display   = meIsOwner ? "inline-block" : "none";
+        }
+      }
+    }
   }
 
   async function loadProfile(uid) {
@@ -1157,6 +1271,71 @@
     }
   };
 
+  /* ====== BAN / UNBAN / ELIMINAR CUENTA (Admin+Owner) ====== */
+
+  async function banUser() {
+    const meIsOwner = currentUserRole === "Owner";
+    const meIsAdmin = currentUserRole === "Admin";
+    if (!currentUser || !targetUid) return;
+    if (!meIsOwner && !meIsAdmin) return;
+    if (meIsAdmin && targetUserRole === "Owner") return;
+    const name = (profileData && profileData.name) || targetUid;
+    if (!confirm(`¿Banear a "${name}"?\nSe mostrará el badge BANEADO en su perfil.`)) return;
+    try {
+      await setDoc(doc(db, "profiles", targetUid), { banned: true }, { merge: true });
+      try { await updateDoc(doc(db, "users", targetUid), { banned: true }); }
+      catch (e) { console.warn("[profile] ban users doc:", e); }
+      profileData = { ...profileData, banned: true };
+      renderProfile(profileData);
+      updateRoleEditButton();
+    } catch (err) {
+      alert("Error al banear: " + (err.message || err.code || ""));
+    }
+  }
+
+  async function unbanUser() {
+    const meIsOwner = currentUserRole === "Owner";
+    const meIsAdmin = currentUserRole === "Admin";
+    if (!currentUser || !targetUid) return;
+    if (!meIsOwner && !meIsAdmin) return;
+    const name = (profileData && profileData.name) || targetUid;
+    if (!confirm(`¿Quitar el ban de "${name}"?`)) return;
+    try {
+      await setDoc(doc(db, "profiles", targetUid), { banned: false }, { merge: true });
+      try { await updateDoc(doc(db, "users", targetUid), { banned: false }); }
+      catch (e) { console.warn("[profile] unban users doc:", e); }
+      profileData = { ...profileData, banned: false };
+      renderProfile(profileData);
+      updateRoleEditButton();
+    } catch (err) {
+      alert("Error al quitar ban: " + (err.message || err.code || ""));
+    }
+  }
+
+  async function deleteUserAccount() {
+    if (currentUserRole !== "Owner") return;
+    if (!targetUid) return;
+    const name = (profileData && profileData.name) || targetUid;
+    if (!confirm(
+      `⚠ ELIMINAR CUENTA de "${name}"\n\n` +
+      `Esta acción borrará el perfil y los datos del usuario. NO se puede deshacer.\n\n¿Continuar?`
+    )) return;
+    if (!confirm(`Confirmación final: ¿borrar la cuenta de "${name}"?`)) return;
+    try {
+      await deleteDoc(doc(db, "profiles", targetUid));
+      try { await deleteDoc(doc(db, "users", targetUid)); }
+      catch (e) { console.warn("[profile] delete users doc:", e); }
+      alert(`Cuenta de "${name}" eliminada.`);
+      history.back();
+    } catch (err) {
+      alert("Error al eliminar cuenta: " + (err.message || err.code || ""));
+    }
+  }
+
+  $("btnBan").onclick           = banUser;
+  $("btnUnban").onclick         = unbanUser;
+  $("btnDeleteAccount").onclick = deleteUserAccount;
+
   /* ====== RECORDS ====== */
   function fmtDate(ts) {
     if (!ts) return "—";
@@ -1305,12 +1484,24 @@
     }
     $("recordsState").style.display = "none";
 
-    visibleRecords.forEach(rec => {
+    /* ── Helper: tier según posición ─────────────────────────── */
+    function getTierInfo(pos) {
+      const p = Number(pos);
+      if (!p || p <= 0) return { name: "Sin posición", order: 99 };
+      if (p <= 50)  return { name: "Main List",         order: 0 };
+      if (p <= 150) return { name: "Extended List",     order: 1 };
+      if (p <= 300) return { name: "Advanced List",     order: 2 };
+      if (p <= 450) return { name: "Contender List",    order: 3 };
+      if (p <= 750) return { name: "Intermediate List", order: 4 };
+      return          { name: "Beginner List",          order: 5 };
+    }
+
+    /* ── Construir una card de record ────────────────────────── */
+    function buildCard(rec) {
       const lvl = levelsCache.get(rec.levelId) || {};
       const card = document.createElement("article");
       card.className = "lvl-card";
 
-      /* Background del card = campo "background" del nivel (con fallback a imageURL) */
       const bgUrl = lvl.background || lvl.imageURL || lvl.thumbnail || "";
       if (bgUrl) {
         const bgEl = document.createElement("div");
@@ -1319,25 +1510,20 @@
         card.appendChild(bgEl);
       }
 
-      /* Content */
       const content = document.createElement("div");
       content.className = "lvl-card-content";
 
-      /* Carita de dificultad (reemplaza la antigua miniatura).
-         Si el nivel no existe (reclamo Pending de "Nuevo nivel"),
-         usamos la dificultad que el usuario eligió en el reclamo
-         para que la imagen sea coherente con lo que pidió. */
       const claimDiff = rec.claimedLevelDifficulty;
       const diffKey =
-        (lvl.difficulty   && DIFFICULTY_IMAGES[lvl.difficulty])  ? lvl.difficulty :
-        (claimDiff        && DIFFICULTY_IMAGES[claimDiff])       ? claimDiff
-                                                                 : "Extreme Demon";
+        (lvl.difficulty && DIFFICULTY_IMAGES[lvl.difficulty]) ? lvl.difficulty :
+        (claimDiff      && DIFFICULTY_IMAGES[claimDiff])      ? claimDiff
+                                                               : "Extreme Demon";
       const thumb = document.createElement("img");
       thumb.className = "lvl-thumb";
-      thumb.alt = diffKey;
+      thumb.alt   = diffKey;
       thumb.title = diffKey;
-      thumb.src = DIFFICULTY_IMAGES[diffKey];
-      thumb.style.objectFit = "contain";
+      thumb.src   = DIFFICULTY_IMAGES[diffKey];
+      thumb.style.objectFit  = "contain";
       thumb.style.background = "transparent";
       thumb.onerror = () => { thumb.style.opacity = "0.3"; };
       content.appendChild(thumb);
@@ -1349,13 +1535,19 @@
 
       const nameLink = document.createElement("a");
       nameLink.className = "lvl-name";
-      /* Para reclamos pendientes de Nuevo nivel, usamos el nombre que
-         el propio usuario indicó en lugar de "(Nivel desconocido)". */
       const claimName = rec.claimedLevelName;
       nameLink.textContent = lvl.name || claimName || "(Nivel desconocido)";
       nameLink.href = lvl.id ? `/level.html?id=${encodeURIComponent(lvl.id)}` : "#";
       nameLink.style.textDecoration = "none";
       titleRow.appendChild(nameLink);
+
+      /* Posición — visible en todos los estados del record */
+      if (lvl.position) {
+        const posBadge = document.createElement("span");
+        posBadge.className = "lvl-pos-badge";
+        posBadge.textContent = `#${lvl.position}`;
+        titleRow.appendChild(posBadge);
+      }
 
       if (rec.mode2P || lvl.is2P) {
         const b = document.createElement("span");
@@ -1370,7 +1562,6 @@
       author.textContent = lvl.author ? `por ${lvl.author}` : "";
       info.appendChild(author);
 
-      /* Compañero 2P */
       const partnerId = rec.userId === targetUid ? rec.player2Id
                        : rec.player2Id === targetUid ? rec.userId : null;
       if (partnerId) {
@@ -1381,7 +1572,6 @@
         info.appendChild(partnerEl);
       }
 
-      /* Mobile flag */
       if (rec.mobile || rec.mobile2P) {
         const m = document.createElement("div");
         m.className = "lvl-meta";
@@ -1390,37 +1580,29 @@
       }
       content.appendChild(info);
 
-      /* Aside: points + percent */
       const aside = document.createElement("div");
       aside.className = "lvl-aside";
 
       if (rec.status === "Accepted" && Number(rec.percent) > 0 && lvl.value) {
-        const base = Number(lvl.value);
+        const base   = Number(lvl.value);
         const earned = Number(rec.percent) === 100 ? base : (base / 10);
-        const pts = document.createElement("div");
-        pts.className = "lvl-points";
+        const pts    = document.createElement("div");
+        pts.className   = "lvl-points";
         pts.textContent = "+" + (Math.round(earned * 100) / 100);
         aside.appendChild(pts);
         const lab = document.createElement("div");
-        lab.className = "lvl-points-label";
+        lab.className   = "lvl-points-label";
         lab.textContent = "puntos";
         aside.appendChild(lab);
-      } else if (lvl.position) {
-        const pos = document.createElement("div");
-        pos.className = "lvl-points-label";
-        pos.textContent = `#${lvl.position}`;
-        aside.appendChild(pos);
       }
 
       const pct = document.createElement("div");
-      pct.className = "lvl-percent" + (Number(rec.percent) === 100 ? " full" : "");
+      pct.className   = "lvl-percent" + (Number(rec.percent) === 100 ? " full" : "");
       pct.textContent = (rec.percent ?? "?") + "%";
       aside.appendChild(pct);
       content.appendChild(aside);
-
       card.appendChild(content);
 
-      /* Footer */
       const footer = document.createElement("div");
       footer.className = "lvl-card-footer";
 
@@ -1428,16 +1610,16 @@
       left.className = "lvl-actions";
       const badge = document.createElement("span");
       const stKey = (rec.status || "Pending").toLowerCase();
-      badge.className = "status-badge " + stKey;
+      badge.className   = "status-badge " + stKey;
       const labels = { pending: "Pendiente", accepted: "Aceptado", rejected: "Rechazado" };
       badge.textContent = labels[stKey] || rec.status;
       left.appendChild(badge);
 
       const dateEl = document.createElement("span");
       dateEl.className = "status-date";
-      if (rec.status === "Accepted")      dateEl.textContent = "Aceptado: " + fmtDate(rec.acceptedAt);
-      else if (rec.status === "Rejected") dateEl.textContent = "Rechazado: " + fmtDate(rec.updatedAt || rec.createdAt);
-      else                                 dateEl.textContent = "Enviado: "  + fmtDate(rec.createdAt);
+      if (rec.status === "Accepted")       dateEl.textContent = "Aceptado: "  + fmtDate(rec.acceptedAt);
+      else if (rec.status === "Rejected")  dateEl.textContent = "Rechazado: " + fmtDate(rec.updatedAt || rec.createdAt);
+      else                                  dateEl.textContent = "Enviado: "   + fmtDate(rec.createdAt);
       left.appendChild(dateEl);
       footer.appendChild(left);
 
@@ -1446,44 +1628,38 @@
 
       if (rec.video) {
         const vidLink = document.createElement("a");
-        vidLink.className = "lvl-link";
-        vidLink.href = rec.video; vidLink.target = "_blank"; vidLink.rel = "noopener";
+        vidLink.className   = "lvl-link";
+        vidLink.href        = rec.video;
+        vidLink.target      = "_blank";
+        vidLink.rel         = "noopener";
         vidLink.textContent = "Ver video ▶";
         right.appendChild(vidLink);
       }
 
-      /* Puede actualizar/editar el record:
-       *   - su propio dueño (jugador 1) en su propio perfil, o
-       *   - cualquier usuario con rol Owner (puede corregir records ajenos). */
       const meIsOwnerRole = currentUserRole === "Owner";
       const canEditThisRecord =
         (isViewerOwner && rec.userId === currentUser.uid) ||
         (meIsOwnerRole && currentUser);
       if (canEditThisRecord) {
         const btn = document.createElement("button");
-        btn.className = "btn btn-secondary";
+        btn.className   = "btn btn-secondary";
         btn.textContent = "Actualizar";
         btn.onclick = () => openUpdateModal(rec);
         right.appendChild(btn);
 
-        /* Eliminar:
-         *   - Dueño del record: sólo si NO está Accepted.
-         *   - Rol Owner: cualquier record, en cualquier estado. */
-        const isMyRec  = currentUser && rec.userId === currentUser.uid;
-        const canDelete = (meIsOwnerRole)
-          || (isMyRec && rec.status !== "Accepted");
+        const isMyRec   = currentUser && rec.userId === currentUser.uid;
+        const canDelete = meIsOwnerRole || (isMyRec && rec.status !== "Accepted");
         if (canDelete) {
           const delBtn = document.createElement("button");
-          delBtn.className = "btn btn-danger";
+          delBtn.className   = "btn btn-danger";
           delBtn.textContent = "Eliminar";
           delBtn.onclick = () => deleteOwnRecord(rec);
           right.appendChild(delBtn);
         }
 
-        /* Solo el rol Owner: re-enviar un record Aceptado/Rechazado a revisión */
         if (meIsOwnerRole && rec.status !== "Pending") {
           const reBtn = document.createElement("button");
-          reBtn.className = "btn btn-secondary";
+          reBtn.className   = "btn btn-secondary";
           reBtn.textContent = "↩ Mandar a revisión";
           reBtn.onclick = () => resendForReview(rec);
           right.appendChild(reBtn);
@@ -1491,9 +1667,57 @@
       }
       footer.appendChild(right);
       card.appendChild(footer);
+      return card;
+    }
 
-      list.appendChild(card);
+    /* ── Separar por estado ──────────────────────────────────── */
+    const acceptedRecs = visibleRecords.filter(r => r.status === "Accepted");
+    const pendingRecs  = visibleRecords.filter(r => r.status === "Pending");
+    const rejectedRecs = visibleRecords.filter(r => r.status === "Rejected");
+
+    /* ── Agrupar aceptados por tier ──────────────────────────── */
+    const tierMap = new Map();
+    acceptedRecs.forEach(rec => {
+      const lvl  = levelsCache.get(rec.levelId) || {};
+      const tier = getTierInfo(lvl.position);
+      if (!tierMap.has(tier.order)) tierMap.set(tier.order, { name: tier.name, recs: [] });
+      tierMap.get(tier.order).recs.push(rec);
     });
+
+    /* Renderizar grupos de menor a mayor (Main List primero) */
+    [...tierMap.keys()].sort((a, b) => a - b).forEach(key => {
+      const group = tierMap.get(key);
+      group.recs.sort((a, b) => {
+        const la = levelsCache.get(a.levelId) || {};
+        const lb = levelsCache.get(b.levelId) || {};
+        return (Number(la.position) || 9999) - (Number(lb.position) || 9999);
+      });
+      const hdr = document.createElement("div");
+      hdr.className   = "tier-section-header";
+      hdr.textContent = group.name;
+      list.appendChild(hdr);
+      group.recs.forEach(rec => list.appendChild(buildCard(rec)));
+    });
+
+    /* Records en espera (solo staff y dueño del perfil) */
+    if (pendingRecs.length) {
+      const hdr = document.createElement("div");
+      hdr.className   = "pending-section-header";
+      hdr.textContent = `Records en espera (${pendingRecs.length})`;
+      list.appendChild(hdr);
+      pendingRecs.forEach(rec => list.appendChild(buildCard(rec)));
+    }
+
+    /* Records rechazados (solo staff y dueño del perfil) */
+    if (rejectedRecs.length) {
+      const hdr = document.createElement("div");
+      hdr.className       = "pending-section-header";
+      hdr.style.color       = "rgba(255,100,100,0.55)";
+      hdr.style.borderColor = "rgba(255,100,100,0.15)";
+      hdr.textContent = `Records rechazados (${rejectedRecs.length})`;
+      list.appendChild(hdr);
+      rejectedRecs.forEach(rec => list.appendChild(buildCard(rec)));
+    }
   }
 
   /* ====== Re-enviar a revisión (sólo Owner role) ====== *

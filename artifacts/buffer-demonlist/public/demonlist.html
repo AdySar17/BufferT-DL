@@ -1131,6 +1131,43 @@
     bindPointsPreview("inp-position",  "inp-points-preview");
     bindPointsPreview("edit-position", "edit-points-preview");
 
+    /* ── MIN % SOLO PARA TOP 50 ──────────────────────────────────
+       Si la posición es > 50, el campo minPercent se bloquea a 100
+       porque solo los niveles del Main List pueden tener % mínimo. */
+    function syncMinPercentLock(posId, minId, hintId) {
+      const posInp = document.getElementById(posId);
+      const minInp = document.getElementById(minId);
+      let hintEl   = document.getElementById(hintId);
+      if (!posInp || !minInp) return;
+      /* Crear el hint si no existe */
+      if (!hintEl) {
+        hintEl = document.createElement("div");
+        hintEl.id = hintId;
+        hintEl.style.cssText = "font-size:.78rem;color:#ff9a9a;margin:-4px 0 6px 2px;display:none;";
+        minInp.insertAdjacentElement("afterend", hintEl);
+      }
+      function update() {
+        const p = Number(posInp.value);
+        const locked = p > 50;
+        minInp.disabled = locked;
+        minInp.style.opacity = locked ? "0.45" : "";
+        minInp.title = locked ? "Solo Top 50 puede tener % mínimo < 100" : "";
+        if (locked) {
+          minInp.value = "";
+          minInp.placeholder = "100 (bloqueado — solo Top 50)";
+          hintEl.textContent = "% mínimo solo disponible para niveles Top 50.";
+          hintEl.style.display = "block";
+        } else {
+          minInp.placeholder = "% mínimo requerido (1–100, default 100)";
+          hintEl.style.display = "none";
+        }
+      }
+      posInp.addEventListener("input", update);
+      posInp.addEventListener("change", update);
+    }
+    syncMinPercentLock("inp-position",  "inp-min-percent",  "inp-min-percent-hint");
+    syncMinPercentLock("edit-position", "edit-min-percent", "edit-min-percent-hint");
+
     /* ========== AÑADIR ========== */
     window.agregarNivel = async function () {
       const btn = document.querySelector("#formModal .btn-save");
@@ -1152,7 +1189,8 @@
       const description = document.getElementById("inp-description").value.trim();
       const difficulty = document.getElementById("inp-difficulty").value || "Extreme Demon";
       const minPercentRaw = parseInt(document.getElementById("inp-min-percent").value, 10);
-      const minPercent = Number.isFinite(minPercentRaw)
+      /* Solo Top 50 puede tener minPercent < 100 */
+      const minPercent = (reqPos <= 50 && Number.isFinite(minPercentRaw))
         ? Math.min(100, Math.max(1, minPercentRaw))
         : 100;
       const tags = getTags("inp");
@@ -1268,7 +1306,8 @@
       const description = document.getElementById("edit-description").value.trim();
       const difficulty = document.getElementById("edit-difficulty").value || "Extreme Demon";
       const minPercentRaw = parseInt(document.getElementById("edit-min-percent").value, 10);
-      const minPercent = Number.isFinite(minPercentRaw)
+      /* Solo Top 50 puede tener minPercent < 100 */
+      const minPercent = (reqPos <= 50 && Number.isFinite(minPercentRaw))
         ? Math.min(100, Math.max(1, minPercentRaw))
         : 100;
       const tags = getTags("edit");
