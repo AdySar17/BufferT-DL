@@ -1,18 +1,22 @@
 // ============================================================
 // BFT Demon List — Firestore Security Rules
-// Versión: V17 (ban system + changelog + tier system)
+// Versión: V18 (staff listing público + Control Staff)
 // ============================================================
 //
-// CAMBIOS RESPECTO A V16:
+// CAMBIOS RESPECTO A V17:
 //
-//  1. /users/{uid} — Admin ahora PUEDE escribir el campo "banned"
-//     (excepto en perfiles con rol Owner).
-//     Reemplaza la Regla (C) de V16.
+//  1. /users/{uid} — Lectura ahora permitida a CUALQUIER usuario
+//     autenticado (antes solo el propio usuario o staff).
 //
-//  2. /changelog/{id} — Nueva colección para el mini-changelog
-//     de la homepage.
-//     - Lectura pública (allow read: if true).
-//     - Solo staff puede crear entradas.
+//     Motivo: la homepage muestra un bloque público de staff
+//     (Owners / Admins / Mods) consultando la colección users
+//     con where("role","in",["Owner","Admin","Mod"]).
+//     La página "Control Staff" también necesita leer todos los
+//     documentos de usuarios con roles de staff para agregar
+//     métricas de moderación.
+//
+//     Las reglas de escritura NO cambian — siguen siendo igual
+//     de estrictas que en V17.
 //
 // ============================================================
 // INSTRUCCIONES DE DESPLIEGUE:
@@ -39,15 +43,19 @@ service cloud.firestore {
         : "Default";
     }
 
-    function isMod()    { return myRole() == "Mod";   }
-    function isAdmin()  { return myRole() == "Admin";  }
-    function isOwner()  { return myRole() == "Owner";  }
+    function isMod()      { return myRole() == "Mod";   }
+    function isAdmin()    { return myRole() == "Admin";  }
+    function isOwner()    { return myRole() == "Owner";  }
     function isAdminish() { return isAdmin() || isOwner(); }
-    function isStaff()  { return isMod() || isAdmin() || isOwner(); }
+    function isStaff()    { return isMod() || isAdmin() || isOwner(); }
 
     // ── /users/{uid} ────────────────────────────────────────────
     match /users/{uid} {
-      // Lectura: cualquier usuario autenticado (permite listar staff en home/control)
+      // [V18] Lectura: cualquier usuario autenticado.
+      //   Necesario para:
+      //   - Bloque "Nuestro Staff" en la homepage (query por role).
+      //   - Página "Control Staff" (Owner): agrega métricas de moderación.
+      //   - El propio usuario siempre puede leerse a sí mismo.
       allow read: if isAuth();
 
       // Creación: solo el propio usuario
@@ -71,7 +79,6 @@ service cloud.firestore {
           !(request.resource.data.role in ["Admin","Owner"])
         ) &&
         (
-          // Si toca el campo "banned", bloquear si el target es Owner
           !("banned" in request.resource.data.diff(resource.data).affectedKeys()) ||
           resource.data.get("role","Default") != "Owner"
         );
@@ -92,8 +99,6 @@ service cloud.firestore {
       allow create: if isOwnerOf(uid) || isStaff();
 
       // El propio usuario y cualquier staff pueden actualizar
-      // (el campo "banned" puede escribirlo staff Admin+Owner via client,
-      //  lo que refleja la acción de ban en la UI pública).
       allow update: if isOwnerOf(uid) || isStaff();
 
       allow delete: if isAdminish();
