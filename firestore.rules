@@ -1,6 +1,6 @@
 // ============================================================
 // BFT Demon List — Firestore Security Rules
-// Versión: V18 (staff listing público + Control Staff)
+// Versión: V18 (staff listing completamente público + Control Staff)
 // ============================================================
 //
 // CAMBIOS RESPECTO A V17:
@@ -51,12 +51,14 @@ service cloud.firestore {
 
     // ── /users/{uid} ────────────────────────────────────────────
     match /users/{uid} {
-      // [V18] Lectura: cualquier usuario autenticado.
-      //   Necesario para:
+      // [V18] Lectura pública (if true).
+      //   Necesario para que TODOS los visitantes (sin login) puedan ver:
       //   - Bloque "Nuestro Staff" en la homepage (query por role).
-      //   - Página "Control Staff" (Owner): agrega métricas de moderación.
-      //   - El propio usuario siempre puede leerse a sí mismo.
-      allow read: if isAuth();
+      //   - Página "Control Staff" (Owner): métricas de moderación.
+      //   Los campos expuestos (name, photoURL, role) no son más
+      //   sensibles que los perfiles públicos ya existentes.
+      //   Las reglas de escritura permanecen igual de estrictas.
+      allow read: if true;
 
       // Creación: solo el propio usuario
       allow create: if isOwnerOf(uid);
