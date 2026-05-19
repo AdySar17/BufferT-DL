@@ -615,11 +615,19 @@
     /* Guardar el nivel para usarlo más tarde (validar updates, etc.) */
     window.__currentLevel = nivel;
 
-    /* Fondo del nivel (URL guardada en levels.background) */
-    const bg = (nivel.background || "").trim();
+    /* Background Level: custom > auto-generado desde gdLevelId > vacío
+       NO es thumbnail. Se usa exclusivamente como fondo/banner visual. */
+    const bgCustom = (nivel.background || "").trim();
+    const bgAuto   = nivel.gdLevelId
+      ? `https://levelthumbs.prevter.me/thumbnail/${nivel.gdLevelId}`
+      : "";
+    const bgUrl   = bgCustom || bgAuto;
     const bgLayer = document.getElementById("levelBgLayer");
-    if (bg && bgLayer) {
-      bgLayer.style.backgroundImage = `url("${bg}")`;
+    if (bgUrl && bgLayer) {
+      const _bgImg = new Image();
+      _bgImg.onload  = () => { bgLayer.style.backgroundImage = `url("${bgUrl}")`; };
+      _bgImg.onerror = () => { /* imagen no disponible — fondo permanece oscuro */ };
+      _bgImg.src = bgUrl;
     }
 
     /* Creadores: campo "creators" → array o string separado por comas */

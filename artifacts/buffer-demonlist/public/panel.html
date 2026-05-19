@@ -436,8 +436,11 @@
         <input id="alThumbnail" type="url" class="al-input" placeholder="Opcional">
       </div>
       <div>
-        <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">URL Fondo (card)</label>
-        <input id="alBackground" type="url" class="al-input" placeholder="Opcional">
+        <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">
+          Background Level
+          <span style="text-transform:none; letter-spacing:0; color:rgba(199,255,59,0.7); font-size:.72rem;">(auto-generado desde ID — editable)</span>
+        </label>
+        <input id="alBackground" type="url" class="al-input" placeholder="Se genera automáticamente desde la ID de GD">
       </div>
       <div>
         <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Glow de la carta</label>
@@ -905,6 +908,15 @@
    * ============================================================ */
   let alContext = null;   // {rec, wrap}
 
+  /* ── Background Level automático ──────────────────────────────────
+     NO es thumbnail. Se usa exclusivamente como fondo/banner visual.
+     Formato: https://levelthumbs.prevter.me/thumbnail/LEVEL_ID       */
+  function gdBgUrl(gdId) {
+    const id = (gdId || "").trim();
+    return id ? `https://levelthumbs.prevter.me/thumbnail/${id}` : "";
+  }
+  let _alPrevGdId = "";
+
   function openAddLevelModal(rec, wrap) {
     /* V15: cualquier staff (Mod/Admin/Owner) puede aceptar el reclamo y
        crear el nivel. Los Mods quedarán bloqueados por reglas de
@@ -931,7 +943,9 @@
     $("alCreators").value   = "";
     $("alPosition").value   = "";
     $("alThumbnail").value  = "";
-    $("alBackground").value = "";
+    /* Auto-generar Background Level desde la ID del nivel de GD */
+    _alPrevGdId = (rec.claimedLevelId || "").trim();
+    $("alBackground").value = gdBgUrl(_alPrevGdId);
     $("alGlow").value       = "";
     $("alTags").value       = "";
     $("alVideo").value      = rec.video || "";
@@ -956,6 +970,17 @@
     /* outside click DESHABILITADO a propósito */
     if (false && e.target === $("alBackdrop")) closeAddLevelModal();
   });
+  /* Cuando cambia la ID de GD: actualizar Background Level automáticamente
+     solo si el campo está vacío o contiene el URL auto-generado anterior. */
+  $("alGdLevelId").addEventListener("input", () => {
+    const newId  = $("alGdLevelId").value.trim();
+    const curBg  = $("alBackground").value.trim();
+    if (!curBg || curBg === gdBgUrl(_alPrevGdId)) {
+      $("alBackground").value = gdBgUrl(newId);
+    }
+    _alPrevGdId = newId;
+  });
+
   $("alPosition").addEventListener("input", () => {
     const p = Number($("alPosition").value);
     $("alPointsPreview").textContent = (p > 0)
@@ -990,8 +1015,10 @@
     const author    = $("alAuthor").value.trim();
     const creators  = $("alCreators").value.split(",").map(s => s.trim()).filter(Boolean);
     const reqPos    = Math.max(1, Math.floor(Number($("alPosition").value) || 0));
-    const thumbnail = $("alThumbnail").value.trim();
-    const background= $("alBackground").value.trim();
+    const thumbnail   = $("alThumbnail").value.trim();
+    /* Si el staff borró el campo, restaurar automáticamente el URL generado */
+    const background  = $("alBackground").value.trim()
+                     || gdBgUrl(($("alGdLevelId").value || "").trim());
     const video     = $("alVideo").value.trim();
     const difficulty= $("alDifficulty").value || "Extreme Demon";
     const minRaw    = parseInt($("alMinPercent").value, 10);
