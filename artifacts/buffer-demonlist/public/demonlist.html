@@ -827,6 +827,16 @@
 
     /* ========== HELPERS DE REORGANIZACIÓN ========== */
 
+    /* ── Background Level automático ──────────────────────────────────
+       NO es thumbnail. Se usa exclusivamente como fondo/banner visual.
+       Formato: https://levelthumbs.prevter.me/thumbnail/LEVEL_ID       */
+    function gdBgUrl(gdId) {
+      const id = (gdId || "").trim();
+      return id ? `https://levelthumbs.prevter.me/thumbnail/${id}` : "";
+    }
+    let _inpPrevGdId  = "";
+    let _editPrevGdId = "";
+
     /* Devuelve los niveles actuales ordenados por position (los sin position
        quedan al final, ordenados por value descendente como respaldo).      */
     function ordenarNiveles(arr) {
@@ -1183,7 +1193,9 @@
       const gdLevelId  = document.getElementById("inp-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("inp-position").value) || 0));
       const thumbnail  = document.getElementById("inp-thumbnail").value.trim();
-      const background = document.getElementById("inp-background").value.trim();
+      /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
+      const background = document.getElementById("inp-background").value.trim()
+                      || gdBgUrl(gdLevelId);
       const video      = document.getElementById("inp-video").value.trim();
       const glow       = document.getElementById("inp-glow").value.trim();
       const is2P       = document.getElementById("inp-is2P").checked;
@@ -1263,8 +1275,11 @@
                                                           : (nivel.creators || "");
       document.getElementById("edit-gdLevelId").value  = nivel.gdLevelId  || "";
       document.getElementById("edit-position").value   = nivel.position   || "";
-      document.getElementById("edit-thumbnail").value  = nivel.thumbnail  || "";
-      document.getElementById("edit-background").value = nivel.background || "";
+      document.getElementById("edit-thumbnail").value  = nivel.thumbnail || "";
+      /* Background Level: custom > auto-generado desde gdLevelId */
+      _editPrevGdId = (nivel.gdLevelId || "").trim();
+      document.getElementById("edit-background").value =
+        (nivel.background || "").trim() || gdBgUrl(_editPrevGdId);
       document.getElementById("edit-video").value      = nivel.video      || "";
       document.getElementById("edit-glow").value       = nivel.glow       || "";
       document.getElementById("edit-difficulty").value = nivel.difficulty || "Extreme Demon";
@@ -1290,6 +1305,26 @@
       document.getElementById("editModal").classList.add("open");
     };
 
+    /* Listeners de Background Level automático ─ modal EDITAR */
+    document.getElementById("edit-gdLevelId").addEventListener("input", () => {
+      const newId = document.getElementById("edit-gdLevelId").value.trim();
+      const curBg = document.getElementById("edit-background").value.trim();
+      if (!curBg || curBg === gdBgUrl(_editPrevGdId)) {
+        document.getElementById("edit-background").value = gdBgUrl(newId);
+      }
+      _editPrevGdId = newId;
+    });
+
+    /* Listeners de Background Level automático ─ modal AÑADIR */
+    document.getElementById("inp-gdLevelId").addEventListener("input", () => {
+      const newId = document.getElementById("inp-gdLevelId").value.trim();
+      const curBg = document.getElementById("inp-background").value.trim();
+      if (!curBg || curBg === gdBgUrl(_inpPrevGdId)) {
+        document.getElementById("inp-background").value = gdBgUrl(newId);
+      }
+      _inpPrevGdId = newId;
+    });
+
     /* ========== GUARDAR EDICIÓN ========== */
     window.guardarEdicion = async function () {
       const btn = document.querySelector("#editModal .btn-update");
@@ -1303,7 +1338,9 @@
       const gdLevelId  = document.getElementById("edit-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("edit-position").value) || 0));
       const thumbnail  = document.getElementById("edit-thumbnail").value.trim();
-      const background = document.getElementById("edit-background").value.trim();
+      /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
+      const background = document.getElementById("edit-background").value.trim()
+                      || gdBgUrl(gdLevelId);
       const video      = document.getElementById("edit-video").value.trim();
       const glow       = document.getElementById("edit-glow").value.trim();
       const is2P       = document.getElementById("edit-is2P").checked;
