@@ -52,7 +52,7 @@
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
-  .nav-left  { display: flex; align-items: center; gap: 10px; }
+  .left  { display: flex; align-items: center; gap: 10px; }
   .logo-img  { width: 36px; height: 36px; }
   .logo-text { color: white; font-weight: 700; font-size: 1.05rem; }
   .nav-links { display: flex; gap: 18px; }
@@ -70,7 +70,7 @@
       position: absolute; top: 60px; right: 10px;
       background: rgba(0,0,0,0.92); padding: 10px; border-radius: 10px; gap: 8px;
     }
-    .nav-links.open { display: flex; }
+    .nav-links.active { display: flex; }
   }
 
   /* ===== LOADING / ERROR ===== */
@@ -335,7 +335,7 @@
 
 <!-- NAV -->
 <header class="top-header">
-  <div class="nav-left">
+  <div class="left">
     <img src="https://iili.io/BN3Yhpp.png" class="logo-img" alt="Logo">
     <div class="logo-text">BFT Demon List</div>
   </div>
@@ -352,7 +352,7 @@
       <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
     <div class="auth-slot" id="authSlot"></div>
-    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
+    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
   </div>
 </header>
 
@@ -467,10 +467,26 @@
 
     </aside>
   </div>
+
+  <!-- BANNERS DEL NIVEL -->
+  <div id="levelBannersWrap" style="display:none; margin-top:18px;">
+    <div class="card" style="padding:18px 20px;">
+      <div style="font-weight:700;font-size:.92rem;color:#c7ff3b;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;">
+        🎖 Banners del Nivel
+      </div>
+      <div id="levelBannersList" style="display:flex;flex-wrap:wrap;gap:16px;"></div>
+    </div>
+  </div>
+
 </div>
 
-<!-- ESTILOS DEL HISTORIAL -->
+<!-- ESTILOS BANNERS + HISTORIAL -->
 <style>
+  @keyframes lvlBannerChroma {
+    0%   { background-position: 0% 50%, 0% 50%; }
+    100% { background-position: 200% 50%, 200% 50%; }
+  }
+
   /* ── Toggle del historial ── */
   .hist-toggle {
     cursor: pointer;
@@ -668,6 +684,70 @@
       document.getElementById("lvlIframe").src = embedSrc;
     } else {
       document.getElementById("videoWrap").style.display = "none";
+    }
+
+    /* Banners asignados a este nivel */
+    renderLevelBanners(nivel);
+  }
+
+  /* ── Banners del nivel ───────────────────────────────── */
+  async function renderLevelBanners(nivel) {
+    const rewards = Array.isArray(nivel.rewards) ? nivel.rewards : [];
+    const wrap = document.getElementById("levelBannersWrap");
+    if (!wrap) return;
+    if (!rewards.length) { wrap.style.display = "none"; return; }
+    wrap.style.display = "block";
+    const list = document.getElementById("levelBannersList");
+    list.innerHTML = "";
+    for (const bid of rewards) {
+      try {
+        const snap = await getDoc(doc(db, "banners", bid));
+        if (!snap.exists()) continue;
+        const b = { id: snap.id, ...snap.data() };
+        const item = document.createElement("div");
+        item.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:7px;width:100px;";
+
+        const frame = document.createElement("div");
+        frame.style.cssText = "width:90px;height:90px;border-radius:10px;flex-shrink:0;background-size:cover;background-position:center;";
+        if (b.imageUrl) frame.style.backgroundImage = `url('${b.imageUrl}')`;
+
+        const ft  = b.frameType  || "none";
+        const fc  = b.frameColor  || "#c7ff3b";
+        const fc2 = b.frameColor2 || "#ff6b6b";
+        if (ft === "solid") {
+          frame.style.boxShadow = `inset 0 0 0 4px ${fc}, 0 0 14px ${fc}55`;
+        } else if (ft === "gradient") {
+          frame.style.border = "4px solid transparent";
+          const imgLayer = b.imageUrl ? `url('${b.imageUrl}'), ` : `linear-gradient(rgba(10,22,10,.9),rgba(10,22,10,.9)), `;
+          frame.style.backgroundImage = `${imgLayer}linear-gradient(135deg, ${fc}, ${fc2})`;
+          frame.style.backgroundOrigin = "padding-box, border-box";
+          frame.style.backgroundClip  = "padding-box, border-box";
+          frame.style.backgroundSize  = "cover, 100%";
+        } else if (ft === "chroma") {
+          frame.style.border = "4px solid transparent";
+          const imgLayer = b.imageUrl ? `url('${b.imageUrl}'), ` : "";
+          frame.style.backgroundImage = `${imgLayer}linear-gradient(135deg,#ff0000,#ff8800,#ffff00,#00ff00,#0088ff,#8800ff,#ff0000)`;
+          if (b.imageUrl) {
+            frame.style.backgroundOrigin = "padding-box, border-box";
+            frame.style.backgroundClip   = "padding-box, border-box";
+            frame.style.backgroundSize   = "cover, 200%";
+          } else {
+            frame.style.backgroundSize = "200%";
+          }
+          frame.style.animation = "lvlBannerChroma 3s linear infinite";
+        }
+
+        const name = document.createElement("div");
+        name.style.cssText = "font-size:.75rem;color:rgba(255,255,255,.75);text-align:center;font-weight:600;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+        name.textContent = b.name || "—";
+        if (b.rarity) {
+          const rarityColors = { "Uncommon":"#5dde69","Rare":"#4ab8f5","Epic":"#b16cf5","Legendary":"#f5a623","Mythic":"#ff6b6b" };
+          name.style.color = rarityColors[b.rarity] || "rgba(255,255,255,.75)";
+        }
+        item.appendChild(frame);
+        item.appendChild(name);
+        list.appendChild(item);
+      } catch (e) { console.warn("[level] banner load fail:", bid, e); }
     }
   }
 

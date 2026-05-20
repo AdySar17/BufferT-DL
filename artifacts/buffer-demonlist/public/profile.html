@@ -40,7 +40,7 @@
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255,255,255,0.05);
   }
-  .nav-left  { display: flex; align-items: center; gap: 10px; }
+  .left  { display: flex; align-items: center; gap: 10px; }
   .logo-img  { width: 36px; height: 36px; }
   .logo-text { color: white; font-weight: 700; font-size: 1.05rem; }
   .nav-links { display: flex; gap: 18px; }
@@ -58,7 +58,7 @@
       position: absolute; top: 60px; right: 10px;
       background: rgba(0,0,0,0.92); padding: 10px; border-radius: 10px; gap: 8px;
     }
-    .nav-links.open { display: flex; }
+    .nav-links.active { display: flex; }
   }
 
   /* ========== ESTADO / LOADER ========== */
@@ -827,7 +827,7 @@
 
 <!-- NAV -->
 <header class="top-header">
-  <div class="nav-left">
+  <div class="left">
     <img src="https://iili.io/BN3Yhpp.png" class="logo-img" alt="Logo">
     <div class="logo-text">BFT Demon List</div>
   </div>
@@ -844,7 +844,7 @@
       <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
     <div class="auth-slot" id="authSlot"></div>
-    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
+    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
   </div>
 </header>
 
@@ -1597,6 +1597,9 @@
       }
     }
     renderDiffStats(diffCounts);
+    /* Compartir el hardest con el script de cosméticos */
+    window.__profileHardestLevel = hardestLvl;
+    if (window.__tryAutoEquipBanner) window.__tryAutoEquipBanner();
   }
 
   function renderDiffStats(counts) {
@@ -2184,6 +2187,25 @@
   let tempBanner = null;
   let tempBadges = [];
 
+  /* ── Auto-equip: zona guardada para cuando llegue hardestLevel ── */
+  let _autoEquipZone = null;
+
+  async function tryAutoEquipBannerFn() {
+    const zone = _autoEquipZone;
+    if (!zone) return;
+    if (cosmData.equippedBanner) return;
+    const lvl = window.__profileHardestLevel;
+    if (!lvl || !Array.isArray(lvl.rewards) || !lvl.rewards.length) {
+      applyDefaultBanner(zone); return;
+    }
+    try {
+      const bData = await getBannerData(lvl.rewards[0]);
+      if (bData) applyBannerToZone(zone, bData);
+      else        applyDefaultBanner(zone);
+    } catch { applyDefaultBanner(zone); }
+  }
+  window.__tryAutoEquipBanner = tryAutoEquipBannerFn;
+
   /* ── Wait for ?id= to appear (set by main profile script) ── */
   function waitForUid() {
     return new Promise(resolve => {
@@ -2222,7 +2244,15 @@
   async function renderBannerZone() {
     const zone = $c("pBannerZone");
     if (!zone) return;
-    if (!cosmData.equippedBanner) { applyDefaultBanner(zone); return; }
+    if (!cosmData.equippedBanner) {
+      _autoEquipZone = zone;
+      if (window.__profileHardestLevel !== undefined) {
+        await tryAutoEquipBannerFn();
+      } else {
+        applyDefaultBanner(zone);
+      }
+      return;
+    }
     try {
       const bData = await getBannerData(cosmData.equippedBanner);
       if (bData) applyBannerToZone(zone, bData);

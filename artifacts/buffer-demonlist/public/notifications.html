@@ -56,7 +56,7 @@
       position: absolute; top: 60px; right: 10px;
       background: rgba(0,0,0,0.92); padding: 10px; border-radius: 10px; gap: 8px;
     }
-    .nav-links.open { display: flex; }
+    .nav-links.active { display: flex; }
   }
 
   .page-wrap {
@@ -169,7 +169,7 @@
       <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
     <div class="auth-slot" id="authSlot"></div>
-    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
+    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
   </div>
 </header>
 

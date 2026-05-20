@@ -49,7 +49,7 @@
         padding: 10px; border-radius: 10px; gap: 8px;
         min-width: 180px;
       }
-      .nav-links.open { display: flex; }
+      .nav-links.active { display: flex; }
     }
 
     /* ── Visibility classes ── */
@@ -339,12 +339,13 @@
       <a href="/leaderboards.html">Leaderboards</a>
       <a href="/notifications.html">✉ Notificaciones</a>
       <a href="/submit.html">Enviar Record</a>
+      <a href="/guidelines.html">Guidelines</a>
       <a href="/panel.html" class="staff-only">Panel de Records</a>
       <a href="/staff-control.html" class="owner-only">Control Staff</a>
       <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
     <div class="auth-slot" id="authSlot"></div>
-    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
+    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
   </div>
 </header>
 
