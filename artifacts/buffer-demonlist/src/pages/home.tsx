@@ -46,6 +46,24 @@ type LiveStats = {
   recent: number;
 };
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readCache<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts < CACHE_TTL_MS) return data as T;
+  } catch {}
+  return null;
+}
+
+function writeCache(key: string, data: unknown) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
 /* ─── Hook que carga todo desde Firestore ─── */
 function useLiveData() {
   const [stats, setStats] = useState<LiveStats>({ records: 0, players: 0, levels: 0, recent: 0 });
@@ -56,6 +74,14 @@ function useLiveData() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const cached = readCache<{ stats: LiveStats; top10: LiveLevel[]; records: LiveRecord[] }>("home_livedata");
+      if (cached) {
+        setStats(cached.stats);
+        setTop10(cached.top10);
+        setRecords(cached.records);
+        setLoading(false);
+        return;
+      }
       try {
         /* Esquivar el análisis estático de Vite: estos módulos se sirven en
            runtime (auth.js desde /public, Firebase desde CDN). */
@@ -132,10 +158,9 @@ function useLiveData() {
           })
         );
 
-        /* Conteos — usamos getCountFromServer si está disponible, y caemos
-         * a getDocs(...).size si la versión del SDK no lo soporta o el
-         * conteo agregado falla por reglas/red. Así nunca quedan en 0
-         * silenciosamente. */
+        /* Conteos — usamos getCountFromServer únicamente.
+         * Si falla (cuota, permisos), devuelve 0 sin hacer un getDocs
+         * completo que leería miles de documentos y agotar la cuota. */
         async function countCol(colRef: any, label: string): Promise<number> {
           if (typeof getCountFromServer === "function") {
             try {
@@ -143,16 +168,10 @@ function useLiveData() {
               const n = snap.data().count;
               if (typeof n === "number") return n;
             } catch (e) {
-              console.warn(`[home] count agregado falló (${label}), usando getDocs:`, e);
+              console.warn(`[home] count agregado falló (${label}):`, e);
             }
           }
-          try {
-            const snap = await getDocs(colRef);
-            return snap.size;
-          } catch (e) {
-            console.error(`[home] no se pudo contar ${label}:`, e);
-            return 0;
-          }
+          return 0;
         }
 
         const [recordsCount, playersCount, levelsCount] = await Promise.all([
@@ -165,14 +184,16 @@ function useLiveData() {
         ]);
 
         if (cancelled) return;
-        setTop10(lvls);
-        setRecords(recsResolved);
-        setStats({
+        const newStats = {
           records: recordsCount,
           players: playersCount,
           levels: levelsCount,
           recent: recsResolved.length,
-        });
+        };
+        writeCache("home_livedata", { stats: newStats, top10: lvls, records: recsResolved });
+        setTop10(lvls);
+        setRecords(recsResolved);
+        setStats(newStats);
         setLoading(false);
       } catch (err) {
         console.error("[home] error cargando datos en vivo:", err);
@@ -204,6 +225,12 @@ function useStaffMembers() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const cached = readCache<StaffMember[]>("home_staff");
+      if (cached) {
+        setStaffMembers(cached);
+        setLoadingStaff(false);
+        return;
+      }
       try {
         const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
         const auth = await dynImport("/auth.js");
@@ -226,6 +253,7 @@ function useStaffMembers() {
           })
         );
 
+        writeCache("home_staff", members);
         if (!cancelled) setStaffMembers(members);
       } catch (e) {
         console.warn("[home] staff load failed:", e);
@@ -258,6 +286,12 @@ function useChangelog() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const cached = readCache<ChangelogEntry[]>("home_changelog");
+      if (cached) {
+        setEntries(cached);
+        setLoadingCl(false);
+        return;
+      }
       try {
         const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
         const auth = await dynImport("/auth.js");
@@ -270,6 +304,7 @@ function useChangelog() {
         );
         const rows: ChangelogEntry[] = [];
         snap.forEach((d: any) => rows.push({ id: d.id, ...d.data() }));
+        writeCache("home_changelog", rows);
         if (!cancelled) setEntries(rows);
       } catch (e) {
         console.warn("[home] changelog load failed:", e);
