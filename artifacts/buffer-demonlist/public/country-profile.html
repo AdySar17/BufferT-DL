@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>País — BFT Demon List</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           #0a0e0a;
+    --glass-border: rgba(255,255,255,0.07);
+    --text:         #e8f5e9;
+    --muted:        rgba(200,220,200,0.65);
+    --accent-start: #7cfc00;
+    --radius:       16px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Montserrat', sans-serif; }
+
+  /* ── NAV ── */
+  .top-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9000;
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(5,10,5,0.88); backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(124,252,0,0.1);
+  }
+  .top-header .left { display: flex; align-items: center; gap: 10px; }
+  .logo-img  { width: 32px; height: 32px; object-fit: contain; }
+  .logo-text { font-weight: 800; font-size: .92rem; color: #7cfc00; letter-spacing: .5px; }
+  .nav-links { display: flex; gap: 18px; list-style: none; }
+  .nav-links a { color: rgba(200,220,200,.75); text-decoration: none; font-size: .82rem; font-weight: 600; transition: color .2s; }
+  .nav-links a:hover { color: #c7ff3b; }
+  .auth-slot { display: flex; align-items: center; }
+  .menu-toggle { display: none; cursor: pointer; font-size: 1.4rem; color: rgba(200,220,200,.75); }
+  @media (max-width: 820px) {
+    .nav-links { display: none; flex-direction: column; position: absolute; top: 56px; left: 0; right: 0; background: rgba(5,10,5,.97); padding: 16px 24px; gap: 12px; border-bottom: 1px solid rgba(124,252,0,0.1); }
+    .nav-links.active { display: flex; }
+    .menu-toggle { display: block; }
+  }
+  .staff-only, .owner-only, .admin-only { display: none; }
+  body.is-staff .staff-only  { display: block; }
+  body.is-owner .owner-only  { display: block; }
+  body.is-admin .admin-only  { display: block; }
+
+  /* ── LAYOUT ── */
+  .page-wrap { max-width: 1000px; margin: 80px auto 60px; padding: 0 20px; }
+
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 7px; margin-bottom: 20px;
+    padding: 7px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04); color: var(--muted);
+    font-family: 'Montserrat', sans-serif; font-size: 0.88rem; font-weight: 600;
+    cursor: pointer; text-decoration: none; transition: background .2s, color .2s;
+  }
+  .back-btn:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+
+  /* ── CARD ── */
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.38));
+    border: 1px solid var(--glass-border); border-radius: var(--radius);
+    padding: 22px; box-shadow: 0 6px 28px rgba(0,0,0,0.55); margin-bottom: 18px;
+  }
+
+  /* ── HEADER DE PAÍS ── */
+  .country-header { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .country-flag-big { width: 90px; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.55); flex-shrink: 0; }
+  .country-info h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
+  .country-code-tag {
+    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .72rem;
+    font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+    background: rgba(124,252,0,.12); border: 1px solid rgba(124,252,0,.25); color: #a8ff5b;
+    margin-bottom: 8px;
+  }
+  .country-stats-row { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; }
+  .cstat { text-align: center; }
+  .cstat-val { font-size: 1.35rem; font-weight: 800; color: #c7ff3b; }
+  .cstat-lbl { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+
+  /* ── SECTION LABEL ── */
+  .sec-label {
+    font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+    color: rgba(199,255,59,.75); margin-bottom: 12px;
+  }
+
+  /* ── TOP PLAYERS ── */
+  .tp-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 10px; background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.04); margin-bottom: 6px;
+    cursor: pointer; transition: background .15s; text-decoration: none; color: var(--text);
+  }
+  .tp-row:hover { background: rgba(255,255,255,0.055); }
+  .tp-pos { width: 34px; font-weight: 700; font-size: .85rem; color: var(--muted); text-align: center; flex-shrink: 0; }
+  .tp-pos.gold   { color: #ffd700; }
+  .tp-pos.silver { color: #c0c0c0; }
+  .tp-pos.bronze { color: #cd7f32; }
+  .tp-photo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.05); }
+  .tp-photo-fb { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(124,252,0,.12); font-size: .75rem; font-weight: 700; flex-shrink: 0; }
+  .tp-name { font-weight: 600; font-size: .9rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tp-pts  { font-size: .88rem; font-weight: 700; color: var(--accent-start); white-space: nowrap; }
+
+  /* ── FVN (First Victor Nacional) ── */
+  .fvn-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 10px; background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.04); margin-bottom: 6px;
+    text-decoration: none; color: var(--text); transition: background .15s;
+  }
+  .fvn-row:hover { background: rgba(255,255,255,0.055); }
+  .fvn-lvl  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: .9rem; }
+  .fvn-pos  { font-size: .72rem; color: var(--muted); font-weight: 700; white-space: nowrap; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.06); }
+  .fvn-player { font-size: .8rem; color: rgba(200,220,200,.7); white-space: nowrap; }
+  .fvn-date   { font-size: .74rem; color: rgba(180,180,180,.5); white-space: nowrap; }
+
+  /* ── EMPTY ── */
+  .empty-msg { text-align: center; padding: 28px 0; color: var(--muted); font-size: .9rem; }
+
+  /* ── STATE ── */
+  #stateMsg { text-align: center; padding: 60px 20px; color: var(--muted); font-size: .95rem; }
+</style>
+</head>
+<body>
+
+<header class="top-header">
+  <div class="left">
+    <img src="https://iili.io/BN3Yhpp.png" class="logo-img" alt="Logo">
+    <div class="logo-text">BFT Demon List</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <nav class="nav-links" id="navLinks">
+      <a href="/">Home</a>
+      <a href="/demonlist.html">Demon List</a>
+      <a href="/leaderboards.html">Leaderboards</a>
+      <a href="/notifications.html">✉ Notificaciones</a>
+      <a href="/submit.html">Enviar Record</a>
+      <a href="/guidelines.html">Guidelines</a>
+      <a href="/panel.html" class="staff-only">Panel de Records</a>
+      <a href="/staff-control.html" class="owner-only">Control Staff</a>
+      <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
+    </nav>
+    <div class="auth-slot" id="authSlot"></div>
+    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
+  </div>
+</header>
+
+<script type="module">
+  import { mountAuthUI, onAuthChange, isStaff } from "/auth.js";
+  mountAuthUI("authSlot");
+  onAuthChange(() => {
+    document.body.classList.toggle("is-staff", isStaff());
+  });
+</script>
+
+<div id="stateMsg">Cargando...</div>
+
+<div class="page-wrap" id="pageWrap" style="display:none;">
+  <a href="/leaderboards.html?cat=countries" class="back-btn">&#8592; Volver a Leaderboards</a>
+
+  <!-- Header del país -->
+  <div class="card" id="countryHeaderCard">
+    <div class="country-header">
+      <img id="cpFlag" class="country-flag-big" src="" alt="">
+      <div class="country-info">
+        <div class="country-code-tag" id="cpCode"></div>
+        <h1 id="cpName">—</h1>
+        <div class="country-stats-row" id="cpStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top jugadores -->
+  <div class="card">
+    <div class="sec-label">Top Jugadores</div>
+    <div id="topPlayersList"><div class="empty-msg">Cargando...</div></div>
+  </div>
+
+  <!-- Primeros Victores -->
+  <div class="card" id="fvCard" style="display:none;">
+    <div class="sec-label" id="fvTitle">Primeros en completar cada nivel</div>
+    <div id="fvList"></div>
+  </div>
+</div>
+
+<script type="module">
+  import { db } from "/auth.js";
+  import { collection, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { countryName, flagUrl } from "/country-utils.js";
+
+  const code = new URLSearchParams(location.search).get("code") || "";
+
+  if (!code) {
+    document.getElementById("stateMsg").textContent = "Código de país no especificado.";
+  } else {
+    document.title = `${code.toUpperCase()} — BFT Demon List`;
+    init(code.toLowerCase());
+  }
+
+  async function init(code) {
+    const state = document.getElementById("stateMsg");
+    try {
+      /* 1. Cargar perfiles → filtrar por país */
+      const profSnap = await getDocs(collection(db, "profiles"));
+      const countryProfiles = new Map();
+      profSnap.forEach(ps => {
+        const d = ps.data() || {};
+        if ((d.country || "").toLowerCase() === code) {
+          countryProfiles.set(ps.id, { uid: ps.id, name: d.name || "Sin nombre", photoURL: d.photoURL || "" });
+        }
+      });
+
+      if (!countryProfiles.size) {
+        state.textContent = `Ningún jugador registrado de ${countryName(code) || code.toUpperCase()}.`;
+        return;
+      }
+
+      /* 2. Cargar todos los records aceptados */
+      const recsSnap  = await getDocs(collection(db, "records"));
+      const allRecs = recsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => r.status === "Accepted" && Number(r.percent) > 0);
+
+      /* 3. Cargar todos los niveles */
+      const lvlSnap = await getDocs(collection(db, "levels"));
+      const levelsMap = new Map();
+      lvlSnap.forEach(d => levelsMap.set(d.id, { id: d.id, ...d.data() }));
+
+      /* 4. Agregar puntos por jugador del país */
+      const playerStats = new Map(); // uid → {points, records100, records}
+      countryProfiles.forEach((_, uid) => {
+        playerStats.set(uid, { points: 0, records100: 0, records: 0 });
+      });
+
+      /* Also track for player2 if they are from the country */
+      const fullRecords = []; // 100% records by this country's players
+
+      allRecs.forEach(r => {
+        const uids = [r.userId, r.player2Id].filter(Boolean);
+        uids.forEach(uid => {
+          if (!countryProfiles.has(uid)) return;
+          const lvl = levelsMap.get(r.levelId);
+          if (!lvl) return;
+          const pct  = Number(r.percent);
+          const base = Number(lvl.value || 0);
+          const pts  = pct === 100 ? base : (base / 10);
+          const st = playerStats.get(uid);
+          st.points += pts;
+          st.records++;
+          if (pct === 100) st.records100++;
+        });
+
+        /* Collect 100% records for FVN calculation */
+        if (Number(r.percent) === 100 && countryProfiles.has(r.userId)) {
+          fullRecords.push(r);
+        }
+      });
+
+      /* 5. Compute country totals */
+      let totalPts = 0, totalRecs = 0;
+      playerStats.forEach(st => { totalPts += st.points; totalRecs += st.records100; });
+      totalPts = Math.round(totalPts * 100) / 100;
+
+      /* 6. First Victor per level (earliest acceptedAt 100%) */
+      const fvnMap = new Map(); // levelId → {levelId, uid, ts, date}
+      fullRecords.forEach(r => {
+        const ts = r.acceptedAt?.toMillis ? r.acceptedAt.toMillis() : 0;
+        if (!ts) return;
+        const existing = fvnMap.get(r.levelId);
+        if (!existing || ts < existing.ts) {
+          fvnMap.set(r.levelId, { levelId: r.levelId, uid: r.userId, ts, date: r.acceptedAt });
+        }
+      });
+
+      /* Hardest level: lowest position among fvn keys */
+      let hardestLvl = null;
+      fvnMap.forEach((_, lid) => {
+        const l = levelsMap.get(lid);
+        if (!l) return;
+        const pos = Number(l.position) || Infinity;
+        if (!hardestLvl || pos < Number(hardestLvl.position)) hardestLvl = l;
+      });
+
+      /* 7. Render */
+      renderHeader(code, countryProfiles.size, totalPts, totalRecs, hardestLvl);
+      renderTopPlayers(playerStats, countryProfiles);
+      renderFVN(fvnMap, levelsMap, countryProfiles);
+
+      state.style.display = "none";
+      document.getElementById("pageWrap").style.display = "block";
+
+    } catch (err) {
+      state.textContent = "Error al cargar: " + (err.message || err);
+      console.error("[country-profile]", err);
+    }
+  }
+
+  function renderHeader(code, players, pts, recs, hardest) {
+    const name = countryName(code) || code.toUpperCase();
+    document.title = `${name} — BFT Demon List`;
+    document.getElementById("cpFlag").src = flagUrl(code);
+    document.getElementById("cpFlag").alt = name;
+    document.getElementById("cpCode").textContent = code.toUpperCase();
+    document.getElementById("cpName").textContent = name;
+
+    const hardestTxt = hardest
+      ? `<span class="cstat-val">#${hardest.position}</span><div class="cstat-lbl">Más difícil</div>`
+      : "";
+
+    document.getElementById("cpStats").innerHTML = `
+      <div class="cstat"><div class="cstat-val">${players}</div><div class="cstat-lbl">Jugadores</div></div>
+      <div class="cstat"><div class="cstat-val">${pts.toLocaleString()}</div><div class="cstat-lbl">Puntos</div></div>
+      <div class="cstat"><div class="cstat-val">${recs}</div><div class="cstat-lbl">Completes</div></div>
+      ${hardest ? `<div class="cstat">${hardestTxt}</div>` : ""}
+    `;
+  }
+
+  function renderTopPlayers(playerStats, profiles) {
+    const list = document.getElementById("topPlayersList");
+    const sorted = [...playerStats.entries()]
+      .sort((a, b) => b[1].points - a[1].points)
+      .slice(0, 50);
+
+    if (!sorted.length) {
+      list.innerHTML = `<div class="empty-msg">Sin datos.</div>`; return;
+    }
+    list.innerHTML = "";
+    sorted.forEach(([uid, st], i) => {
+      const p = profiles.get(uid) || {};
+      const pts = (Math.round(st.points * 100) / 100).toLocaleString();
+      const posClass = i === 0 ? "gold" : i === 1 ? "silver" : i === 2 ? "bronze" : "";
+      const initials = (p.name || "?").split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase();
+      const photoHtml = p.photoURL
+        ? `<img class="tp-photo" src="${p.photoURL}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
+        : `<div class="tp-photo-fb">${initials}</div>`;
+
+      const row = document.createElement("a");
+      row.className = "tp-row";
+      row.href = `/profile.html?id=${encodeURIComponent(uid)}`;
+      row.innerHTML = `
+        <div class="tp-pos ${posClass}">#${i+1}</div>
+        ${photoHtml}
+        <div class="tp-name">${escHtml(p.name || "Sin nombre")}</div>
+        <div class="tp-pts">${pts} pts</div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  function renderFVN(fvnMap, levelsMap, profiles) {
+    if (!fvnMap.size) return;
+    const card  = document.getElementById("fvCard");
+    const title = document.getElementById("fvTitle");
+    const list  = document.getElementById("fvList");
+
+    /* Sort by level position ASC (most ranked first) */
+    const entries = [...fvnMap.values()]
+      .map(e => ({ ...e, level: levelsMap.get(e.levelId) }))
+      .filter(e => e.level)
+      .sort((a, b) => (Number(a.level.position)||9999) - (Number(b.level.position)||9999));
+
+    title.textContent = `Primeros en completar cada nivel (${entries.length})`;
+    card.style.display = "block";
+
+    entries.forEach(e => {
+      const p = profiles.get(e.uid) || {};
+      const dateStr = e.date?.toDate
+        ? e.date.toDate().toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric" })
+        : "—";
+      const lvl = e.level;
+
+      const row = document.createElement("a");
+      row.className = "fvn-row";
+      row.href = `/level.html?id=${encodeURIComponent(e.levelId)}`;
+      row.innerHTML = `
+        <div class="fvn-pos">#${lvl.position || "?"}</div>
+        <div class="fvn-lvl">${escHtml(lvl.name || "Nivel")}</div>
+        <div class="fvn-player">${escHtml(p.name || "?")}</div>
+        <div class="fvn-date">${dateStr}</div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  }
+</script>
+</body>
+</html>

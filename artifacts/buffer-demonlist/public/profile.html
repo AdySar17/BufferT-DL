@@ -942,9 +942,10 @@
         </div>
       </div>
       <div>
-        <label for="editCountry">País (código ISO de 2 letras)</label>
-        <input id="editCountry" class="input" maxlength="2" placeholder="Ej: ES, MX, AR, US..." autocomplete="off">
-        <div class="field-help">Usa el código de 2 letras. Ejemplos: ES España · MX México · AR Argentina · CL Chile · US Estados Unidos.</div>
+        <label for="editCountry">País</label>
+        <select id="editCountry" class="input" style="padding-right:8px;cursor:pointer;"></select>
+        <div id="countryCooldownMsg" style="display:none;margin-top:6px;padding:8px 12px;background:rgba(255,150,50,0.12);border:1px solid rgba(255,150,50,0.35);border-radius:8px;color:#ffcc80;font-size:.82rem;"></div>
+        <div class="field-help">Puedes cambiar tu país una vez cada 30 días. Los administradores pueden cambiarlo en cualquier momento.</div>
       </div>
       <div>
         <label for="editYoutube">Canal de YouTube (opcional)</label>
@@ -1072,6 +1073,7 @@
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
            collection, query, where, getDocs }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { COUNTRY_LIST, countryName } from "/country-utils.js";
 
   const $ = (id) => document.getElementById(id);
 
@@ -1121,7 +1123,7 @@
       const code = d.country.trim().toLowerCase();
       $("pCountryFlag").src = `https://flagcdn.com/w40/${code}.png`;
       $("pCountryFlag").onerror = () => { $("pCountryFlag").style.display = "none"; };
-      $("pCountryText").textContent = d.country.toUpperCase();
+      $("pCountryText").textContent = countryName(code) || code.toUpperCase();
       $("pCountryWrap").style.display = "inline-flex";
     }
 
@@ -2051,12 +2053,55 @@
   };
 
   /* ── EDITAR ── */
+  /* ── Populate country select once ── */
+  let _countrySelectReady = false;
+  function populateCountrySelect() {
+    if (_countrySelectReady) return;
+    _countrySelectReady = true;
+    const sel = $("editCountry");
+    const empty = document.createElement("option");
+    empty.value = ""; empty.textContent = "— Sin país —";
+    sel.appendChild(empty);
+    COUNTRY_LIST.forEach(([code, name]) => {
+      const opt = document.createElement("option");
+      opt.value = code;
+      opt.textContent = `${name} (${code.toUpperCase()})`;
+      sel.appendChild(opt);
+    });
+  }
+
   $("btnEdit").onclick = () => {
+    populateCountrySelect();
     $("editName").value    = profileData?.name     || "";
     $("editPhoto").value   = profileData?.photoURL || "";
-    $("editCountry").value = profileData?.country  || "";
+    $("editCountry").value = (profileData?.country || "").toLowerCase();
     $("editYoutube").value = profileData?.youtube  || "";
     $("editBio").value     = profileData?.bio      || "";
+
+    /* Cooldown 30 días — Owner lo salta */
+    const cooldownEl = $("countryCooldownMsg");
+    const selEl      = $("editCountry");
+    const changedAt  = profileData?.countryChangedAt;
+    const bypass     = currentUserRole === "Owner";
+    if (changedAt && !bypass) {
+      const msAgo  = Date.now() - (changedAt.toMillis ? changedAt.toMillis() : Number(changedAt));
+      const THIRTY = 30 * 24 * 60 * 60 * 1000;
+      if (msAgo < THIRTY) {
+        const rem  = THIRTY - msAgo;
+        const days = Math.floor(rem / (24 * 60 * 60 * 1000));
+        const hrs  = Math.floor((rem % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+        cooldownEl.textContent = `País bloqueado — podrás cambiarlo en ${days}d ${hrs}h.`;
+        cooldownEl.style.display = "block";
+        selEl.disabled = true;
+      } else {
+        cooldownEl.style.display = "none";
+        selEl.disabled = false;
+      }
+    } else {
+      cooldownEl.style.display = "none";
+      selEl.disabled = false;
+    }
+
     $("editForm").classList.add("open");
     $("msgOk").style.display  = "none";
     $("msgErr").style.display = "none";
@@ -2104,6 +2149,9 @@
     const finalPhoto = photoURL
       || (isOwner ? (currentUser?.photoURL || "") : (profileData?.photoURL || ""));
 
+    const prevCountry    = (profileData?.country || "").trim().toLowerCase();
+    const countryChanged = country !== prevCountry && !$("editCountry").disabled;
+
     const payload = {
       name,
       photoURL: finalPhoto,
@@ -2112,6 +2160,9 @@
       bio,
       updatedAt: serverTimestamp()
     };
+    if (countryChanged && currentUserRole !== "Owner") {
+      payload.countryChangedAt = serverTimestamp();
+    }
 
     console.log("[profile] guardando perfil", targetUid, payload);
 
@@ -2141,6 +2192,8 @@
       $("btnSave").disabled    = false;
       $("btnCancel").disabled  = false;
       $("btnSave").textContent = "Guardar";
+      if ($("countryCooldownMsg").style.display !== "block")
+        $("editCountry").disabled = false;
     }
   };
 </script>

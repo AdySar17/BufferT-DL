@@ -421,6 +421,7 @@
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
 
     const $ = (id) => document.getElementById(id);
 
@@ -446,9 +447,13 @@
       { key: "Hard Demon",    label: "Por Hard Demons",       unit: "Demons", diff: "Hard Demon"    },
       { key: "Medium Demon",  label: "Por Medium Demons",     unit: "Demons", diff: "Medium Demon"  },
       { key: "Easy Demon",    label: "Por Easy Demons",       unit: "Demons", diff: "Easy Demon"    },
+      { key: "countries",     label: "Países",                unit: "Pts",    special: true         },
     ];
-    /* Categoría inicial: SIEMPRE "Por Puntos" al entrar al leaderboard. */
+    /* Categoría inicial: SIEMPRE "Por Puntos" al entrar al leaderboard.
+       Se puede sobreescribir con el parámetro ?cat= de la URL. */
     let activeCat = "points";
+    const _urlCat = new URLSearchParams(location.search).get("cat");
+    if (_urlCat && CATEGORIES.some(c => c.key === _urlCat)) activeCat = _urlCat;
 
     function renderTabs() {
       const sel = $("catSelect");
@@ -642,7 +647,69 @@
       return { rows, field, unit: cat.unit };
     }
 
+    /* ===== LEADERBOARD PAÍSES ===== */
+    function renderCountryList() {
+      const list = $("lbList");
+      list.innerHTML = "";
+      $("pager").style.display = "none";
+
+      const term = ($("searchBar").value || "").trim().toLowerCase();
+
+      /* Agregar puntos por país */
+      const cMap = new Map();
+      aggregates.forEach(u => {
+        const code = (u.country || "").toLowerCase();
+        if (!code) return;
+        if (!cMap.has(code)) cMap.set(code, { code, pts: 0, players: 0, topPlayer: null });
+        const c = cMap.get(code);
+        c.pts += Number(u.points || 0);
+        c.players++;
+        if (!c.topPlayer || Number(u.points) > Number(c.topPlayer.points))
+          c.topPlayer = u;
+      });
+
+      let rows = [...cMap.values()].sort((a, b) => b.pts - a.pts);
+
+      if (term) {
+        rows = rows.filter(c =>
+          _cname(c.code).toLowerCase().includes(term) || c.code.includes(term)
+        );
+      }
+
+      if (!rows.length) {
+        $("stateMsg").style.display = "block";
+        $("stateMsg").textContent = aggregates.length ? "No hay países que mostrar." : "Cargando...";
+        return;
+      }
+      $("stateMsg").style.display = "none";
+
+      rows.forEach((c, i) => {
+        const row = document.createElement("div");
+        row.className = "lb-row lb-country-row";
+        row.addEventListener("click", () => {
+          location.href = `/country-profile.html?code=${encodeURIComponent(c.code)}`;
+        });
+
+        const ptsStr  = (Math.round(c.pts * 100) / 100).toLocaleString();
+        const cName   = _cname(c.code);
+        const topName = c.topPlayer ? escapeHtml(c.topPlayer.name || "—") : "—";
+        const topUid  = c.topPlayer ? c.topPlayer.uid : "";
+
+        row.innerHTML = `
+          <div class="lb-pos">#${i + 1}</div>
+          <img class="lb-flag" src="${_cflag(c.code)}" alt="${escapeHtml(c.code.toUpperCase())}" onerror="this.style.opacity='0'"/>
+          <div class="lb-name lb-country-name">
+            <span class="lb-cn-main">${escapeHtml(cName)}</span>
+            <span class="lb-cn-sub">${escapeHtml(c.code.toUpperCase())} &middot; ${c.players} jugador${c.players !== 1 ? "es" : ""} &middot; Top: <a href="/profile.html?id=${encodeURIComponent(topUid)}" onclick="event.stopPropagation()" style="color:#c7ff3b;text-decoration:none;">${topName}</a></span>
+          </div>
+          <div class="lb-value">${ptsStr}<span class="unit">Pts</span></div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
     function renderList() {
+      if (activeCat === "countries") { renderCountryList(); return; }
       const { rows, field, unit } = getCurrentSorted();
       const list = $("lbList");
       list.innerHTML = "";
@@ -764,6 +831,12 @@
   </script>
 
 <style>
+  /* ── Filas de países ── */
+  .lb-country-row { align-items: center; cursor: pointer; }
+  .lb-country-name { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .lb-cn-main { font-weight: 700; font-size: .95rem; }
+  .lb-cn-sub  { font-size: .73rem; color: rgba(200,210,200,.6); font-weight: 500; }
+
   @keyframes lbChroma {
     0%   { box-shadow: inset 0 0 0 3px hsl(0,100%,60%),   0 0 8px hsl(0,100%,60%); }
     16%  { box-shadow: inset 0 0 0 3px hsl(60,100%,60%),  0 0 8px hsl(60,100%,60%); }

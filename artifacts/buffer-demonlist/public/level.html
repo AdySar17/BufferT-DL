@@ -437,6 +437,7 @@
             <div class="records-title" id="recTitle">RECORDS (0)</div>
             <div class="records-min" id="recMinPct">Porcentaje mínimo: 100%</div>
           </div>
+          <button id="btnCountriesModal" class="pager-btn" title="Ver completaciones por país" style="padding:7px 11px;font-size:.78rem;flex-shrink:0;">🌍 Países</button>
           <input class="rec-search" id="recSearch" placeholder="Buscar jugador...">
         </div>
 
@@ -449,6 +450,18 @@
           <div class="pager-info" id="pageInfo">1 / 1</div>
           <button class="pager-btn" id="nextBtn" disabled>Siguiente</button>
         </div>
+      </div>
+
+      <!-- First Victor Nacional -->
+      <div class="card" id="fvnCard" style="display:none;">
+        <div class="records-head hist-toggle" id="fvnToggle" role="button" tabindex="0" aria-expanded="false">
+          <div>
+            <div class="records-title" id="fvnTitle">PRIMEROS VICTORES NACIONALES</div>
+            <div class="records-min">Primer jugador de cada país en completar este nivel</div>
+          </div>
+          <span class="hist-arrow" id="fvnArrow">▼</span>
+        </div>
+        <div id="fvnList" class="hist-body hist-collapsed"></div>
       </div>
 
       <!-- Historial de posiciones -->
@@ -544,6 +557,45 @@
     .ph-row { grid-template-columns: 1fr 1fr; }
     .ph-row .ph-newpos, .ph-row .ph-reason { grid-column: span 2; }
   }
+
+  /* ── First Victor Nacional ── */
+  .fvn-row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 12px; border-radius: 9px; margin-bottom: 5px;
+    background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.04);
+    text-decoration: none; color: var(--text); transition: background .15s; cursor: pointer;
+  }
+  .fvn-row:hover { background: rgba(255,255,255,.05); }
+  .fvn-flag  { width: 30px; height: 20px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
+  .fvn-name  { font-weight: 600; font-size: .88rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fvn-code  { font-size: .72rem; font-weight: 700; color: rgba(199,255,59,.7); white-space: nowrap; padding: 2px 6px; border-radius: 5px; background: rgba(124,252,0,.08); }
+  .fvn-date  { font-size: .74rem; color: var(--muted); white-space: nowrap; }
+
+  /* ── Countries modal ── */
+  .cm-backdrop {
+    position: fixed; inset: 0; z-index: 99997;
+    background: rgba(0,0,0,.75); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .cm-backdrop.open { display: flex; }
+  .cm-modal {
+    width: 100%; max-width: 560px; max-height: 86vh; overflow-y: auto;
+    background: rgba(10,16,10,.98);
+    border: 1px solid rgba(199,255,59,.2); border-radius: 18px; padding: 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.75);
+  }
+  .cm-modal h2 { font-size: 1.08rem; margin-bottom: 14px; color: #c7ff3b; }
+  .cm-block { margin-bottom: 16px; }
+  .cm-block-hdr {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 0; margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,.07); cursor: pointer;
+    text-decoration: none; color: var(--text);
+  }
+  .cm-block-hdr:hover .cm-hdr-name { color: #c7ff3b; }
+  .cm-hdr-flag { width: 26px; border-radius: 3px; flex-shrink: 0; }
+  .cm-hdr-name { font-weight: 700; font-size: .88rem; flex: 1; transition: color .15s; }
+  .cm-hdr-count { font-size: .74rem; color: var(--muted); }
 </style>
 
 <!-- FIREBASE -->
@@ -552,6 +604,7 @@
   import { difficultyImage, difficultyName } from "/difficulty.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { countryName as lvlCname, flagUrl as lvlFlagUrl } from "/country-utils.js";
 
   /* ── Constantes ─────────────────────────────────────── */
   const PER_PAGE      = 15;
@@ -977,6 +1030,7 @@
       document.getElementById("recTitle").textContent =
         `RECORDS (${allRecords.length})`;
       renderPage();
+      renderFirstVictors(allRecords);
     } catch (err) {
       document.getElementById("recordsList").innerHTML =
         `<div class="rec-empty">Error al cargar records: ${err.message}</div>`;
@@ -1053,6 +1107,186 @@
 
   init();
 
+  /* ── First Victor Nacional ──────────────────────── */
+  function renderFirstVictors(records) {
+    const fvnCard  = document.getElementById("fvnCard");
+    const fvnTitle = document.getElementById("fvnTitle");
+    const fvnList  = document.getElementById("fvnList");
+    if (!fvnCard) return;
+
+    const full = records.filter(r => Number(r.percent) === 100);
+    if (!full.length) return;
+
+    const fvnMap = new Map();
+    full.forEach(r => {
+      const country = (r._profile && r._profile.country) ? r._profile.country.toLowerCase() : "";
+      if (!country) return;
+      const ts = r.acceptedAt?.toMillis ? r.acceptedAt.toMillis()
+               : r.updatedAt?.toMillis  ? r.updatedAt.toMillis() : 0;
+      if (!ts) return;
+      const ex = fvnMap.get(country);
+      if (!ex || ts < ex.ts)
+        fvnMap.set(country, { country, name: r._profile.name || "?", uid: r.userId, ts, date: r.acceptedAt });
+    });
+
+    if (!fvnMap.size) return;
+
+    fvnTitle.textContent = `PRIMEROS VICTORES NACIONALES (${fvnMap.size})`;
+    fvnCard.style.display = "block";
+
+    const entries = [...fvnMap.values()].sort((a, b) => a.ts - b.ts);
+    fvnList.innerHTML = "";
+    entries.forEach(e => {
+      const dateStr = e.date?.toDate
+        ? e.date.toDate().toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric" })
+        : "—";
+      const row = document.createElement("div");
+      row.className = "fvn-row";
+      row.onclick = () => { location.href = `/country-profile.html?code=${encodeURIComponent(e.country)}`; };
+
+      const flag = document.createElement("img");
+      flag.className = "fvn-flag";
+      flag.src = lvlFlagUrl(e.country);
+      flag.alt = e.country.toUpperCase();
+      flag.onerror = () => { flag.style.display = "none"; };
+
+      const nameEl = document.createElement("a");
+      nameEl.className = "fvn-name";
+      nameEl.href = `/profile.html?id=${encodeURIComponent(e.uid)}`;
+      nameEl.textContent = e.name;
+      nameEl.style.cssText = "color:inherit;text-decoration:none;";
+      nameEl.onclick = ev => ev.stopPropagation();
+
+      const codeEl = document.createElement("span");
+      codeEl.className = "fvn-code";
+      codeEl.textContent = e.country.toUpperCase();
+
+      const dateEl = document.createElement("span");
+      dateEl.className = "fvn-date";
+      dateEl.textContent = dateStr;
+
+      row.appendChild(flag);
+      row.appendChild(nameEl);
+      row.appendChild(codeEl);
+      row.appendChild(dateEl);
+      fvnList.appendChild(row);
+    });
+
+    const fvnToggle = document.getElementById("fvnToggle");
+    const fvnArrow  = document.getElementById("fvnArrow");
+    if (fvnToggle) {
+      fvnToggle.addEventListener("click", () => {
+        const isOpen = !fvnList.classList.contains("hist-collapsed");
+        if (isOpen) {
+          fvnList.style.maxHeight = fvnList.scrollHeight + "px";
+          requestAnimationFrame(() => {
+            fvnList.classList.add("hist-collapsed");
+            fvnList.style.maxHeight = "";
+          });
+          fvnArrow && fvnArrow.classList.remove("open");
+          fvnToggle.setAttribute("aria-expanded", "false");
+        } else {
+          fvnList.classList.remove("hist-collapsed");
+          fvnList.style.maxHeight = fvnList.scrollHeight + "px";
+          fvnArrow && fvnArrow.classList.add("open");
+          fvnToggle.setAttribute("aria-expanded", "true");
+          setTimeout(() => { fvnList.style.maxHeight = ""; }, 350);
+        }
+      });
+    }
+  }
+
+  /* ── Modal Completaciones por País ──────────────── */
+  (function() {
+    const modal   = document.getElementById("countriesModal");
+    const cmBody  = document.getElementById("cmBody");
+    const cmClose = document.getElementById("cmClose");
+    const openBtn = document.getElementById("btnCountriesModal");
+    if (!modal || !openBtn) return;
+
+    function escH(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c =>
+        ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+    }
+
+    openBtn.addEventListener("click", () => { buildModalContent(); modal.classList.add("open"); });
+    cmClose.addEventListener("click", () => modal.classList.remove("open"));
+    modal.addEventListener("click", e => { if (e.target === modal) modal.classList.remove("open"); });
+
+    function buildModalContent() {
+      const full = allRecords.filter(r => Number(r.percent) === 100);
+      if (!full.length) {
+        cmBody.innerHTML = `<p style="color:rgba(200,200,200,.6);font-size:.88rem;text-align:center;padding:20px 0;">No hay completaciones al 100%.</p>`;
+        return;
+      }
+
+      const cMap = new Map();
+      full.forEach(r => {
+        const country = (r._profile && r._profile.country) ? r._profile.country.toLowerCase() : "__none";
+        if (!cMap.has(country)) cMap.set(country, []);
+        cMap.get(country).push(r);
+      });
+      cMap.forEach(arr => arr.sort((a, b) => {
+        const ta = a.acceptedAt?.toMillis ? a.acceptedAt.toMillis() : 0;
+        const tb = b.acceptedAt?.toMillis ? b.acceptedAt.toMillis() : 0;
+        return ta - tb;
+      }));
+
+      const entries = [...cMap.entries()].sort((a, b) => b[1].length - a[1].length);
+      cmBody.innerHTML = "";
+
+      entries.forEach(([country, recs]) => {
+        const isNone = country === "__none";
+        const name   = isNone ? "Sin país" : (lvlCname(country) || country.toUpperCase());
+        const fSrc   = isNone ? "" : lvlFlagUrl(country);
+
+        const block = document.createElement("div");
+        block.className = "cm-block";
+
+        const hdr = document.createElement("a");
+        hdr.className = "cm-block-hdr";
+        if (!isNone) hdr.href = `/country-profile.html?code=${encodeURIComponent(country)}`;
+        hdr.innerHTML = `
+          ${fSrc ? `<img class="cm-hdr-flag" src="${fSrc}" alt="" onerror="this.style.display='none'">` : ""}
+          <span class="cm-hdr-name">${escH(name)}</span>
+          <span class="cm-hdr-count">${recs.length} complete${recs.length !== 1 ? "s" : ""}</span>`;
+        block.appendChild(hdr);
+
+        recs.forEach(r => {
+          const p = r._profile || {};
+          const dateStr = r.acceptedAt?.toDate
+            ? r.acceptedAt.toDate().toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric" })
+            : "—";
+          const recRow = document.createElement("div");
+          recRow.className = "record";
+          recRow.style.marginBottom = "4px";
+
+          const lft = document.createElement("div"); lft.className = "rec-left";
+          if (p.country) {
+            const fl = document.createElement("img");
+            fl.className = "rec-flag"; fl.src = lvlFlagUrl(p.country); fl.alt = p.country;
+            fl.onerror = () => { fl.style.display = "none"; };
+            lft.appendChild(fl);
+          }
+          const nm = document.createElement("a");
+          nm.className = "rec-name";
+          nm.href = `/profile.html?id=${encodeURIComponent(r.userId || "")}`;
+          nm.textContent = p.name || "?";
+          nm.style.cssText = "color:inherit;text-decoration:none;";
+          lft.appendChild(nm);
+
+          const rgt = document.createElement("div"); rgt.className = "rec-right";
+          rgt.style.cssText = "font-size:.76rem;color:rgba(200,200,200,.55);";
+          rgt.textContent = dateStr;
+
+          recRow.appendChild(lft); recRow.appendChild(rgt);
+          block.appendChild(recRow);
+        });
+        cmBody.appendChild(block);
+      });
+    }
+  })();
+
   /* ── Toggle historial de posiciones ────────────────── */
   const histToggle = document.getElementById("histToggle");
   const histArrow  = document.getElementById("histArrow");
@@ -1089,5 +1323,15 @@
   });
 </script>
 
+<!-- MODAL: Completaciones por País -->
+<div id="countriesModal" class="cm-backdrop">
+  <div class="cm-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h2>Completaciones por País</h2>
+      <button id="cmClose" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:1.3rem;cursor:pointer;padding:0 6px;">✕</button>
+    </div>
+    <div id="cmBody"></div>
+  </div>
+</div>
 </body>
 </html>
