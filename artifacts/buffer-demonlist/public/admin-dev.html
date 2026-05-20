@@ -382,27 +382,16 @@
     </div>
   </div>
 
-  <!-- ── PANEL NIVEL → BANNER (ancho completo) ── -->
+  <!-- ── PANEL ACTUALIZAR DATA ── -->
   <div class="editor-panel" style="margin-top:24px;">
-    <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
-      <span class="panel-title">🎮 Nivel → Banner</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-add" id="btnSaveLvlBanner" style="background:rgba(199,255,59,.15);border-color:rgba(199,255,59,.4);">💾 Guardar asignación</button>
-        <button class="btn-add" id="btnActualizarTodo" style="background:rgba(255,180,0,.12);border-color:rgba(255,180,0,.4);color:#ffd700;">⚡ Actualizar Todo</button>
-      </div>
+    <div class="panel-header">
+      <span class="panel-title">⚡ Actualizar Data</span>
+      <button class="btn-add" id="btnActualizarTodo" style="background:rgba(255,180,0,.12);border-color:rgba(255,180,0,.4);color:#ffd700;">⚡ Actualizar Data</button>
     </div>
-    <p style="color:rgba(255,255,255,.45);font-size:.8rem;margin-bottom:14px;">Selecciona un nivel, luego haz clic en el banner que le corresponde. Presiona "Actualizar Todo" para sincronizar banners a todos los usuarios que hayan completado sus niveles al 100%.</p>
-
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-      <div style="flex:1;min-width:220px;">
-        <label style="font-size:.75rem;font-weight:700;color:rgba(199,255,59,.8);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px;">Nivel</label>
-        <select class="form-select" id="lvlSelect" style="width:100%;"><option value="">Cargando niveles…</option></select>
-      </div>
-      <div id="lvlCurrentBanner" style="font-size:.8rem;color:rgba(255,255,255,.45);align-self:flex-end;padding-bottom:8px;"></div>
-    </div>
-
-    <div id="lvlBannerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;"></div>
-    <div id="actualizarLog" style="margin-top:14px;font-size:.78rem;color:rgba(199,255,59,.7);white-space:pre-wrap;display:none;max-height:180px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:10px;padding:10px;"></div>
+    <p style="color:rgba(255,255,255,.45);font-size:.8rem;margin-bottom:14px;">
+      Crea automáticamente banners para todos los niveles que no tengan uno (usando su nombre, glow como color de marco y fondo como imagen del banner), los asigna al nivel correspondiente, y luego sincroniza todos los banners ganados a los usuarios que completaron sus niveles al 100%.
+    </p>
+    <div id="actualizarLog" style="margin-top:14px;font-size:.78rem;color:rgba(199,255,59,.7);white-space:pre-wrap;display:none;max-height:250px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:10px;padding:10px;"></div>
   </div>
 </div>
 
@@ -583,126 +572,109 @@
   let editingBadge  = null;
 
   async function initPage() {
-    await Promise.all([loadBanners(), loadBadges(), loadLevels()]);
+    await Promise.all([loadBanners(), loadBadges()]);
   }
 
   /* ══════════════════════════════════════════
-     NIVEL → BANNER
+     ACTUALIZAR DATA — auto-crea banners para
+     niveles sin uno y sincroniza desbloqueos
   ══════════════════════════════════════════ */
-  let levelsData = [];
-  let selectedBannerForLevel = null;
-
-  async function loadLevels() {
-    try {
-      const snap = await getDocs(query(collection(db, "levels"), orderBy("position", "asc")));
-      levelsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const sel = $("lvlSelect");
-      sel.innerHTML = `<option value="">-- Seleccionar nivel --</option>`;
-      levelsData.forEach(lvl => {
-        const opt = document.createElement("option");
-        opt.value = lvl.id;
-        opt.textContent = `#${lvl.position || "?"} ${lvl.name || "(Sin nombre)"}`;
-        sel.appendChild(opt);
-      });
-    } catch(e) {
-      console.error("[admin-dev] loadLevels:", e);
-    }
-  }
-
-  $("lvlSelect").addEventListener("change", () => {
-    const id = $("lvlSelect").value;
-    const lvl = levelsData.find(l => l.id === id);
-    selectedBannerForLevel = lvl?.bannerId || null;
-    const info = $("lvlCurrentBanner");
-    if (lvl?.bannerId) {
-      const b = bannersCache.find(x => x.id === lvl.bannerId);
-      info.textContent = `Banner actual: ${b ? b.name : lvl.bannerId}`;
-    } else {
-      info.textContent = lvl ? "Sin banner asignado" : "";
-    }
-    renderLvlBannerGrid();
-  });
-
-  function renderLvlBannerGrid() {
-    const grid = $("lvlBannerGrid");
-    if (!bannersCache.length) {
-      grid.innerHTML = `<p style="color:rgba(255,255,255,.4);font-size:.82rem;">Sin banners disponibles.</p>`;
-      return;
-    }
-    grid.innerHTML = bannersCache.map(b => {
-      const fc  = b.frameColor  || '#c7ff3b';
-      const fc2 = b.frameColor2 || '#ff6b6b';
-      const selected = selectedBannerForLevel === b.id;
-      let thumbStyle;
-      if (b.frameType === 'gradient') {
-        const imgLayer = b.imageUrl
-          ? `url('${escHtml(b.imageUrl)}'),`
-          : `linear-gradient(rgba(10,22,10,.95),rgba(10,22,10,.95)),`;
-        thumbStyle = `border:3px solid transparent;background-image:${imgLayer}linear-gradient(135deg,${fc},${fc2});background-origin:padding-box,border-box;background-clip:padding-box,border-box;background-size:cover,100%;background-position:center,center;`;
-      } else {
-        const bgS = b.imageUrl ? `background-image:url('${escHtml(b.imageUrl)}');` : '';
-        const fS  = b.frameType !== 'chroma' ? `--fc:${fc};` : '';
-        thumbStyle = `${bgS}${fS}`;
-      }
-      const frameClass = `frame-${b.frameType || 'solid'}`;
-      return `<div onclick="lvlPickBanner('${b.id}')" style="cursor:pointer;position:relative;border-radius:12px;overflow:hidden;background:rgba(0,0,0,.4);border:2px solid ${selected?'rgba(199,255,59,.8)':'rgba(255,255,255,.1)'};transition:border-color .15s;">
-        <div class="banner-thumb ${frameClass}" style="${thumbStyle};width:100%;height:72px;border-radius:10px;"></div>
-        <div style="padding:4px 6px;font-size:.7rem;font-weight:700;color:rgba(255,255,255,.75);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(b.name||'')}</div>
-        ${selected ? `<div style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:#000;border:2px solid rgba(199,255,59,.8);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:#c7ff3b;">✓</div>` : ''}
-      </div>`;
-    }).join('');
-  }
-
-  window.lvlPickBanner = id => {
-    selectedBannerForLevel = selectedBannerForLevel === id ? null : id;
-    renderLvlBannerGrid();
-    const lvlId = $("lvlSelect").value;
-    const lvl   = levelsData.find(l => l.id === lvlId);
-    const info  = $("lvlCurrentBanner");
-    if (selectedBannerForLevel) {
-      const b = bannersCache.find(x => x.id === selectedBannerForLevel);
-      info.textContent = `Seleccionado: ${b ? b.name : selectedBannerForLevel}`;
-    } else {
-      info.textContent = lvl ? "Sin banner asignado" : "";
-    }
+  const GLOW_TO_HEX = {
+    'glow-celeste':      '#00B4FF',
+    'glow-rojo':         '#FF3C3C',
+    'glow-verde':        '#7CFC00',
+    'glow-rojo-naranja': '#FF5000',
+    'glow-azul':         '#0064FF',
+    'glow-naranja':      '#FF8C00',
+    'glow-amarillo':     '#FFE600',
+    'glow-rosa':         '#FF69B4',
+    'glow-morado':       '#9B59B6',
+    'glow-magenta':      '#FF00C8',
+    'glow-turquesa':     '#00CED1',
+    'glow-dorado':       '#FFD700',
+    'glow-plateado':     '#B4B4D2',
+    'glow-blanco':       '#FFFFFF',
+    'glow-indigo':       '#643CDC',
+    'glow-coral':        '#FF6448',
+    'glow-lima':         '#8CFF00',
+    'glow-menta':        '#3EB489',
+    'glow-lavanda':      '#A082FF',
+    'glow-salmon':       '#FA8072',
+    'glow-aguamarina':   '#7FFFD4',
+    'glow-violeta':      '#9400FF',
+    'glow-carmesi':      '#DC143C',
+    'glow-cian':         '#00FFFF',
+    'glow-esmeralda':    '#50C878',
+    'glow-rubi':         '#E0115F',
+    'glow-zafiro':       '#1A5FCC',
+    'glow-bronce':       '#CD7F32',
+    'glow-ambar':        '#FFBF00',
+    'glow-fucsia':       '#FF1493',
+    'glow-marino':       '#0050A0',
+    'glow-electrico':    '#00D2FF',
+    'glow-neon-verde':   '#39FF14',
+    'glow-neon-naranja': '#FF6400',
   };
-
-  $("btnSaveLvlBanner").addEventListener("click", async () => {
-    const lvlId = $("lvlSelect").value;
-    if (!lvlId) { alert("Selecciona un nivel primero."); return; }
-    const btn = $("btnSaveLvlBanner");
-    btn.disabled = true; btn.textContent = "Guardando…";
-    try {
-      await updateDoc(doc(db, "levels", lvlId), { bannerId: selectedBannerForLevel || null });
-      const lvl = levelsData.find(l => l.id === lvlId);
-      if (lvl) lvl.bannerId = selectedBannerForLevel || null;
-      const b = selectedBannerForLevel ? bannersCache.find(x => x.id === selectedBannerForLevel) : null;
-      $("lvlCurrentBanner").textContent = b ? `Banner actual: ${b.name}` : "Sin banner asignado";
-      alert(b ? `✅ Banner "${b.name}" asignado al nivel.` : "✅ Banner eliminado del nivel.");
-    } catch(e) { alert("Error: " + e.message); }
-    finally { btn.disabled = false; btn.textContent = "💾 Guardar asignación"; }
-  });
 
   $("btnActualizarTodo").addEventListener("click", actualizarTodo);
 
   async function actualizarTodo() {
     const logEl = $("actualizarLog");
     logEl.style.display = "block";
-    logEl.textContent = "⚡ Iniciando Actualizar Todo…\n";
+    logEl.textContent = "⚡ Iniciando Actualizar Data…\n";
     const btn = $("btnActualizarTodo");
     btn.disabled = true;
     function log(msg) { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+
     try {
+      /* 1) Cargar todos los niveles */
       log("📖 Cargando niveles…");
       const lvlSnap = await getDocs(collection(db, "levels"));
-      const levelBannerMap = new Map();
-      lvlSnap.forEach(d => { if (d.data().bannerId) levelBannerMap.set(d.id, d.data().bannerId); });
-      log(`✅ ${levelBannerMap.size} niveles con banner asignado.`);
+      const allLevels = lvlSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      log(`✅ ${allLevels.length} niveles encontrados.`);
 
-      if (levelBannerMap.size === 0) {
-        log("ℹ️ No hay niveles con banner asignado. Asigna banners primero."); btn.disabled = false; return;
+      /* 2) Auto-crear banners para niveles sin rewards */
+      const sinBanner = allLevels.filter(l => !l.rewards || !l.rewards.length);
+      log(`🔍 ${sinBanner.length} nivel(es) sin banner — creando automáticamente…`);
+      let created = 0;
+      for (const lvl of sinBanner) {
+        const glowClass = lvl.glow || '';
+        const isChroma  = glowClass === 'glow-arcoiris';
+        const bannerData = {
+          name:       lvl.name || 'Banner',
+          imageUrl:   lvl.background || '',
+          frameType:  isChroma ? 'chroma' : 'solid',
+          frameColor: isChroma ? '#FF0000' : (GLOW_TO_HEX[glowClass] || '#c7ff3b'),
+          rarity:     'legendario',
+          obtainable: true,
+          createdAt:  serverTimestamp()
+        };
+        const bannerRef = await addDoc(collection(db, "banners"), bannerData);
+        await updateDoc(doc(db, "levels", lvl.id), { rewards: [bannerRef.id] });
+        lvl.rewards = [bannerRef.id];
+        created++;
+        log(`  ✨ "${lvl.name}" → banner creado (${bannerRef.id})`);
+      }
+      if (created > 0) {
+        log(`✅ ${created} banner(es) creados y asignados.`);
+        await loadBanners(); /* refrescar caché de banners */
+      } else {
+        log("ℹ️ Todos los niveles ya tienen banner asignado.");
       }
 
+      /* 3) Construir mapa nivel → lista de banner IDs (desde rewards) */
+      const levelBannerMap = new Map();
+      allLevels.forEach(lvl => {
+        if (lvl.rewards && lvl.rewards.length) {
+          levelBannerMap.set(lvl.id, lvl.rewards);
+        }
+      });
+
+      if (levelBannerMap.size === 0) {
+        log("ℹ️ Ningún nivel tiene banners asignados. Operación finalizada."); btn.disabled = false; return;
+      }
+
+      /* 4) Cargar records aceptados al 100% */
       log("📖 Cargando records aceptados al 100%…");
       const recsSnap = await getDocs(collection(db, "records"));
       const records  = recsSnap.docs
@@ -710,6 +682,7 @@
         .filter(r => r.status === "Accepted" && Number(r.percent) === 100);
       log(`✅ ${records.length} records al 100%.`);
 
+      /* 5) Determinar qué banners ganó cada usuario */
       const userBannersEarned = new Map();
       const addEarned = (uid, bId) => {
         if (!uid || !bId) return;
@@ -717,17 +690,20 @@
         userBannersEarned.get(uid).add(bId);
       };
       records.forEach(r => {
-        const bId = levelBannerMap.get(r.levelId);
-        if (!bId) return;
-        addEarned(r.userId, bId);
-        if (r.player2Id) addEarned(r.player2Id, bId);
+        const bannerIds = levelBannerMap.get(r.levelId);
+        if (!bannerIds) return;
+        bannerIds.forEach(bid => {
+          addEarned(r.userId, bid);
+          if (r.player2Id) addEarned(r.player2Id, bid);
+        });
       });
-      log(`✅ ${userBannersEarned.size} usuarios con banners ganados.`);
+      log(`✅ ${userBannersEarned.size} usuario(s) con banners ganados.`);
 
       if (!userBannersEarned.size) {
         log("ℹ️ Ningún usuario completó niveles con banner asignado al 100%."); btn.disabled = false; return;
       }
 
+      /* 6) Cargar cosméticos actuales para no repetir desbloqueos */
       log("📖 Cargando cosméticos actuales…");
       const cosmDocs = new Map();
       await Promise.all([...userBannersEarned.keys()].map(async uid => {
@@ -737,6 +713,7 @@
         } catch(_) { cosmDocs.set(uid, new Set()); }
       }));
 
+      /* 7) Batch-write user_cosmetics */
       log("💾 Actualizando user_cosmetics…");
       let updated = 0, batchCount = 0;
       let batch = writeBatch(db), opsInBatch = 0;
@@ -750,8 +727,8 @@
       }
       if (opsInBatch > 0) { await batch.commit(); batchCount++; }
 
-      log(`✅ Actualizados ${updated} usuarios (${batchCount} batch${batchCount!==1?'es':''}).`);
-      log("🎉 ¡Actualizar Todo completado con éxito!");
+      log(`✅ Actualizados ${updated} usuario(s) (${batchCount} batch${batchCount!==1?'es':''}).`);
+      log("🎉 ¡Actualizar Data completado con éxito!");
     } catch(e) {
       log("❌ Error: " + e.message);
       console.error("[actualizarTodo]", e);

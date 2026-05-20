@@ -716,6 +716,15 @@
         <div class="tag-list" id="inp-tag-list"></div>
       </div>
 
+      <!-- BANNER DEL NIVEL (añadir) -->
+      <div class="rewards-section">
+        <div class="rewards-label">🎖 Banner del nivel</div>
+        <div class="rewards-hint">Selecciona el banner que se desbloqueará al completar este nivel.</div>
+        <div id="inp-rewards-grid" class="rewards-grid">
+          <span style="color:rgba(255,255,255,.35);font-size:.78rem;">Cargando banners…</span>
+        </div>
+      </div>
+
       <div class="modal-btns">
         <button class="btn-save"   onclick="agregarNivel()">Guardar</button>
         <button class="btn-cancel" onclick="cerrarModal('formModal')">Cancelar</button>
@@ -876,8 +885,9 @@
     }
     let _inpPrevGdId  = "";
     let _editPrevGdId = "";
-    let _allBannersCache   = null;
+    let _allBannersCache     = null;
     let _editSelectedRewards = [];
+    let _inpSelectedRewards  = [];
 
     /* Devuelve los niveles actuales ordenados por position (los sin position
        quedan al final, ordenados por value descendente como respaldo).      */
@@ -1269,7 +1279,8 @@
         const _addPayload = {
           name, author, creators, position: newPos, value: newValue,
           thumbnail, background, video, glow, is2P,
-          description, difficulty, minPercent, tags
+          description, difficulty, minPercent, tags,
+          rewards: _inpSelectedRewards
         };
         if (gdLevelId) _addPayload.gdLevelId = String(gdLevelId);
         const newRef   = await addDoc(collection(db, "levels"), _addPayload);
@@ -1343,6 +1354,31 @@
       const idx = _editSelectedRewards.indexOf(id);
       if (idx === -1) { _editSelectedRewards.push(id); el.classList.add("sel"); }
       else            { _editSelectedRewards.splice(idx, 1); el.classList.remove("sel"); }
+    };
+
+    async function renderInpRewardsGrid(currentRewards) {
+      _inpSelectedRewards = Array.isArray(currentRewards) ? [...currentRewards] : [];
+      const grid = document.getElementById("inp-rewards-grid");
+      if (!grid) return;
+      const banners = await getAllBannersForRewards();
+      if (!banners.length) {
+        grid.innerHTML = `<span style="color:rgba(255,255,255,.35);font-size:.78rem;">No hay banners creados aún.</span>`;
+        return;
+      }
+      grid.innerHTML = banners.map(b => {
+        const sel = _inpSelectedRewards.includes(b.id) ? " sel" : "";
+        const bg  = b.imageUrl ? `background-image:url('${b.imageUrl.replace(/'/g,"\\'")}')` : "";
+        return `<div class="reward-item${sel}" onclick="toggleInpReward('${b.id}',this)">
+          <div class="reward-thumb" style="${bg}"></div>
+          <div class="reward-name" title="${b.name||""}">${b.name||"—"}</div>
+        </div>`;
+      }).join("");
+    }
+
+    window.toggleInpReward = function(id, el) {
+      const idx = _inpSelectedRewards.indexOf(id);
+      if (idx === -1) { _inpSelectedRewards.push(id); el.classList.add("sel"); }
+      else            { _inpSelectedRewards.splice(idx, 1); el.classList.remove("sel"); }
     };
 
     /* ========== ABRIR EDICIÓN ========== */
@@ -1634,6 +1670,8 @@
       const descEl = document.getElementById("inp-description");
       if (descEl) descEl.value = "";
       setTags("inp", []);
+      _inpSelectedRewards = [];
+      renderInpRewardsGrid([]);
       document.getElementById("formModal").classList.add("open");
     });
 

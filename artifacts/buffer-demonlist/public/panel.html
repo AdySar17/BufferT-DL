@@ -1077,6 +1077,38 @@
       const newRef = await addDoc(collection(db, "levels"), levelDoc);
       placeholder.id = newRef.id;
 
+      /* 2b) Auto-crear banner para el nuevo nivel */
+      try {
+        const GLOW_TO_HEX = {
+          'glow-celeste':'#00B4FF','glow-rojo':'#FF3C3C','glow-verde':'#7CFC00',
+          'glow-rojo-naranja':'#FF5000','glow-azul':'#0064FF','glow-naranja':'#FF8C00',
+          'glow-amarillo':'#FFE600','glow-rosa':'#FF69B4','glow-morado':'#9B59B6',
+          'glow-magenta':'#FF00C8','glow-turquesa':'#00CED1','glow-dorado':'#FFD700',
+          'glow-plateado':'#B4B4D2','glow-blanco':'#FFFFFF','glow-indigo':'#643CDC',
+          'glow-coral':'#FF6448','glow-lima':'#8CFF00','glow-menta':'#3EB489',
+          'glow-lavanda':'#A082FF','glow-salmon':'#FA8072','glow-aguamarina':'#7FFFD4',
+          'glow-violeta':'#9400FF','glow-carmesi':'#DC143C','glow-cian':'#00FFFF',
+          'glow-esmeralda':'#50C878','glow-rubi':'#E0115F','glow-zafiro':'#1A5FCC',
+          'glow-bronce':'#CD7F32','glow-ambar':'#FFBF00','glow-fucsia':'#FF1493',
+          'glow-marino':'#0050A0','glow-electrico':'#00D2FF','glow-neon-verde':'#39FF14',
+          'glow-neon-naranja':'#FF6400',
+        };
+        const isChroma = glow === 'glow-arcoiris';
+        const bannerDoc = {
+          name:       name,
+          imageUrl:   background || '',
+          frameType:  isChroma ? 'chroma' : 'solid',
+          frameColor: isChroma ? '#FF0000' : (GLOW_TO_HEX[glow] || '#c7ff3b'),
+          rarity:     'legendario',
+          obtainable: true,
+          createdAt:  serverTimestamp()
+        };
+        const bannerRef = await addDoc(collection(db, "banners"), bannerDoc);
+        await updateDoc(doc(db, "levels", newRef.id), { rewards: [bannerRef.id] });
+      } catch(bannerErr) {
+        console.warn("[panel] auto-banner creation failed:", bannerErr);
+      }
+
       /* 3) Re-shift de las demás posiciones (writeBatch en chunks) */
       const originalById = new Map(all.map(l => [l.id, { position: l.position, value: l.value }]));
       const updates = [];
