@@ -31,10 +31,10 @@
     backdrop-filter: blur(10px);
   }
   .left { display: flex; align-items: center; gap: 10px; }
-  .logo-img  { width: 38px; height: 38px; }
+  .logo-img { width: 38px; height: 38px; }
   .logo-text { color: white; font-weight: bold; font-size: 1.1rem; }
-  .nav-links { display: flex; gap: 15px; list-style: none; }
-  .nav-links a { color: white; text-decoration: none; font-size: 0.95rem; transition: color .2s; }
+  .nav-links { display: flex; gap: 15px; }
+  .nav-links a { color: white; text-decoration: none; font-size: 0.95rem; }
   .nav-links a:hover { color: #7cfc00; }
   .menu-toggle {
     display: none;
@@ -43,16 +43,21 @@
     align-items: center; justify-content: center;
     cursor: pointer; user-select: none;
   }
-  .auth-slot { display: flex; align-items: center; }
-  @media (max-width: 820px) {
-    .nav-links { display: none; flex-direction: column; position: absolute; top: 60px; left: 0; right: 0; background: rgba(0,0,0,.95); padding: 16px 24px; gap: 12px; border-bottom: 1px solid rgba(124,252,0,0.1); }
-    .nav-links.active { display: flex; }
-    .menu-toggle { display: flex; }
-  }
   .staff-only, .owner-only, .admin-only { display: none; }
-  body.is-staff .staff-only { display: block; }
-  body.is-owner .owner-only { display: block; }
-  body.is-admin .admin-only { display: block; }
+  body.is-staff .staff-only { display: revert; }
+  body.is-owner .owner-only { display: revert; }
+  body.is-admin .admin-only { display: revert; }
+  body.is-owner .admin-only { display: revert; }
+  @media (max-width: 768px) {
+    .menu-toggle { display: flex; }
+    .nav-links {
+      display: none; flex-direction: column;
+      position: absolute; top: 60px; right: 10px;
+      background: rgba(0,0,0,0.9);
+      padding: 10px; border-radius: 10px; gap: 8px;
+    }
+    .nav-links.active { display: flex; }
+  }
 
   /* ── LAYOUT ── */
   .page-wrap { max-width: 900px; margin: 0 auto; padding: 30px 20px 60px; }
@@ -140,22 +145,20 @@
     <img src="https://iili.io/BN3Yhpp.png" class="logo-img" alt="Logo">
     <div class="logo-text">BFT Demon List</div>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;">
-    <nav>
-      <ul class="nav-links" id="navLinks">
-        <li><a href="/">Home</a></li>
-        <li><a href="/demonlist.html">Demon List</a></li>
-        <li><a href="/leaderboards.html">Leaderboards</a></li>
-        <li><a href="/notifications.html">✉ Notificaciones</a></li>
-        <li><a href="/submit.html">Enviar Record</a></li>
-        <li><a href="/guidelines.html">Guidelines</a></li>
-        <li class="staff-only"><a href="/panel.html">Panel de Records</a></li>
-        <li class="owner-only"><a href="/staff-control.html">Control Staff</a></li>
-        <li class="admin-only"><a href="/admin-dev.html">Admin Dev</a></li>
-      </ul>
+  <div style="display:flex; align-items:center; gap:14px;">
+    <nav class="nav-links" id="navLinks">
+      <a href="/">Home</a>
+      <a href="/demonlist.html">Demon List</a>
+      <a href="/leaderboards.html">Leaderboards</a>
+      <a href="/notifications.html">✉ Notificaciones</a>
+      <a href="/submit.html">Enviar Record</a>
+      <a href="/guidelines.html">Guidelines</a>
+      <a href="/panel.html" class="staff-only">Panel de Records</a>
+      <a href="/staff-control.html" class="owner-only">Control Staff</a>
+      <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
     <div class="auth-slot" id="authSlot"></div>
-    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
+    <div class="menu-toggle" onclick="toggleMenu()">☰</div>
   </div>
 </header>
 
@@ -165,6 +168,13 @@
   onAuthChange(() => {
     document.body.classList.toggle("is-staff", isStaff());
   });
+</script>
+<script>
+  function toggleMenu() {
+    const el = document.getElementById("navLinks");
+    if (el) el.classList.toggle("active");
+  }
+  window.toggleMenu = toggleMenu;
 </script>
 
 <div id="stateMsg">Cargando...</div>

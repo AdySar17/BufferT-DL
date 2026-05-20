@@ -1105,7 +1105,7 @@
 
     if (!fvnMap.size) return;
 
-    fvnTitle.textContent = `PRIMEROS VICTORES NACIONALES (${fvnMap.size})`;
+    fvnTitle.textContent = `First Victor por País (${fvnMap.size})`;
     fvnCard.style.display = "block";
 
     const entries = [...fvnMap.values()].sort((a, b) => a.ts - b.ts);
