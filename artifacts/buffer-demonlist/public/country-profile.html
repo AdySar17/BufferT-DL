@@ -304,7 +304,7 @@
       <div class="cstat"><div class="cstat-val">${players}</div><div class="cstat-lbl">Jugadores</div></div>
       <div class="cstat"><div class="cstat-val">${pts.toLocaleString()}</div><div class="cstat-lbl">Puntos</div></div>
       <div class="cstat"><div class="cstat-val">${recs}</div><div class="cstat-lbl">Completes</div></div>
-      ${hardest ? `<div class="cstat"><div class="cstat-val">#${hardest.position}</div><div class="cstat-lbl">Más difícil</div></div>` : ""}
+      ${hardest ? `<div class="cstat"><div class="cstat-val">#${hardest.position}</div><div class="cstat-lbl" title="${hardest.name || ''}">Hardest: ${hardest.name || '—'}</div></div>` : ""}
     `;
   }
 
