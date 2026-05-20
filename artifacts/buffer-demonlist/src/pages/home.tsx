@@ -413,8 +413,15 @@ export default function Home() {
       .home-top-card, .home-top-card * { font-family: 'Montserrat', sans-serif; }
 
       /* Role-based visibility (mirrors auth.js CSS for React context) */
-      .owner-only { display: none !important; }
-      body.is-owner .owner-only { display: revert !important; }
+      .staff-only  { display: none !important; }
+      body.is-staff .staff-only  { display: revert !important; }
+      body.is-admin .staff-only  { display: revert !important; }
+      body.is-owner .staff-only  { display: revert !important; }
+      .owner-only  { display: none !important; }
+      body.is-owner .owner-only  { display: revert !important; }
+      .admin-only  { display: none !important; }
+      body.is-admin .admin-only  { display: revert !important; }
+      body.is-owner .admin-only  { display: revert !important; }
 
       @media (max-width: 768px) {
         .top-header .menu-toggle { display: flex; }
@@ -468,6 +475,7 @@ export default function Home() {
             <a href="/guidelines.html">Guidelines</a>
             <a href="/panel.html" className="staff-only">Panel de Records</a>
             <a href="/staff-control.html" className="owner-only">Control Staff</a>
+            <a href="/admin-dev.html" className="admin-only">Admin Dev</a>
           </nav>
           <div className="auth-slot" id="authSlot"></div>
           <div

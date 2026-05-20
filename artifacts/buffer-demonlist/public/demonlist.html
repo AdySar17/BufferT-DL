@@ -471,9 +471,102 @@
     }
     .rewards-label {
       color: #c7ff3b; font-size: .82rem; font-weight: 700;
-      margin-bottom: 3px; text-transform: uppercase; letter-spacing: .4px;
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: .4px;
     }
-    .rewards-hint { font-size: .72rem; color: rgba(255,255,255,.38); margin-bottom: 10px; }
+    /* Row that holds the selected banner chips + the add button */
+    .edit-rewards-row {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 66px;
+    }
+    /* Each selected banner chip */
+    .edit-reward-chip {
+      position: relative; width: 90px; border-radius: 8px; overflow: hidden;
+      border: 2px solid rgba(199,255,59,.4); flex-shrink: 0;
+    }
+    .edit-reward-chip-thumb {
+      height: 46px; background-size: cover; background-position: center;
+      background-color: #1a2a1a;
+    }
+    .edit-reward-chip-name {
+      font-size: .6rem; font-weight: 700; padding: 3px 5px; text-align: center;
+      background: rgba(0,0,0,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .edit-reward-chip-remove {
+      position: absolute; top: 3px; right: 3px;
+      width: 18px; height: 18px; border-radius: 4px;
+      background: rgba(220,40,40,.85); border: none;
+      color: white; font-size: .75rem; font-weight: 900;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      line-height: 1; padding: 0;
+      transition: background .15s;
+    }
+    .edit-reward-chip-remove:hover { background: rgba(255,60,60,1); }
+    /* Gray "+" add button */
+    .edit-reward-add-btn {
+      width: 90px; height: 66px; border-radius: 8px;
+      border: 2px dashed rgba(255,255,255,.22);
+      background: rgba(255,255,255,.05);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+      transition: border-color .18s, background .18s;
+    }
+    .edit-reward-add-btn:hover { border-color: rgba(255,255,255,.5); background: rgba(255,255,255,.1); }
+    .edit-reward-add-btn span {
+      font-size: 1.8rem; font-weight: 300; color: rgba(150,150,150,.8); line-height: 1;
+    }
+    /* ===== Banner Picker Overlay ===== */
+    #bannerPickerOverlay {
+      display: none; position: fixed; inset: 0; z-index: 11000;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(5px);
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #bannerPickerOverlay.open { display: flex; }
+    .banner-picker-box {
+      background: #121a12; border: 1px solid rgba(199,255,59,.2);
+      border-radius: 14px; padding: 22px 20px 18px;
+      width: 100%; max-width: 500px; max-height: 80vh;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .banner-picker-box h3 {
+      margin: 0; color: #c7ff3b; font-size: .95rem;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .banner-picker-search {
+      padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.15);
+      background: rgba(255,255,255,.07); color: white;
+      font-family: 'Montserrat', sans-serif; font-size: .85rem; outline: none;
+      width: 100%; box-sizing: border-box;
+    }
+    .banner-picker-search::placeholder { color: rgba(255,255,255,.35); }
+    .banner-picker-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px; overflow-y: auto; max-height: 45vh; padding-right: 4px;
+    }
+    .picker-banner-item {
+      position: relative; border-radius: 8px; overflow: hidden;
+      border: 2px solid rgba(255,255,255,.08);
+      cursor: pointer; transition: border-color .18s;
+      background: rgba(255,255,255,.03);
+    }
+    .picker-banner-item:hover { border-color: rgba(199,255,59,.35); }
+    .picker-banner-item.sel   { border-color: #c7ff3b; box-shadow: 0 0 8px rgba(199,255,59,.25); }
+    .picker-banner-thumb { height: 48px; background-size: cover; background-position: center; background-color: #1a2a1a; }
+    .picker-banner-name  { font-size: .6rem; font-weight: 700; padding: 3px 5px; text-align: center; background: rgba(0,0,0,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .picker-banner-check {
+      position: absolute; top: 3px; left: 3px;
+      width: 17px; height: 17px; border-radius: 4px;
+      border: 2px solid rgba(255,255,255,.5);
+      background: rgba(0,0,0,.55);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem; color: transparent; font-weight: 900;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .picker-banner-item.sel .picker-banner-check {
+      background: #c7ff3b; border-color: #c7ff3b; color: #111;
+    }
+    /* ===== Confirm remove banner modal ===== */
+    #confirmRemoveBannerModal .modal-content { max-width: 360px; }
+    #confirmRemoveBannerModal p { color: rgba(255,255,255,0.7); margin-bottom: 8px; font-size: .93rem; }
+    /* keep old grid for the ADD form (inp-rewards-grid) */
     .rewards-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
@@ -817,16 +910,44 @@
 
       <!-- RECOMPENSAS -->
       <div class="rewards-section">
-        <div class="rewards-label">🎖 Recompensas de Banner</div>
-        <div class="rewards-hint">Al completar este nivel, el jugador desbloquea estos banners.</div>
-        <div id="edit-rewards-grid" class="rewards-grid">
-          <span style="color:rgba(255,255,255,.35);font-size:.78rem;">Cargando banners…</span>
+        <div class="rewards-label">Recompensas de Banner</div>
+        <div class="edit-rewards-row" id="edit-rewards-row">
+          <span style="color:rgba(255,255,255,.35);font-size:.78rem;">Cargando…</span>
         </div>
       </div>
 
       <div class="modal-btns">
         <button class="btn-update" onclick="guardarEdicion()">Guardar cambios</button>
         <button class="btn-cancel" onclick="cerrarModal('editModal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PICKER DE BANNERS (edición de recompensas) -->
+  <div id="bannerPickerOverlay">
+    <div class="banner-picker-box">
+      <h3>Seleccionar Banners</h3>
+      <input type="text" id="bannerPickerSearch" class="banner-picker-search"
+             placeholder="Buscar banner…" oninput="filterBannerPicker()">
+      <div id="bannerPickerGrid" class="banner-picker-grid">
+        <span style="color:rgba(255,255,255,.35);font-size:.78rem;">Cargando…</span>
+      </div>
+      <div class="modal-btns" style="margin-top:0;">
+        <button class="btn-save"   onclick="saveBannerPicker()">Guardar</button>
+        <button class="btn-cancel" onclick="closeBannerPicker()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR QUITAR BANNER -->
+  <div id="confirmRemoveBannerModal" class="modal">
+    <div class="modal-content" style="max-width:340px;">
+      <h2>Quitar banner</h2>
+      <p>¿Seguro que quieres quitar este banner de las recompensas del nivel?</p>
+      <input type="hidden" id="confirm-remove-banner-id">
+      <div class="modal-btns">
+        <button class="btn-danger"  onclick="doRemoveBanner()">Sí, quitar</button>
+        <button class="btn-cancel"  onclick="cerrarModal('confirmRemoveBannerModal')">Cancelar</button>
       </div>
     </div>
   </div>
@@ -1331,29 +1452,101 @@
       return _allBannersCache;
     }
 
+    /* ─── renderRewardsGrid: set state & paint chips ─── */
     async function renderRewardsGrid(currentRewards) {
       _editSelectedRewards = Array.isArray(currentRewards) ? [...currentRewards] : [];
-      const grid = document.getElementById("edit-rewards-grid");
+      await getAllBannersForRewards(); // ensure cache loaded
+      renderEditRewardsRow();
+    }
+
+    function renderEditRewardsRow() {
+      const row = document.getElementById("edit-rewards-row");
+      if (!row) return;
+      const banners = _allBannersCache || [];
+      let html = "";
+      _editSelectedRewards.forEach(id => {
+        const b = banners.find(x => x.id === id);
+        if (!b) return;
+        const bg = b.imageUrl ? `background-image:url('${b.imageUrl.replace(/'/g,"\\'")}')` : "";
+        const safeName = (b.name || "—").replace(/"/g, "&quot;");
+        html += `<div class="edit-reward-chip">
+          <div class="edit-reward-chip-thumb" style="${bg}"></div>
+          <div class="edit-reward-chip-name" title="${safeName}">${b.name||"—"}</div>
+          <button class="edit-reward-chip-remove" title="Quitar banner"
+                  onclick="confirmRemoveBanner('${b.id}')">✕</button>
+        </div>`;
+      });
+      html += `<div class="edit-reward-add-btn" onclick="openBannerPicker()" title="Añadir banner">
+        <span>+</span>
+      </div>`;
+      row.innerHTML = html;
+    }
+
+    /* ─── Confirm & remove banner ─── */
+    window.confirmRemoveBanner = function(id) {
+      document.getElementById("confirm-remove-banner-id").value = id;
+      document.getElementById("confirmRemoveBannerModal").classList.add("open");
+    };
+    window.doRemoveBanner = function() {
+      const id = document.getElementById("confirm-remove-banner-id").value;
+      const idx = _editSelectedRewards.indexOf(id);
+      if (idx !== -1) _editSelectedRewards.splice(idx, 1);
+      cerrarModal("confirmRemoveBannerModal");
+      renderEditRewardsRow();
+    };
+
+    /* ─── Banner Picker ─── */
+    let _pickerSelectedIds = [];
+
+    window.openBannerPicker = async function() {
+      _pickerSelectedIds = [..._editSelectedRewards];
+      document.getElementById("bannerPickerSearch").value = "";
+      document.getElementById("bannerPickerOverlay").classList.add("open");
+      await getAllBannersForRewards();
+      renderPickerGrid(_allBannersCache || []);
+    };
+
+    window.closeBannerPicker = function() {
+      document.getElementById("bannerPickerOverlay").classList.remove("open");
+    };
+
+    window.saveBannerPicker = function() {
+      _editSelectedRewards = [..._pickerSelectedIds];
+      closeBannerPicker();
+      renderEditRewardsRow();
+    };
+
+    window.filterBannerPicker = function() {
+      const q = document.getElementById("bannerPickerSearch").value.toLowerCase().trim();
+      const banners = (_allBannersCache || []).filter(b =>
+        !q || (b.name || "").toLowerCase().includes(q)
+      );
+      renderPickerGrid(banners);
+    };
+
+    function renderPickerGrid(banners) {
+      const grid = document.getElementById("bannerPickerGrid");
       if (!grid) return;
-      const banners = await getAllBannersForRewards();
       if (!banners.length) {
-        grid.innerHTML = `<span style="color:rgba(255,255,255,.35);font-size:.78rem;">No hay banners creados aún.</span>`;
+        grid.innerHTML = `<span style="color:rgba(255,255,255,.35);font-size:.78rem;">Sin resultados.</span>`;
         return;
       }
       grid.innerHTML = banners.map(b => {
-        const sel = _editSelectedRewards.includes(b.id) ? " sel" : "";
+        const sel = _pickerSelectedIds.includes(b.id) ? " sel" : "";
         const bg  = b.imageUrl ? `background-image:url('${b.imageUrl.replace(/'/g,"\\'")}')` : "";
-        return `<div class="reward-item${sel}" onclick="toggleReward('${b.id}',this)">
-          <div class="reward-thumb" style="${bg}"></div>
-          <div class="reward-name" title="${b.name||""}">${b.name||"—"}</div>
+        const safeName = (b.name || "—").replace(/"/g, "&quot;");
+        return `<div class="picker-banner-item${sel}" onclick="togglePickerBanner('${b.id}',this)">
+          <div class="picker-banner-check">✓</div>
+          <div class="picker-banner-thumb" style="${bg}"></div>
+          <div class="picker-banner-name" title="${safeName}">${b.name||"—"}</div>
         </div>`;
       }).join("");
     }
 
-    window.toggleReward = function(id, el) {
-      const idx = _editSelectedRewards.indexOf(id);
-      if (idx === -1) { _editSelectedRewards.push(id); el.classList.add("sel"); }
-      else            { _editSelectedRewards.splice(idx, 1); el.classList.remove("sel"); }
+    window.togglePickerBanner = function(id, el) {
+      const idx = _pickerSelectedIds.indexOf(id);
+      if (idx === -1) { _pickerSelectedIds.push(id); el.classList.add("sel"); }
+      else            { _pickerSelectedIds.splice(idx, 1); el.classList.remove("sel"); }
     };
 
     async function renderInpRewardsGrid(currentRewards) {
