@@ -46,11 +46,11 @@ type LiveStats = {
   recent: number;
 };
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
 
 function readCache<T>(key: string): T | null {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
     if (Date.now() - ts < CACHE_TTL_MS) return data as T;
@@ -60,7 +60,7 @@ function readCache<T>(key: string): T | null {
 
 function writeCache(key: string, data: unknown) {
   try {
-    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
   } catch {}
 }
 
@@ -158,9 +158,8 @@ function useLiveData() {
           })
         );
 
-        /* Conteos — usamos getCountFromServer únicamente.
-         * Si falla (cuota, permisos), devuelve 0 sin hacer un getDocs
-         * completo que leería miles de documentos y agotar la cuota. */
+        /* Conteos: intenta getCountFromServer primero (barato).
+         * Si falla por cuota, usa getDocs con limit alto como fallback. */
         async function countCol(colRef: any, label: string): Promise<number> {
           if (typeof getCountFromServer === "function") {
             try {
@@ -168,8 +167,15 @@ function useLiveData() {
               const n = snap.data().count;
               if (typeof n === "number") return n;
             } catch (e) {
-              console.warn(`[home] count agregado falló (${label}):`, e);
+              console.warn(`[home] count agregado falló (${label}), usando fallback:`, e);
             }
+          }
+          // Fallback: getDocs con limit grande para aproximar el conteo
+          try {
+            const snap = await getDocs(query(colRef, limit(1000)));
+            return snap.size;
+          } catch (e2) {
+            console.warn(`[home] fallback getDocs también falló (${label}):`, e2);
           }
           return 0;
         }
