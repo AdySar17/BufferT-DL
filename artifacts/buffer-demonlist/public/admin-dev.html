@@ -381,6 +381,29 @@
       </div>
     </div>
   </div>
+
+  <!-- ── PANEL NIVEL → BANNER (ancho completo) ── -->
+  <div class="editor-panel" style="margin-top:24px;">
+    <div class="panel-header" style="flex-wrap:wrap;gap:10px;">
+      <span class="panel-title">🎮 Nivel → Banner</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-add" id="btnSaveLvlBanner" style="background:rgba(199,255,59,.15);border-color:rgba(199,255,59,.4);">💾 Guardar asignación</button>
+        <button class="btn-add" id="btnActualizarTodo" style="background:rgba(255,180,0,.12);border-color:rgba(255,180,0,.4);color:#ffd700;">⚡ Actualizar Todo</button>
+      </div>
+    </div>
+    <p style="color:rgba(255,255,255,.45);font-size:.8rem;margin-bottom:14px;">Selecciona un nivel, luego haz clic en el banner que le corresponde. Presiona "Actualizar Todo" para sincronizar banners a todos los usuarios que hayan completado sus niveles al 100%.</p>
+
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="flex:1;min-width:220px;">
+        <label style="font-size:.75rem;font-weight:700;color:rgba(199,255,59,.8);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px;">Nivel</label>
+        <select class="form-select" id="lvlSelect" style="width:100%;"><option value="">Cargando niveles…</option></select>
+      </div>
+      <div id="lvlCurrentBanner" style="font-size:.8rem;color:rgba(255,255,255,.45);align-self:flex-end;padding-bottom:8px;"></div>
+    </div>
+
+    <div id="lvlBannerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;"></div>
+    <div id="actualizarLog" style="margin-top:14px;font-size:.78rem;color:rgba(199,255,59,.7);white-space:pre-wrap;display:none;max-height:180px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:10px;padding:10px;"></div>
+  </div>
 </div>
 
 <!-- ═══════════════════ BANNER MODAL ═══════════════════ -->
@@ -523,8 +546,8 @@
 <script type="module">
   import { db, onAuthChange, isOwner, isAdmin, mountAuthUI } from "/auth.js";
   import {
-    collection, getDocs, addDoc, updateDoc, deleteDoc,
-    doc, serverTimestamp, query, orderBy
+    collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, setDoc,
+    doc, serverTimestamp, query, orderBy, writeBatch, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   mountAuthUI("authSlot");
@@ -560,7 +583,179 @@
   let editingBadge  = null;
 
   async function initPage() {
-    await Promise.all([loadBanners(), loadBadges()]);
+    await Promise.all([loadBanners(), loadBadges(), loadLevels()]);
+  }
+
+  /* ══════════════════════════════════════════
+     NIVEL → BANNER
+  ══════════════════════════════════════════ */
+  let levelsData = [];
+  let selectedBannerForLevel = null;
+
+  async function loadLevels() {
+    try {
+      const snap = await getDocs(query(collection(db, "levels"), orderBy("position", "asc")));
+      levelsData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sel = $("lvlSelect");
+      sel.innerHTML = `<option value="">-- Seleccionar nivel --</option>`;
+      levelsData.forEach(lvl => {
+        const opt = document.createElement("option");
+        opt.value = lvl.id;
+        opt.textContent = `#${lvl.position || "?"} ${lvl.name || "(Sin nombre)"}`;
+        sel.appendChild(opt);
+      });
+    } catch(e) {
+      console.error("[admin-dev] loadLevels:", e);
+    }
+  }
+
+  $("lvlSelect").addEventListener("change", () => {
+    const id = $("lvlSelect").value;
+    const lvl = levelsData.find(l => l.id === id);
+    selectedBannerForLevel = lvl?.bannerId || null;
+    const info = $("lvlCurrentBanner");
+    if (lvl?.bannerId) {
+      const b = bannersCache.find(x => x.id === lvl.bannerId);
+      info.textContent = `Banner actual: ${b ? b.name : lvl.bannerId}`;
+    } else {
+      info.textContent = lvl ? "Sin banner asignado" : "";
+    }
+    renderLvlBannerGrid();
+  });
+
+  function renderLvlBannerGrid() {
+    const grid = $("lvlBannerGrid");
+    if (!bannersCache.length) {
+      grid.innerHTML = `<p style="color:rgba(255,255,255,.4);font-size:.82rem;">Sin banners disponibles.</p>`;
+      return;
+    }
+    grid.innerHTML = bannersCache.map(b => {
+      const fc  = b.frameColor  || '#c7ff3b';
+      const fc2 = b.frameColor2 || '#ff6b6b';
+      const selected = selectedBannerForLevel === b.id;
+      let thumbStyle;
+      if (b.frameType === 'gradient') {
+        const imgLayer = b.imageUrl
+          ? `url('${escHtml(b.imageUrl)}'),`
+          : `linear-gradient(rgba(10,22,10,.95),rgba(10,22,10,.95)),`;
+        thumbStyle = `border:3px solid transparent;background-image:${imgLayer}linear-gradient(135deg,${fc},${fc2});background-origin:padding-box,border-box;background-clip:padding-box,border-box;background-size:cover,100%;background-position:center,center;`;
+      } else {
+        const bgS = b.imageUrl ? `background-image:url('${escHtml(b.imageUrl)}');` : '';
+        const fS  = b.frameType !== 'chroma' ? `--fc:${fc};` : '';
+        thumbStyle = `${bgS}${fS}`;
+      }
+      const frameClass = `frame-${b.frameType || 'solid'}`;
+      return `<div onclick="lvlPickBanner('${b.id}')" style="cursor:pointer;position:relative;border-radius:12px;overflow:hidden;background:rgba(0,0,0,.4);border:2px solid ${selected?'rgba(199,255,59,.8)':'rgba(255,255,255,.1)'};transition:border-color .15s;">
+        <div class="banner-thumb ${frameClass}" style="${thumbStyle};width:100%;height:72px;border-radius:10px;"></div>
+        <div style="padding:4px 6px;font-size:.7rem;font-weight:700;color:rgba(255,255,255,.75);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(b.name||'')}</div>
+        ${selected ? `<div style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:#000;border:2px solid rgba(199,255,59,.8);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:#c7ff3b;">✓</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  window.lvlPickBanner = id => {
+    selectedBannerForLevel = selectedBannerForLevel === id ? null : id;
+    renderLvlBannerGrid();
+    const lvlId = $("lvlSelect").value;
+    const lvl   = levelsData.find(l => l.id === lvlId);
+    const info  = $("lvlCurrentBanner");
+    if (selectedBannerForLevel) {
+      const b = bannersCache.find(x => x.id === selectedBannerForLevel);
+      info.textContent = `Seleccionado: ${b ? b.name : selectedBannerForLevel}`;
+    } else {
+      info.textContent = lvl ? "Sin banner asignado" : "";
+    }
+  };
+
+  $("btnSaveLvlBanner").addEventListener("click", async () => {
+    const lvlId = $("lvlSelect").value;
+    if (!lvlId) { alert("Selecciona un nivel primero."); return; }
+    const btn = $("btnSaveLvlBanner");
+    btn.disabled = true; btn.textContent = "Guardando…";
+    try {
+      await updateDoc(doc(db, "levels", lvlId), { bannerId: selectedBannerForLevel || null });
+      const lvl = levelsData.find(l => l.id === lvlId);
+      if (lvl) lvl.bannerId = selectedBannerForLevel || null;
+      const b = selectedBannerForLevel ? bannersCache.find(x => x.id === selectedBannerForLevel) : null;
+      $("lvlCurrentBanner").textContent = b ? `Banner actual: ${b.name}` : "Sin banner asignado";
+      alert(b ? `✅ Banner "${b.name}" asignado al nivel.` : "✅ Banner eliminado del nivel.");
+    } catch(e) { alert("Error: " + e.message); }
+    finally { btn.disabled = false; btn.textContent = "💾 Guardar asignación"; }
+  });
+
+  $("btnActualizarTodo").addEventListener("click", actualizarTodo);
+
+  async function actualizarTodo() {
+    const logEl = $("actualizarLog");
+    logEl.style.display = "block";
+    logEl.textContent = "⚡ Iniciando Actualizar Todo…\n";
+    const btn = $("btnActualizarTodo");
+    btn.disabled = true;
+    function log(msg) { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+    try {
+      log("📖 Cargando niveles…");
+      const lvlSnap = await getDocs(collection(db, "levels"));
+      const levelBannerMap = new Map();
+      lvlSnap.forEach(d => { if (d.data().bannerId) levelBannerMap.set(d.id, d.data().bannerId); });
+      log(`✅ ${levelBannerMap.size} niveles con banner asignado.`);
+
+      if (levelBannerMap.size === 0) {
+        log("ℹ️ No hay niveles con banner asignado. Asigna banners primero."); btn.disabled = false; return;
+      }
+
+      log("📖 Cargando records aceptados al 100%…");
+      const recsSnap = await getDocs(collection(db, "records"));
+      const records  = recsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => r.status === "Accepted" && Number(r.percent) === 100);
+      log(`✅ ${records.length} records al 100%.`);
+
+      const userBannersEarned = new Map();
+      const addEarned = (uid, bId) => {
+        if (!uid || !bId) return;
+        if (!userBannersEarned.has(uid)) userBannersEarned.set(uid, new Set());
+        userBannersEarned.get(uid).add(bId);
+      };
+      records.forEach(r => {
+        const bId = levelBannerMap.get(r.levelId);
+        if (!bId) return;
+        addEarned(r.userId, bId);
+        if (r.player2Id) addEarned(r.player2Id, bId);
+      });
+      log(`✅ ${userBannersEarned.size} usuarios con banners ganados.`);
+
+      if (!userBannersEarned.size) {
+        log("ℹ️ Ningún usuario completó niveles con banner asignado al 100%."); btn.disabled = false; return;
+      }
+
+      log("📖 Cargando cosméticos actuales…");
+      const cosmDocs = new Map();
+      await Promise.all([...userBannersEarned.keys()].map(async uid => {
+        try {
+          const s = await getDoc(doc(db, "user_cosmetics", uid));
+          cosmDocs.set(uid, new Set(s.exists() ? (s.data()?.unlockedBanners || []) : []));
+        } catch(_) { cosmDocs.set(uid, new Set()); }
+      }));
+
+      log("💾 Actualizando user_cosmetics…");
+      let updated = 0, batchCount = 0;
+      let batch = writeBatch(db), opsInBatch = 0;
+      for (const [uid, earned] of userBannersEarned) {
+        const current = cosmDocs.get(uid) || new Set();
+        const toAdd   = [...earned].filter(id => !current.has(id));
+        if (!toAdd.length) continue;
+        batch.set(doc(db, "user_cosmetics", uid), { unlockedBanners: arrayUnion(...toAdd) }, { merge: true });
+        opsInBatch++; updated++;
+        if (opsInBatch >= 490) { await batch.commit(); batchCount++; batch = writeBatch(db); opsInBatch = 0; }
+      }
+      if (opsInBatch > 0) { await batch.commit(); batchCount++; }
+
+      log(`✅ Actualizados ${updated} usuarios (${batchCount} batch${batchCount!==1?'es':''}).`);
+      log("🎉 ¡Actualizar Todo completado con éxito!");
+    } catch(e) {
+      log("❌ Error: " + e.message);
+      console.error("[actualizarTodo]", e);
+    } finally { btn.disabled = false; }
   }
 
   /* ── Rarity helpers ── */
@@ -600,10 +795,19 @@
       const rc = RARITY_CLASS[b.rarity] || 'r-comun';
       const rl = RARITY_LABEL[b.rarity] || b.rarity;
       const frameClass = `frame-${b.frameType || 'solid'}`;
-      const frameStyle = b.frameType !== 'chroma'
-        ? `--fc:${b.frameColor || '#fff'};`
-        : '';
-      const bgStyle = b.imageUrl ? `background-image:url('${escHtml(b.imageUrl)}');` : '';
+      const fc  = b.frameColor  || '#c7ff3b';
+      const fc2 = b.frameColor2 || '#ff6b6b';
+      let thumbStyle;
+      if (b.frameType === 'gradient') {
+        const imgLayer = b.imageUrl
+          ? `url('${escHtml(b.imageUrl)}'),`
+          : `linear-gradient(rgba(10,22,10,.95),rgba(10,22,10,.95)),`;
+        thumbStyle = `border:3px solid transparent;background-image:${imgLayer}linear-gradient(135deg,${fc},${fc2});background-origin:padding-box,border-box;background-clip:padding-box,border-box;background-size:cover,100%;background-position:center,center;`;
+      } else {
+        const bgStyle  = b.imageUrl ? `background-image:url('${escHtml(b.imageUrl)}');` : '';
+        const fStyle   = b.frameType !== 'chroma' ? `--fc:${fc};` : '';
+        thumbStyle = `${bgStyle}${fStyle}`;
+      }
       const flags = [
         b.animated  ? '<span class="obtain-tag">✨ Anim</span>'   : '',
         b.seasonal  ? '<span class="obtain-tag">🗓 Temp</span>'   : '',
@@ -612,7 +816,7 @@
       ].filter(Boolean).join('');
       return `
       <div class="cosm-card">
-        <div class="banner-thumb ${frameClass}" style="${bgStyle}${frameStyle}"></div>
+        <div class="banner-thumb ${frameClass}" style="${thumbStyle}"></div>
         <div class="cosm-info">
           <div class="cosm-name">${escHtml(b.name || 'Sin nombre')}</div>
           <div class="cosm-meta">
@@ -670,20 +874,36 @@
   }
 
   function updateBannerPreview() {
-    const url = $("bImageUrl").value.trim();
-    const fc  = $("bFrameColor").value.trim();
-    const fc2 = $("bFrameColor2").value.trim();
-    const ft  = $("bFrameType").value;
+    const url  = $("bImageUrl").value.trim();
+    const fc   = $("bFrameColor").value.trim();
+    const fc2  = $("bFrameColor2").value.trim();
+    const ft   = $("bFrameType").value;
     const prev = $("bPreview");
-    prev.style.backgroundImage = url ? `url('${escHtml(url)}')` : "";
+    const imgUrl = url ? `url('${escHtml(url)}')` : "";
+
+    prev.style.backgroundImage    = "";
+    prev.style.backgroundSize     = "";
+    prev.style.backgroundPosition = "";
+    prev.style.backgroundOrigin   = "";
+    prev.style.backgroundClip     = "";
+    prev.style.border             = "";
+    prev.style.boxShadow          = "";
+    prev.style.animation          = "";
+
     if (ft === "solid") {
+      if (imgUrl) prev.style.backgroundImage = imgUrl;
       prev.style.boxShadow = `inset 0 0 0 4px ${fc}, 0 0 12px ${fc}44`;
-      prev.style.animation = "";
     } else if (ft === "gradient") {
-      prev.style.boxShadow = `inset 0 0 0 4px ${fc}`;
-      prev.style.animation = "";
+      prev.style.border = "4px solid transparent";
+      prev.style.backgroundImage  = imgUrl
+        ? `${imgUrl}, linear-gradient(135deg, ${fc}, ${fc2})`
+        : `linear-gradient(rgba(10,22,10,.95),rgba(10,22,10,.95)), linear-gradient(135deg, ${fc}, ${fc2})`;
+      prev.style.backgroundOrigin = "padding-box, border-box";
+      prev.style.backgroundClip  = "padding-box, border-box";
+      prev.style.backgroundSize  = "cover, 100%";
+      prev.style.backgroundPosition = "center, center";
     } else {
-      prev.style.boxShadow = "";
+      if (imgUrl) prev.style.backgroundImage = imgUrl;
       prev.style.animation = "chromaPreview 4s linear infinite";
     }
   }

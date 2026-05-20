@@ -2244,26 +2244,46 @@
     return null;
   }
 
+  function resetZoneStyles(zone) {
+    zone.style.backgroundImage    = "";
+    zone.style.backgroundSize     = "";
+    zone.style.backgroundPosition = "";
+    zone.style.backgroundOrigin   = "";
+    zone.style.backgroundClip     = "";
+    zone.style.border             = "";
+    zone.style.boxShadow          = "";
+    zone.style.animation          = "";
+  }
+
   function applyBannerToZone(zone, b) {
-    if (b.imageUrl) {
-      zone.style.backgroundImage    = `url('${esc(b.imageUrl)}')`;
-      zone.style.backgroundSize     = "cover";
-      zone.style.backgroundPosition = "center";
+    resetZoneStyles(zone);
+    const ft  = b.frameType  || "none";
+    const fc  = b.frameColor  || "#c7ff3b";
+    const fc2 = b.frameColor2 || "#ff6b6b";
+    const imgUrl = b.imageUrl ? `url('${esc(b.imageUrl)}')` : "";
+
+    if (ft === "solid") {
+      if (imgUrl) { zone.style.backgroundImage = imgUrl; zone.style.backgroundSize = "cover"; zone.style.backgroundPosition = "center"; }
+      zone.style.boxShadow = `inset 0 0 0 5px ${fc}, 0 0 18px ${fc}55`;
+    } else if (ft === "gradient") {
+      zone.style.border = "5px solid transparent";
+      zone.style.backgroundImage  = imgUrl
+        ? `${imgUrl}, linear-gradient(135deg, ${fc}, ${fc2})`
+        : `linear-gradient(rgba(10,22,10,.95),rgba(10,22,10,.95)), linear-gradient(135deg, ${fc}, ${fc2})`;
+      zone.style.backgroundOrigin = "padding-box, border-box";
+      zone.style.backgroundClip  = "padding-box, border-box";
+      zone.style.backgroundSize  = "cover, 100%";
+      zone.style.backgroundPosition = "center, center";
+    } else if (ft === "chroma") {
+      if (imgUrl) { zone.style.backgroundImage = imgUrl; zone.style.backgroundSize = "cover"; zone.style.backgroundPosition = "center"; }
+      zone.style.animation = "pBannerChroma 4s linear infinite";
     } else {
-      zone.style.backgroundImage = "";
+      if (imgUrl) { zone.style.backgroundImage = imgUrl; zone.style.backgroundSize = "cover"; zone.style.backgroundPosition = "center"; }
     }
-    const ft = b.frameType || "none";
-    const fc = b.frameColor || "#c7ff3b";
-    if (ft === "solid")    { zone.style.boxShadow = `inset 0 0 0 5px ${fc}`; zone.style.animation = ""; }
-    else if (ft === "gradient") { zone.style.boxShadow = `inset 0 0 0 5px ${fc}`; zone.style.animation = ""; }
-    else if (ft === "chroma")  { zone.style.boxShadow = ""; zone.style.animation = "pBannerChroma 4s linear infinite"; }
-    else { zone.style.boxShadow = ""; zone.style.animation = ""; }
   }
 
   function applyDefaultBanner(zone) {
-    zone.style.backgroundImage = "";
-    zone.style.boxShadow = "";
-    zone.style.animation  = "";
+    resetZoneStyles(zone);
   }
 
   async function renderEquippedBadges() {
@@ -2374,10 +2394,41 @@
   function updateCosmPreview() {
     const pb = $c("cosmPBanner");
     const b  = tempBanner ? cosmBMap[tempBanner] : null;
-    pb.style.backgroundImage = b?.imageUrl ? `url('${esc(b.imageUrl)}')` : "";
-    if (b?.frameType === "solid")   { pb.style.boxShadow = `inset 0 0 0 4px ${b.frameColor||"#c7ff3b"}`; pb.style.animation=""; }
-    else if (b?.frameType==="chroma") { pb.style.animation="pBannerChroma 4s linear infinite"; pb.style.boxShadow=""; }
-    else { pb.style.boxShadow=""; pb.style.animation=""; }
+
+    pb.style.backgroundImage    = "";
+    pb.style.backgroundSize     = "";
+    pb.style.backgroundPosition = "";
+    pb.style.backgroundOrigin   = "";
+    pb.style.backgroundClip     = "";
+    pb.style.border             = "";
+    pb.style.boxShadow          = "";
+    pb.style.animation          = "";
+
+    if (b) {
+      const ft  = b.frameType  || "none";
+      const fc  = b.frameColor  || "#c7ff3b";
+      const fc2 = b.frameColor2 || "#ff6b6b";
+      const imgUrl = b.imageUrl ? `url('${esc(b.imageUrl)}')` : "";
+
+      if (ft === "solid") {
+        if (imgUrl) pb.style.backgroundImage = imgUrl;
+        pb.style.boxShadow = `inset 0 0 0 4px ${fc}, 0 0 14px ${fc}55`;
+      } else if (ft === "gradient") {
+        pb.style.border = "4px solid transparent";
+        pb.style.backgroundImage  = imgUrl
+          ? `${imgUrl}, linear-gradient(135deg, ${fc}, ${fc2})`
+          : `linear-gradient(rgba(10,22,10,.95),rgba(10,22,10,.95)), linear-gradient(135deg, ${fc}, ${fc2})`;
+        pb.style.backgroundOrigin = "padding-box, border-box";
+        pb.style.backgroundClip  = "padding-box, border-box";
+        pb.style.backgroundSize  = "cover, 100%";
+        pb.style.backgroundPosition = "center, center";
+      } else if (ft === "chroma") {
+        if (imgUrl) pb.style.backgroundImage = imgUrl;
+        pb.style.animation = "pBannerChroma 4s linear infinite";
+      } else {
+        if (imgUrl) pb.style.backgroundImage = imgUrl;
+      }
+    }
 
     $c("cosmPBadges").innerHTML = tempBadges.map(id => {
       const bd = cosmGMap[id];

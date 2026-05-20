@@ -516,22 +516,12 @@
           /* Posición del nivel: en una demon-list, posición 1 = el más
              difícil, posiciones grandes = más fáciles. Lo usamos para
              saber cuál es el nivel más difícil completado por cada jugador. */
-          const lvlPos = Number(lvl.position);
-          const lvlBg  = (lvl.background || "").trim();
           [r.userId, r.player2Id].forEach(uid => {
             if (!uid) return;
             const u = bump(uid);
             u.points += earned;
-            u.total  += 1;             // todos los records (100% o progreso) cuentan
-            if (pct === 100) u[dkey] += 1;   // categorías por dificultad: solo 100%
-            /* Solo cuenta como "nivel más difícil completado" si lo
-               completó al 100% y el nivel tiene posición válida + bg. */
-            if (pct === 100 && Number.isFinite(lvlPos) && lvlPos >= 1 && lvlBg) {
-              if (!u._hardestPos || lvlPos < u._hardestPos) {
-                u._hardestPos = lvlPos;
-                u._hardestBg  = lvlBg;
-              }
-            }
+            u.total  += 1;
+            if (pct === 100) u[dkey] += 1;
           });
         });
 
@@ -548,12 +538,33 @@
           u.country  = (d.country  || "").trim().toLowerCase();
           u.photoURL = (d.photoURL || "").trim();
         });
-        /* Los uids que sí tenían records pero NO tenían profile doc */
         map.forEach((u, uid) => {
-          if (u.name == null) {
-            u.name = "Sin nombre";
-            u.country = "";
+          if (u.name == null) { u.name = "Sin nombre"; u.country = ""; }
+        });
+
+        /* 5) Banners equipados — user_cosmetics (1 sola lectura lista) */
+        const cosmSnap = await getDocs(collection(db, "user_cosmetics"));
+        const bannerIds = new Set();
+        cosmSnap.forEach(cs => {
+          const uid = cs.id;
+          const d   = cs.data() || {};
+          if (map.has(uid) && d.equippedBanner) {
+            map.get(uid)._equippedBanner = d.equippedBanner;
+            bannerIds.add(d.equippedBanner);
           }
+        });
+
+        /* 6) Cargar datos de banners únicos */
+        const bannersDataMap = new Map();
+        await Promise.all([...bannerIds].map(async id => {
+          try {
+            const bs = await getDoc(doc(db, "banners", id));
+            if (bs.exists()) bannersDataMap.set(id, { id, ...bs.data() });
+          } catch(_) {}
+        }));
+        map.forEach(u => {
+          if (u._equippedBanner && bannersDataMap.has(u._equippedBanner))
+            u._banner = bannersDataMap.get(u._equippedBanner);
         });
 
         aggregates = [...map.values()];
@@ -636,24 +647,28 @@
           location.href = `/profile.html?id=${encodeURIComponent(u.uid)}`;
         });
 
-        /* Fondo: imagen del nivel más difícil completado por el jugador
-           (si tiene), oscurecida con un gradiente para que el texto se
-           lea bien encima. Si no tiene records 100%, se queda con el
-           fondo gris translúcido del CSS. */
-        if (u._hardestBg) {
-          const safeBg = u._hardestBg.replace(/"/g, "%22");
-          /* Viñeta tipo "spotlight":
-             el CENTRO se ve claro y nítido, los BORDES se desvanecen
-             a negro casi opaco.  Así la foto del nivel queda visible
-             en el medio y los lados (donde van el nombre y los
-             puntos) son oscuros para que el texto se lea bien. */
-          row.style.backgroundImage =
-            `radial-gradient(ellipse 100% 130% at center, ` +
-              `rgba(0,0,0,0) 0%, ` +
-              `rgba(0,0,0,0) 28%, ` +
-              `rgba(0,0,0,0.55) 60%, ` +
-              `rgba(0,0,0,0.95) 100%), ` +
-            `url("${safeBg}")`;
+        /* Fondo: banner equipado por el jugador */
+        if (u._banner && u._banner.imageUrl) {
+          const b      = u._banner;
+          const safeBg = b.imageUrl.replace(/"/g, "%22");
+          const ft     = b.frameType  || "none";
+          const fc     = b.frameColor  || "#c7ff3b";
+          const fc2    = b.frameColor2 || "#ff6b6b";
+          const vig    = `radial-gradient(ellipse 100% 130% at center,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 28%,rgba(0,0,0,0.55) 60%,rgba(0,0,0,0.95) 100%)`;
+          if (ft === "gradient") {
+            row.style.border             = "3px solid transparent";
+            row.style.backgroundImage    = `${vig},url("${safeBg}"),linear-gradient(135deg,${fc},${fc2})`;
+            row.style.backgroundOrigin   = "padding-box,padding-box,border-box";
+            row.style.backgroundClip     = "padding-box,padding-box,border-box";
+            row.style.backgroundSize     = "cover,cover,100%";
+            row.style.backgroundPosition = "center,center,center";
+          } else if (ft === "chroma") {
+            row.style.backgroundImage    = `${vig},url("${safeBg}")`;
+            row.style.animation          = "lbChroma 4s linear infinite";
+          } else {
+            row.style.backgroundImage    = `${vig},url("${safeBg}")`;
+            if (ft === "solid") row.style.boxShadow = `inset 0 0 0 3px ${fc},inset 0 8px 30px rgba(0,0,0,0.5)`;
+          }
           row.style.textShadow = "0 1px 3px rgba(0,0,0,0.85)";
         }
 
@@ -725,5 +740,17 @@
     renderTabs();
     loadAll();
   </script>
+
+<style>
+  @keyframes lbChroma {
+    0%   { box-shadow: inset 0 0 0 3px hsl(0,100%,60%),   0 0 8px hsl(0,100%,60%); }
+    16%  { box-shadow: inset 0 0 0 3px hsl(60,100%,60%),  0 0 8px hsl(60,100%,60%); }
+    33%  { box-shadow: inset 0 0 0 3px hsl(120,100%,55%), 0 0 8px hsl(120,100%,55%); }
+    50%  { box-shadow: inset 0 0 0 3px hsl(180,100%,55%), 0 0 8px hsl(180,100%,55%); }
+    66%  { box-shadow: inset 0 0 0 3px hsl(240,100%,70%), 0 0 8px hsl(240,100%,70%); }
+    83%  { box-shadow: inset 0 0 0 3px hsl(300,100%,70%), 0 0 8px hsl(300,100%,70%); }
+    100% { box-shadow: inset 0 0 0 3px hsl(360,100%,60%), 0 0 8px hsl(360,100%,60%); }
+  }
+</style>
 </body>
 </html>
