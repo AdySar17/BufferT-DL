@@ -559,8 +559,8 @@
 <script type="module">
   import { db, onAuthChange, isStaff, isAdmin, isOwner } from "/auth.js";
   import {
-    collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc,
-    writeBatch, serverTimestamp, deleteField
+    collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc,
+    writeBatch, serverTimestamp, deleteField, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { computePoints } from "/points.js";
 
@@ -1344,6 +1344,75 @@
     await notifyDiscord({ target: "records", content, embeds: [embed] });
   }
 
+  /* ══ Conceder insignias de completion automáticamente al aceptar al 100% ══
+     Se ejecuta en background — no bloquea la UI ni muestra errores al staff.  */
+  const DIFF_RANK_P = {"Easy Demon":1,"Medium Demon":2,"Hard Demon":3,"Insane Demon":4,"Extreme Demon":5};
+
+  async function tryGrantBadgesOnAccept(rec) {
+    const uid = rec.userId;
+    if (!uid || Number(rec.percent) !== 100) return;
+    try {
+      /* Cargar badges de tipo completion que sean obtenibles */
+      const badgesSnap = await getDocs(query(
+        collection(db, "badges"),
+        where("obtainType", "==", "completion")
+      ));
+      const compBadges = badgesSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(b => b.obtainable !== false);
+      if (!compBadges.length) return;
+
+      /* Todos los records aceptados al 100% del usuario (como P1 y P2) */
+      const [snap1, snap2] = await Promise.all([
+        getDocs(query(collection(db,"records"), where("userId","==",uid), where("status","==","Accepted"))),
+        getDocs(query(collection(db,"records"), where("player2Id","==",uid), where("status","==","Accepted")))
+      ]);
+      const fullRecs = [];
+      snap1.forEach(d => { const r = d.data(); if (Number(r.percent)===100) fullRecs.push(r); });
+      snap2.forEach(d => { const r = d.data(); if (Number(r.percent)===100) fullRecs.push(r); });
+
+      /* Obtener dificultad de cada nivel único */
+      const lvlIds = [...new Set(fullRecs.map(r => r.levelId).filter(Boolean))];
+      const lvlDiffs = new Map();
+      await Promise.all(lvlIds.map(async id => {
+        try {
+          const s = await getDoc(doc(db,"levels",id));
+          if (s.exists()) lvlDiffs.set(id, s.data().difficulty || "Extreme Demon");
+        } catch(_) {}
+      }));
+
+      /* Contar completions por dificultad */
+      const diffCounts = new Map();
+      fullRecs.forEach(r => {
+        const d = lvlDiffs.get(r.levelId) || "Extreme Demon";
+        diffCounts.set(d, (diffCounts.get(d) || 0) + 1);
+      });
+
+      /* Cosméticos actuales */
+      const cosmDoc = await getDoc(doc(db,"user_cosmetics",uid));
+      const existing = new Set(Array.isArray(cosmDoc.data()?.unlockedBadges) ? cosmDoc.data().unlockedBadges : []);
+
+      /* Determinar cuáles badges cumple */
+      const toGrant = [];
+      for (const badge of compBadges) {
+        if (existing.has(badge.id)) continue;
+        const m = badge.unlockMeta || {};
+        const qty     = Number(m.quantity || 1);
+        const reqRank = DIFF_RANK_P[m.difficulty || "Extreme Demon"] || 5;
+        let total = 0;
+        diffCounts.forEach((cnt, d) => { if ((DIFF_RANK_P[d]||0) >= reqRank) total += cnt; });
+        if (total >= qty) toGrant.push(badge.id);
+      }
+      if (!toGrant.length) return;
+
+      /* Conceder: setDoc con merge para no sobreescribir otros campos */
+      await setDoc(doc(db,"user_cosmetics",uid), { unlockedBadges: arrayUnion(...toGrant) }, { merge: true });
+      console.log(`[panel] Insignias concedidas a ${uid}:`, toGrant);
+    } catch(e) {
+      console.warn("[panel] tryGrantBadgesOnAccept error:", e);
+    }
+  }
+
   async function moderate(recordId, action, wrap, staffnotes) {
     const buttons = wrap.querySelectorAll("button");
     buttons.forEach(b => b.disabled = true);
@@ -1366,6 +1435,11 @@
         const recId = recordId;
         const recObj = (window.__pendingRecords || []).find(r => r.id === recId) || null;
         await sendRecordWebhook(recObj, action, staffnotes);
+
+        /* Conceder insignias de completion si fue aceptado al 100% */
+        if (action === "accept" && recObj) {
+          tryGrantBadgesOnAccept(recObj); /* silencioso, no se espera */
+        }
       } catch (e) { console.warn("[panel] discord records notify fail:", e); }
 
       wrap.style.transition = "opacity .25s, transform .25s";

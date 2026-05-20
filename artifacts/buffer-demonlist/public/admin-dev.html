@@ -587,7 +587,8 @@
       <select class="form-select" id="bdObtainType">
         <option value="manual">Manual (admin lo da)</option>
         <option value="completion">Completar niveles</option>
-        <option value="member">Miembro fundador</option>
+        <option value="entry">Recompensa por Entrada</option>
+        <option value="annual">Recompensa Anual</option>
         <option value="booster">Server Booster</option>
         <option value="event">Evento</option>
         <option value="staff">Staff</option>
@@ -851,7 +852,103 @@
       }
       if (opsInBatch > 0) { await batch.commit(); batchCount++; }
 
-      log(`✅ Actualizados ${updated} usuario(s) (${batchCount} batch${batchCount!==1?'es':''}).`);
+      log(`✅ Banners: ${updated} usuario(s) actualizados.`);
+
+      /* ════ FASE 2: INSIGNIAS AUTOMÁTICAS ════
+         Procesa badges de tipo: completion, entry, annual              */
+      log("🔄 Fase 2: procesando insignias automáticas…");
+      const badgesSnap = await getDocs(collection(db, "badges"));
+      const allBadges  = badgesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const autoBadges = allBadges.filter(b =>
+        b.obtainable !== false &&
+        ["completion", "entry", "annual"].includes(b.obtainType)
+      );
+      if (!autoBadges.length) {
+        log("ℹ️ No hay insignias automáticas (completion/entry/annual) configuradas.");
+      } else {
+        /* 2a) Perfiles → createdAt */
+        const profSnap = await getDocs(collection(db, "profiles"));
+        const profCreatedAt = new Map();
+        profSnap.forEach(d => {
+          const ca = d.data().createdAt;
+          if (ca && ca.toDate) profCreatedAt.set(d.id, ca.toDate());
+        });
+
+        /* 2b) Cosméticos actuales (badges ya desbloqueados) */
+        const cosmSnap2 = await getDocs(collection(db, "user_cosmetics"));
+        const userBadgesMap = new Map();
+        cosmSnap2.forEach(d => {
+          const ub = d.data().unlockedBadges;
+          userBadgesMap.set(d.id, new Set(Array.isArray(ub) ? ub : []));
+        });
+
+        /* 2c) Completions al 100% por usuario y dificultad */
+        const DIFF_RANK = { "Easy Demon":1,"Medium Demon":2,"Hard Demon":3,"Insane Demon":4,"Extreme Demon":5 };
+        const userDiffCounts = new Map(); // uid → Map<difficulty, count>
+        records.forEach(r => {
+          const lvlData = allLevels.find(l => l.id === r.levelId);
+          const diff = lvlData?.difficulty || "Extreme Demon";
+          [r.userId, r.player2Id].forEach(uid => {
+            if (!uid) return;
+            if (!userDiffCounts.has(uid)) userDiffCounts.set(uid, new Map());
+            const dm = userDiffCounts.get(uid);
+            dm.set(diff, (dm.get(diff) || 0) + 1);
+          });
+        });
+
+        /* 2d) Iterar usuarios y determinar badges a conceder */
+        const allUids = new Set([...userDiffCounts.keys(), ...profCreatedAt.keys()]);
+        const now = new Date();
+        let badgeUpdated = 0;
+        let batchB = writeBatch(db);
+        let bOps   = 0;
+
+        for (const uid of allUids) {
+          const existing = userBadgesMap.get(uid) || new Set();
+          const toGrant  = [];
+
+          for (const badge of autoBadges) {
+            if (existing.has(badge.id)) continue;
+            const m = badge.unlockMeta || {};
+
+            if (badge.obtainType === "completion") {
+              const qty     = Number(m.quantity || 1);
+              const reqRank = DIFF_RANK[m.difficulty || "Extreme Demon"] || 5;
+              let total = 0;
+              (userDiffCounts.get(uid) || new Map()).forEach((cnt, d) => {
+                if ((DIFF_RANK[d] || 0) >= reqRank) total += cnt;
+              });
+              if (total >= qty) toGrant.push(badge.id);
+
+            } else if (badge.obtainType === "entry") {
+              const regDate = profCreatedAt.get(uid);
+              if (!regDate) continue;
+              const entryType = m.entryType || "first";
+              if (entryType === "first") {
+                toGrant.push(badge.id);
+              } else if (entryType === "anniversary") {
+                const years   = Number(m.years || 1);
+                const elapsed = (now - regDate) / (365.25 * 24 * 3600 * 1000);
+                if (elapsed >= years) toGrant.push(badge.id);
+              }
+
+            } else if (badge.obtainType === "annual") {
+              const regDate = profCreatedAt.get(uid);
+              if (!regDate) continue;
+              if (regDate.getFullYear() === Number(m.year || 2024)) toGrant.push(badge.id);
+            }
+          }
+
+          if (!toGrant.length) continue;
+          batchB.set(doc(db, "user_cosmetics", uid), { unlockedBadges: arrayUnion(...toGrant) }, { merge: true });
+          bOps++;
+          badgeUpdated++;
+          if (bOps >= 490) { await batchB.commit(); batchB = writeBatch(db); bOps = 0; }
+        }
+        if (bOps > 0) await batchB.commit();
+        log(`✅ Fase 2: ${badgeUpdated} usuario(s) con nuevas insignias concedidas.`);
+      }
+
       log("🎉 ¡Actualizar Data completado con éxito!");
     } catch(e) {
       log("❌ Error: " + e.message);
@@ -869,7 +966,9 @@
     legendario:'Legendario', mitico:'Mítico', exclusivo:'Exclusivo'
   };
   const OBTAIN_LABEL = {
-    manual:'Manual', completion:'Completar niveles', member:'Miembro fundador',
+    manual:'Manual', completion:'Completar niveles',
+    entry:'Recompensa por Entrada', annual:'Recompensa Anual',
+    member:'Miembro fundador (legacy)',
     booster:'Booster', event:'Evento', staff:'Staff', leaderboard:'Leaderboard'
   };
 
@@ -1120,11 +1219,32 @@
     manual:       ``,
     completion:   `<div class="form-row" id="bm-qty"><label>Cantidad de niveles</label><input class="form-input" id="meta_qty" type="number" min="1" value="10" placeholder="10"><p class="meta-hint">Número de niveles requeridos</p></div>
                    <div class="form-row" id="bm-diff"><label>Dificultad mínima</label><select class="form-select" id="meta_diff"><option>Extreme Demon</option><option>Hard Demon</option><option>Medium Demon</option><option>Easy Demon</option><option>Insane Demon</option></select></div>`,
-    member:       `<div class="form-row"><label>Año de membresía</label><input class="form-input" id="meta_year" type="number" min="2020" value="2024" placeholder="2024"></div>`,
+    entry:        `<div class="form-row"><label>Tipo</label>
+                     <select class="form-select" id="meta_entry_type" onchange="toggleEntryYears()">
+                       <option value="first">Primer registro (cualquier fecha)</option>
+                       <option value="anniversary">Aniversario (N años en la lista)</option>
+                     </select>
+                   </div>
+                   <div class="form-row" id="meta_entry_years_row" style="display:none">
+                     <label>Años registrado</label>
+                     <input class="form-input" id="meta_entry_years" type="number" min="1" max="20" value="1" placeholder="1">
+                     <p class="meta-hint">La insignia se otorga al cumplir N años desde el registro</p>
+                   </div>`,
+    annual:       `<div class="form-row"><label>Año de inscripción</label>
+                     <input class="form-input" id="meta_annual_year" type="number" min="2020" max="2100" value="2024" placeholder="2024">
+                     <p class="meta-hint">Se otorga si el jugador se registró durante ese año calendario</p>
+                   </div>`,
+    member:       `<div class="form-row"><label>Año de membresía (legacy)</label><input class="form-input" id="meta_year" type="number" min="2020" value="2024" placeholder="2024"></div>`,
     booster:      ``,
     event:        `<div class="form-row"><label>Nombre del evento</label><input class="form-input" id="meta_event" placeholder="Ej: Torneo Verano 2025"></div>`,
     staff:        ``,
     leaderboard:  `<div class="form-row"><label>Posición requerida (top)</label><select class="form-select" id="meta_rank"><option value="1">🥇 1er lugar</option><option value="3">🥈 Top 3</option><option value="10">🥉 Top 10</option></select></div>`,
+  };
+
+  window.toggleEntryYears = function() {
+    const t = document.getElementById("meta_entry_type")?.value;
+    const row = document.getElementById("meta_entry_years_row");
+    if (row) row.style.display = (t === "anniversary") ? "" : "none";
   };
 
   function openBadgeModal(badge = null) {
@@ -1164,6 +1284,14 @@
     if (type === "completion") {
       if ($("meta_qty"))  $("meta_qty").value  = m.quantity  || 10;
       if ($("meta_diff")) $("meta_diff").value = m.difficulty || "Extreme Demon";
+    } else if (type === "entry") {
+      if ($("meta_entry_type")) {
+        $("meta_entry_type").value = m.entryType || "first";
+        window.toggleEntryYears();
+      }
+      if ($("meta_entry_years")) $("meta_entry_years").value = m.years || 1;
+    } else if (type === "annual") {
+      if ($("meta_annual_year")) $("meta_annual_year").value = m.year || 2024;
     } else if (type === "member") {
       if ($("meta_year")) $("meta_year").value = m.year || 2024;
     } else if (type === "event") {
@@ -1193,6 +1321,13 @@
     if (type === "completion") {
       meta.quantity   = parseInt($("meta_qty")?.value) || 10;
       meta.difficulty = $("meta_diff")?.value || "Extreme Demon";
+    } else if (type === "entry") {
+      meta.entryType = $("meta_entry_type")?.value || "first";
+      if (meta.entryType === "anniversary") {
+        meta.years = parseInt($("meta_entry_years")?.value) || 1;
+      }
+    } else if (type === "annual") {
+      meta.year = parseInt($("meta_annual_year")?.value) || 2024;
     } else if (type === "member") {
       meta.year = parseInt($("meta_year")?.value) || 2024;
     } else if (type === "event") {
