@@ -80,8 +80,6 @@
     padding: 22px;
     margin-bottom: 16px;
     box-shadow: 0 10px 35px rgba(0,0,0,0.45);
-    overflow: hidden;
-    min-width: 0;
   }
 
   .state-msg {
@@ -92,9 +90,12 @@
   .state-msg.error { color: #ff9a9a; }
 
   /* RECORD CARD */
-  .record-card { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: start; }
-  .record-card .left { min-width: 0; overflow: hidden; word-break: break-word; overflow-wrap: break-word; }
-  .record-card .right { display: flex; flex-direction: column; gap: 8px; align-items: stretch; min-width: 160px; max-width: 200px; }
+  .record-card { display: grid; grid-template-columns: minmax(0, 1fr) 175px; gap: 18px; align-items: start; }
+  .record-card .left { min-width: 0; }
+  .record-card .right { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 175px; flex-shrink: 0; }
+
+  /* Nombre de jugador: truncar con ellipsis, nunca romper letra por letra */
+  .rc-player span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 
   /* === RECLAMAR REVISIÓN ===
      Botoncito pequeño en la cabecera de la columna derecha,
@@ -252,28 +253,29 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
   .toast.error { background: rgba(120,30,30,0.92); border-color: rgba(255,80,80,0.35); color: #ffd0d0; }
 
-  @media (max-width: 720px) {
+  @media (max-width: 900px) {
+    /* En móvil/tablet: todo en columna única, botones abajo */
     .record-card { grid-template-columns: 1fr; gap: 12px; }
-    .record-card .left { overflow: hidden; }
     .record-card .right {
-      min-width: 0; max-width: 100%;
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 8px;
+      width: 100%; flex-direction: row; flex-wrap: wrap; gap: 8px;
     }
     .record-card .right .claim-wrap { flex: 1 0 100%; }
-    .record-card .right .btn        { flex: 1 1 calc(50% - 4px); min-width: 0; font-size: 0.8rem; padding: 9px 8px; }
+    .record-card .right .btn        { flex: 1 1 calc(50% - 4px); min-width: 100px; font-size: 0.8rem; padding: 9px 8px; }
 
-    /* Nivel y meta compactos en móvil */
+    /* Nombre del jugador: más ancho disponible en móvil */
+    .rc-player span { max-width: 60vw; }
+
+    /* Nivel y meta compactos */
     .rc-level { font-size: 1rem; margin-bottom: 8px; }
     .rc-meta  { gap: 8px; }
-    .rc-meta .badge { font-size: 0.65rem; }
+    .rc-meta .badge { font-size: 0.68rem; }
+    .rc-video { font-size: 0.8rem; }
+    .card { padding: 16px 14px; }
+  }
 
-    /* URL del video: truncar en móvil */
-    .rc-video { font-size: 0.78rem; }
-
-    /* Notas del record */
-    .card { padding: 14px 12px; }
+  @media (max-width: 480px) {
+    .rc-player span { max-width: 50vw; }
+    .card { padding: 12px 11px; }
   }
 
   /* Secciones de prioridad */

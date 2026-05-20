@@ -322,6 +322,52 @@
 
     .gradient-end-row { display: none; }
     .gradient-end-row.show { display: block; }
+
+    /* ── Player Cosmetics Manager ── */
+    .pc-section {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .pc-section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: .82rem; font-weight: 700; color: rgba(255,255,255,.7);
+      margin-bottom: 10px;
+    }
+    .pc-cosm-list { display: flex; flex-wrap: wrap; gap: 8px; min-height: 32px; margin-bottom: 10px; }
+    .pc-cosm-list:empty::after {
+      content: "Sin cosméticos"; font-size: .75rem; color: rgba(255,255,255,.3);
+    }
+    .pc-item {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 20px; padding: 4px 10px;
+      font-size: .74rem; color: #e0e0e0;
+    }
+    .pc-item.is-equipped { border-color: rgba(199,255,59,.5); color: #c7ff3b; background: rgba(199,255,59,.1); }
+    .pc-item button {
+      background: none; border: none; cursor: pointer; color: rgba(255,100,100,.7);
+      font-size: .78rem; padding: 0 2px; line-height: 1;
+      transition: color .15s;
+    }
+    .pc-item button:hover { color: #ff6464; }
+    .pc-item .equip-btn {
+      color: rgba(199,255,59,.7); margin-left: 2px;
+    }
+    .pc-item .equip-btn:hover { color: #c7ff3b; }
+    .pc-add-row { display: flex; gap: 8px; }
+    .pc-result-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 9px; cursor: pointer; margin-bottom: 6px;
+      transition: background .15s;
+    }
+    .pc-result-item:hover { background: rgba(199,255,59,.08); border-color: rgba(199,255,59,.3); }
+    .pc-result-item img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: #222; }
+    .pc-result-item .pc-rname { font-size: .85rem; font-weight: 700; }
+    .pc-result-item .pc-ruid  { font-size: .68rem; color: rgba(255,255,255,.4); font-family: monospace; }
   </style>
 </head>
 <body>
@@ -380,6 +426,51 @@
       <div class="cosm-list" id="badgeList">
         <div class="cosm-list-empty">Cargando…</div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── PANEL COSMÉTICOS POR JUGADOR — solo Owner ── -->
+  <div class="editor-panel owner-only" id="playerCosmeticsPanel" style="margin-top:24px;">
+    <div class="panel-header">
+      <span class="panel-title">🎨 Cosméticos por Jugador</span>
+    </div>
+    <p style="color:rgba(255,255,255,.45);font-size:.8rem;margin-bottom:14px;">
+      Busca un jugador para gestionar sus banners e insignias desbloqueadas. Solo el Owner puede conceder o revocar cosméticos.
+    </p>
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <input id="pcSearchInput" class="form-input" type="text" placeholder="Nombre del jugador…" style="flex:1;min-width:180px;">
+      <button class="btn-add" id="pcSearchBtn">🔍 Buscar</button>
+    </div>
+    <div id="pcSearchResults" style="margin-bottom:12px;"></div>
+    <div id="pcEditor" style="display:none;">
+      <div id="pcPlayerInfo" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:rgba(255,255,255,.05);border-radius:10px;border:1px solid rgba(255,255,255,.08);"></div>
+
+      <!-- Banners desbloqueados -->
+      <div class="pc-section">
+        <div class="pc-section-head">
+          <span>🖼 Banners desbloqueados</span>
+          <span id="pcEquippedBannerTag" style="font-size:.72rem;color:#c7ff3b;display:none;"></span>
+        </div>
+        <div id="pcBannerList" class="pc-cosm-list"></div>
+        <div class="pc-add-row">
+          <select id="pcBannerSelect" class="form-select" style="flex:1;min-width:0;"></select>
+          <button class="btn-add" id="pcAddBannerBtn" style="white-space:nowrap;">+ Añadir Banner</button>
+        </div>
+      </div>
+
+      <!-- Insignias desbloqueadas -->
+      <div class="pc-section" style="margin-top:14px;">
+        <div class="pc-section-head">
+          <span>🏅 Insignias desbloqueadas</span>
+        </div>
+        <div id="pcBadgeList" class="pc-cosm-list"></div>
+        <div class="pc-add-row">
+          <select id="pcBadgeSelect" class="form-select" style="flex:1;min-width:0;"></select>
+          <button class="btn-add" id="pcAddBadgeBtn" style="white-space:nowrap;">+ Añadir Insignia</button>
+        </div>
+      </div>
+
+      <div id="pcMsg" style="font-size:.8rem;margin-top:10px;min-height:20px;"></div>
     </div>
   </div>
 
@@ -537,7 +628,7 @@
   import { db, onAuthChange, isOwner, isAdmin, mountAuthUI } from "/auth.js";
   import {
     collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, setDoc,
-    doc, serverTimestamp, query, orderBy, writeBatch, arrayUnion
+    doc, serverTimestamp, query, orderBy, where, writeBatch, arrayUnion, arrayRemove
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   mountAuthUI("authSlot");
@@ -1158,6 +1249,225 @@
       return "#" + color[1]+color[1]+color[2]+color[2]+color[3]+color[3];
     }
     return "#c7ff3b";
+  }
+
+  /* ══════════════════════════════════════════════════════
+     GESTIÓN DE COSMÉTICOS POR JUGADOR  (Owner only)
+  ══════════════════════════════════════════════════════ */
+  let pcCurrentUid     = null;
+  let pcCurrentCosmData = {};
+
+  $("pcSearchBtn").addEventListener("click", pcSearch);
+  $("pcSearchInput").addEventListener("keydown", e => { if (e.key === "Enter") pcSearch(); });
+
+  async function pcSearch() {
+    const term = ($("pcSearchInput").value || "").trim().toLowerCase();
+    if (!term) return;
+    $("pcSearchResults").innerHTML = `<div style="font-size:.8rem;color:rgba(255,255,255,.4);">Buscando…</div>`;
+    $("pcEditor").style.display = "none";
+    pcCurrentUid = null;
+    try {
+      const snap = await getDocs(collection(db, "profiles"));
+      const matches = [];
+      snap.forEach(d => {
+        if ((d.data().name || "").toLowerCase().includes(term))
+          matches.push({ uid: d.id, ...d.data() });
+      });
+      if (!matches.length) {
+        $("pcSearchResults").innerHTML = `<div style="font-size:.8rem;color:rgba(255,255,255,.35);">Sin resultados para "${escHtml(term)}".</div>`;
+        return;
+      }
+      $("pcSearchResults").innerHTML = matches.slice(0, 15).map(p => `
+        <div class="pc-result-item" data-uid="${escHtml(p.uid)}">
+          ${p.photoURL
+            ? `<img src="${escHtml(p.photoURL)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`
+            : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(199,255,59,.15);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.75rem;color:#c7ff3b;">${escHtml((p.name||"?")[0].toUpperCase())}</div>`}
+          <div>
+            <div class="pc-rname">${escHtml(p.name || "Sin nombre")}</div>
+            <div class="pc-ruid">${escHtml(p.uid)}</div>
+          </div>
+        </div>`).join("");
+      $("pcSearchResults").querySelectorAll(".pc-result-item").forEach(el => {
+        el.addEventListener("click", () => pcLoadPlayer(el.dataset.uid));
+      });
+    } catch(e) {
+      $("pcSearchResults").innerHTML = `<div style="font-size:.8rem;color:#ff9a9a;">Error: ${escHtml(e.message)}</div>`;
+    }
+  }
+
+  async function pcLoadPlayer(uid) {
+    pcCurrentUid = uid;
+    $("pcEditor").style.display = "none";
+    pcMsg("⏳ Cargando cosméticos…", "#aaa");
+    try {
+      const [profSnap, cosmSnap] = await Promise.all([
+        getDoc(doc(db, "profiles", uid)),
+        getDoc(doc(db, "user_cosmetics", uid))
+      ]);
+      const prof = profSnap.exists() ? profSnap.data() : {};
+      pcCurrentCosmData = cosmSnap.exists() ? (cosmSnap.data() || {}) : {};
+
+      $("pcPlayerInfo").innerHTML = `
+        ${prof.photoURL
+          ? `<img src="${escHtml(prof.photoURL)}" referrerpolicy="no-referrer" style="width:42px;height:42px;border-radius:50%;object-fit:cover;background:#222;">`
+          : `<div style="width:42px;height:42px;border-radius:50%;background:rgba(199,255,59,.15);display:flex;align-items:center;justify-content:center;font-weight:800;color:#c7ff3b;">${escHtml((prof.name||"?")[0].toUpperCase())}</div>`}
+        <div>
+          <div style="font-weight:800;font-size:.95rem;">${escHtml(prof.name || "Sin nombre")}</div>
+          <div style="font-size:.7rem;color:rgba(255,255,255,.4);font-family:monospace;">${escHtml(uid)}</div>
+        </div>`;
+
+      pcRenderBanners();
+      pcRenderBadges();
+      pcPopulateSelects();
+      $("pcEditor").style.display = "block";
+      pcMsg("", "");
+    } catch(e) {
+      pcMsg("❌ Error al cargar: " + e.message, "#ff9a9a");
+    }
+  }
+
+  function pcMsg(text, color) {
+    const el = $("pcMsg");
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color || "#aaa";
+  }
+
+  function pcRenderBanners() {
+    const unlocked = Array.isArray(pcCurrentCosmData.unlockedBanners) ? pcCurrentCosmData.unlockedBanners : [];
+    const equipped = pcCurrentCosmData.equippedBanner || null;
+    const list = $("pcBannerList");
+    list.innerHTML = "";
+    const tag = $("pcEquippedBannerTag");
+    if (equipped) {
+      const b = bannersCache.find(x => x.id === equipped);
+      tag.textContent = `Equipado: ${b ? b.name : equipped}`;
+      tag.style.display = "inline";
+    } else {
+      tag.style.display = "none";
+    }
+    unlocked.forEach(bid => {
+      const b   = bannersCache.find(x => x.id === bid) || { id: bid, name: bid };
+      const isEq = bid === equipped;
+      const item = document.createElement("div");
+      item.className = "pc-item" + (isEq ? " is-equipped" : "");
+      item.innerHTML = `
+        <span>${escHtml(b.name || bid)}</span>
+        ${!isEq
+          ? `<button class="equip-btn" title="Equipar este banner">⚑</button>`
+          : `<span style="font-size:.68rem;opacity:.7;">(equipado)</span>`}
+        <button class="remove-btn" title="Revocar">✕</button>`;
+      item.querySelector(".remove-btn").addEventListener("click", () => pcRevokeBanner(bid));
+      if (!isEq) item.querySelector(".equip-btn").addEventListener("click", () => pcEquipBanner(bid));
+      list.appendChild(item);
+    });
+  }
+
+  async function pcRevokeBanner(bid) {
+    if (!pcCurrentUid) return;
+    const b = bannersCache.find(x => x.id === bid);
+    if (!confirm(`¿Revocar el banner "${b ? b.name : bid}" de este jugador?`)) return;
+    pcMsg("⏳ Revocando…", "#aaa");
+    try {
+      const upd = { unlockedBanners: arrayRemove(bid) };
+      if (pcCurrentCosmData.equippedBanner === bid) upd.equippedBanner = null;
+      await updateDoc(doc(db, "user_cosmetics", pcCurrentUid), upd);
+      pcCurrentCosmData.unlockedBanners = (pcCurrentCosmData.unlockedBanners || []).filter(x => x !== bid);
+      if (pcCurrentCosmData.equippedBanner === bid) delete pcCurrentCosmData.equippedBanner;
+      pcRenderBanners();
+      pcMsg("✅ Banner revocado.", "#c7ff3b");
+    } catch(e) { pcMsg("❌ " + e.message, "#ff9a9a"); }
+  }
+
+  async function pcEquipBanner(bid) {
+    if (!pcCurrentUid) return;
+    pcMsg("⏳ Equipando…", "#aaa");
+    try {
+      await setDoc(doc(db, "user_cosmetics", pcCurrentUid), { equippedBanner: bid }, { merge: true });
+      pcCurrentCosmData.equippedBanner = bid;
+      pcRenderBanners();
+      pcMsg("✅ Banner equipado.", "#c7ff3b");
+    } catch(e) { pcMsg("❌ " + e.message, "#ff9a9a"); }
+  }
+
+  $("pcAddBannerBtn").addEventListener("click", async () => {
+    const bid = $("pcBannerSelect").value;
+    if (!bid || !pcCurrentUid) return;
+    if ((pcCurrentCosmData.unlockedBanners || []).includes(bid)) {
+      pcMsg("⚠️ El jugador ya tiene ese banner.", "#ffd700"); return;
+    }
+    pcMsg("⏳ Añadiendo…", "#aaa");
+    try {
+      await setDoc(doc(db, "user_cosmetics", pcCurrentUid), { unlockedBanners: arrayUnion(bid) }, { merge: true });
+      if (!pcCurrentCosmData.unlockedBanners) pcCurrentCosmData.unlockedBanners = [];
+      pcCurrentCosmData.unlockedBanners.push(bid);
+      if (!pcCurrentCosmData.equippedBanner) {
+        await setDoc(doc(db, "user_cosmetics", pcCurrentUid), { equippedBanner: bid }, { merge: true });
+        pcCurrentCosmData.equippedBanner = bid;
+      }
+      pcRenderBanners();
+      pcMsg("✅ Banner añadido.", "#c7ff3b");
+    } catch(e) { pcMsg("❌ " + e.message, "#ff9a9a"); }
+  });
+
+  function pcRenderBadges() {
+    const unlocked = Array.isArray(pcCurrentCosmData.unlockedBadges) ? pcCurrentCosmData.unlockedBadges : [];
+    const equipped = Array.isArray(pcCurrentCosmData.equippedBadges)  ? pcCurrentCosmData.equippedBadges  : [];
+    const list = $("pcBadgeList");
+    list.innerHTML = "";
+    unlocked.forEach(bid => {
+      const b   = badgesCache.find(x => x.id === bid) || { id: bid, name: bid };
+      const isEq = equipped.includes(bid);
+      const item = document.createElement("div");
+      item.className = "pc-item" + (isEq ? " is-equipped" : "");
+      item.innerHTML = `
+        <span>${escHtml(b.name || bid)}${isEq ? " (equipada)" : ""}</span>
+        <button class="remove-btn" title="Revocar">✕</button>`;
+      item.querySelector(".remove-btn").addEventListener("click", () => pcRevokeBadge(bid));
+      list.appendChild(item);
+    });
+  }
+
+  async function pcRevokeBadge(bid) {
+    if (!pcCurrentUid) return;
+    const b = badgesCache.find(x => x.id === bid);
+    if (!confirm(`¿Revocar la insignia "${b ? b.name : bid}"?`)) return;
+    pcMsg("⏳ Revocando…", "#aaa");
+    try {
+      await updateDoc(doc(db, "user_cosmetics", pcCurrentUid), {
+        unlockedBadges: arrayRemove(bid),
+        equippedBadges: arrayRemove(bid),
+      });
+      pcCurrentCosmData.unlockedBadges = (pcCurrentCosmData.unlockedBadges || []).filter(x => x !== bid);
+      pcCurrentCosmData.equippedBadges  = (pcCurrentCosmData.equippedBadges  || []).filter(x => x !== bid);
+      pcRenderBadges();
+      pcMsg("✅ Insignia revocada.", "#c7ff3b");
+    } catch(e) { pcMsg("❌ " + e.message, "#ff9a9a"); }
+  }
+
+  $("pcAddBadgeBtn").addEventListener("click", async () => {
+    const bid = $("pcBadgeSelect").value;
+    if (!bid || !pcCurrentUid) return;
+    if ((pcCurrentCosmData.unlockedBadges || []).includes(bid)) {
+      pcMsg("⚠️ El jugador ya tiene esa insignia.", "#ffd700"); return;
+    }
+    pcMsg("⏳ Añadiendo…", "#aaa");
+    try {
+      await setDoc(doc(db, "user_cosmetics", pcCurrentUid), { unlockedBadges: arrayUnion(bid) }, { merge: true });
+      if (!pcCurrentCosmData.unlockedBadges) pcCurrentCosmData.unlockedBadges = [];
+      pcCurrentCosmData.unlockedBadges.push(bid);
+      pcRenderBadges();
+      pcMsg("✅ Insignia añadida.", "#c7ff3b");
+    } catch(e) { pcMsg("❌ " + e.message, "#ff9a9a"); }
+  });
+
+  function pcPopulateSelects() {
+    $("pcBannerSelect").innerHTML = bannersCache.length
+      ? bannersCache.map(b => `<option value="${escHtml(b.id)}">${escHtml(b.name || b.id)}</option>`).join("")
+      : `<option value="">Sin banners en catálogo</option>`;
+    $("pcBadgeSelect").innerHTML = badgesCache.length
+      ? badgesCache.map(b => `<option value="${escHtml(b.id)}">${escHtml(b.name || b.id)}</option>`).join("")
+      : `<option value="">Sin insignias en catálogo</option>`;
   }
 </script>
 

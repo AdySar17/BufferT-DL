@@ -542,15 +542,20 @@
           if (u.name == null) { u.name = "Sin nombre"; u.country = ""; }
         });
 
-        /* 5) Banners equipados — user_cosmetics (1 sola lectura lista) */
+        /* 5) Banners equipados — user_cosmetics (1 sola lectura lista)
+              Usa equippedBanner si existe; si no, cae al primer banner
+              desbloqueado (para usuarios que aún no equiparon manualmente). */
         const cosmSnap = await getDocs(collection(db, "user_cosmetics"));
         const bannerIds = new Set();
         cosmSnap.forEach(cs => {
           const uid = cs.id;
           const d   = cs.data() || {};
-          if (map.has(uid) && d.equippedBanner) {
-            map.get(uid)._equippedBanner = d.equippedBanner;
-            bannerIds.add(d.equippedBanner);
+          if (!map.has(uid)) return;
+          const activeBanner = d.equippedBanner
+            || (Array.isArray(d.unlockedBanners) && d.unlockedBanners.length ? d.unlockedBanners[0] : null);
+          if (activeBanner) {
+            map.get(uid)._equippedBanner = activeBanner;
+            bannerIds.add(activeBanner);
           }
         });
 
