@@ -1,27 +1,22 @@
 // ============================================================
 // BFT Demon List — Firestore Security Rules
-// Versión: V20 (Sistema de cosméticos: banners, badges, user_cosmetics)
+// Versión: V21 (user_cosmetics: escritura restringida a Owner)
 // ============================================================
 //
-// CAMBIOS RESPECTO A V18:
+// CAMBIOS RESPECTO A V20:
 //
-//  1. /banners/{id}
-//     - Lectura pública (cualquiera puede ver los banners).
-//     - Escritura: solo Admin/Owner (gestión desde Admin Dev).
+//  1. /user_cosmetics/{uid}
+//     - Escritura por Admin/Owner → ahora SOLO Owner puede
+//       crear, actualizar o eliminar cosméticos de jugadores
+//       (conceder/revocar banners/badges, etc.).
+//     - El usuario dueño sigue pudiendo equipar sus propios
+//       cosméticos (equippedBanner / equippedBadges).
+//     - Motivo: evitar que los Admins concedan cosméticos
+//       de forma no autorizada.
 //
-//  2. /badges/{id}
-//     - Lectura pública.
-//     - Escritura: solo Admin/Owner.
-//
-//  3. /user_cosmetics/{uid}
-//     - Lectura: pública (perfiles muestran cosméticos equipados).
-//     - Crear: solo el propio usuario (doc vacío, sin unlocks).
-//     - Actualizar por el dueño: SOLO puede cambiar equippedBanner
-//       y equippedBadges. NO puede modificar unlockedBanners/Badges
-//       (evita auto-concederse cosméticos).
-//     - Actualizar por Admin/Owner: sin restricciones (para conceder
-//       desbloqueos y gestionar inventario).
-//     - Eliminar: solo Admin/Owner.
+//  2. /banners/{id}  y  /badges/{id}  (catálogo global)
+//     - Sin cambios respecto a V20: Admin/Owner pueden
+//       crear y editar el catálogo de cosméticos.
 //
 // ============================================================
 // INSTRUCCIONES DE DESPLIEGUE:
@@ -145,7 +140,7 @@ service cloud.firestore {
     // ── /banners/{id} ─────────────────────────────────────────────
     // [V20] Catálogo global de banners cosméticos.
     // Lectura pública para que los perfiles muestren el banner equipado.
-    // Solo Admin/Owner pueden crear/editar/eliminar banners.
+    // Admin/Owner pueden crear/editar/eliminar banners del catálogo.
     match /banners/{id} {
       allow read:   if true;
       allow create: if isAdminish();
@@ -155,7 +150,7 @@ service cloud.firestore {
 
     // ── /badges/{id} ──────────────────────────────────────────────
     // [V20] Catálogo global de insignias (badges).
-    // Lectura pública. Solo Admin/Owner pueden escribir.
+    // Lectura pública. Admin/Owner pueden escribir el catálogo.
     match /badges/{id} {
       allow read:   if true;
       allow create: if isAdminish();
@@ -164,7 +159,7 @@ service cloud.firestore {
     }
 
     // ── /user_cosmetics/{uid} ─────────────────────────────────────
-    // [V20] Inventario cosmético de cada usuario.
+    // [V21] Inventario cosmético de cada usuario.
     //
     // Campos del documento:
     //   equippedBanner  : string | null   → banner ID equipado
@@ -172,8 +167,9 @@ service cloud.firestore {
     //   unlockedBanners : array<string>   → IDs desbloqueados
     //   unlockedBadges  : array<string>   → IDs desbloqueados
     //
-    // El dueño SOLO puede tocar equippedBanner / equippedBadges.
-    // Los admins pueden conceder unlocks (escriben unlockedBanners/Badges).
+    // [V21] El dueño SOLO puede tocar equippedBanner / equippedBadges.
+    // [V21] Solo el Owner puede conceder/revocar unlocks (unlockedBanners/Badges).
+    //       Los Admins ya NO pueden modificar el inventario de cosméticos.
     match /user_cosmetics/{uid} {
       // Lectura pública: los perfiles muestran cosméticos equipados.
       allow read: if true;
@@ -189,10 +185,11 @@ service cloud.firestore {
         !("unlockedBanners" in request.resource.data.diff(resource.data).affectedKeys()) &&
         !("unlockedBadges"  in request.resource.data.diff(resource.data).affectedKeys());
 
-      // Admin/Owner: acceso total para conceder/revocar desbloqueos.
-      allow create: if isAdminish();
-      allow update: if isAdminish();
-      allow delete: if isAdminish();
+      // [V21] Solo el Owner puede crear, actualizar o eliminar el inventario
+      //       completo (conceder/revocar desbloqueos de banners y badges).
+      allow create: if isOwner();
+      allow update: if isOwner();
+      allow delete: if isOwner();
     }
 
   }

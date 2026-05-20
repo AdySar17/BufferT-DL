@@ -53,13 +53,13 @@
     }
 
     /* ── Visibility classes ── */
-    body .owner-only, body .admin-only, body .staff-only { display: none; }
-    body.is-owner .owner-only { display: inline; }
-    body.is-admin .admin-only { display: inline; }
-    body.is-staff .staff-only { display: inline; }
-    body.is-owner .admin-only { display: inline; }
-    body.is-owner .staff-only { display: inline; }
-    body.is-admin .staff-only { display: inline; }
+    body .owner-only, body .admin-only, body .staff-only { display: none !important; }
+    body.is-owner .owner-only { display: revert !important; }
+    body.is-admin .admin-only { display: revert !important; }
+    body.is-staff .staff-only { display: revert !important; }
+    body.is-owner .admin-only { display: revert !important; }
+    body.is-owner .staff-only { display: revert !important; }
+    body.is-admin .staff-only { display: revert !important; }
 
     /* ── Page ── */
     .page-wrap {
@@ -383,14 +383,14 @@
     </div>
   </div>
 
-  <!-- ── PANEL ACTUALIZAR DATA ── -->
-  <div class="editor-panel" style="margin-top:24px;">
+  <!-- ── PANEL ACTUALIZAR DATA — solo Owner ── -->
+  <div class="editor-panel owner-only" id="actualizarPanel" style="margin-top:24px;">
     <div class="panel-header">
       <span class="panel-title">⚡ Actualizar Data</span>
       <button class="btn-add" id="btnActualizarTodo" style="background:rgba(255,180,0,.12);border-color:rgba(255,180,0,.4);color:#ffd700;">⚡ Actualizar Data</button>
     </div>
     <p style="color:rgba(255,255,255,.45);font-size:.8rem;margin-bottom:14px;">
-      Crea automáticamente banners para todos los niveles que no tengan uno (usando su nombre, glow como color de marco y fondo como imagen del banner), los asigna al nivel correspondiente, y luego sincroniza todos los banners ganados a los usuarios que completaron sus niveles al 100%.
+      Crea automáticamente banners para todos los niveles que no tengan uno (usando su nombre, glow como color de marco y fondo como imagen del banner), los asigna al nivel correspondiente, y luego sincroniza todos los banners ganados a los usuarios que completaron sus niveles al 100%. Equipar automáticamente el primer banner si el jugador no tiene ninguno.
     </p>
     <div id="actualizarLog" style="margin-top:14px;font-size:.78rem;color:rgba(199,255,59,.7);white-space:pre-wrap;display:none;max-height:250px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:10px;padding:10px;"></div>
   </div>
@@ -704,25 +704,39 @@
         log("ℹ️ Ningún usuario completó niveles con banner asignado al 100%."); btn.disabled = false; return;
       }
 
-      /* 6) Cargar cosméticos actuales para no repetir desbloqueos */
+      /* 6) Cargar cosméticos actuales para no repetir desbloqueos
+            y saber si ya tienen un banner equipado */
       log("📖 Cargando cosméticos actuales…");
       const cosmDocs = new Map();
       await Promise.all([...userBannersEarned.keys()].map(async uid => {
         try {
           const s = await getDoc(doc(db, "user_cosmetics", uid));
-          cosmDocs.set(uid, new Set(s.exists() ? (s.data()?.unlockedBanners || []) : []));
-        } catch(_) { cosmDocs.set(uid, new Set()); }
+          const d = s.exists() ? (s.data() || {}) : {};
+          cosmDocs.set(uid, {
+            unlocked:      new Set(d.unlockedBanners || []),
+            equippedBanner: d.equippedBanner || null,
+          });
+        } catch(_) { cosmDocs.set(uid, { unlocked: new Set(), equippedBanner: null }); }
       }));
 
-      /* 7) Batch-write user_cosmetics */
+      /* 7) Batch-write user_cosmetics: desbloquear banners ganados
+            y auto-equipar el primero si el jugador no tiene ninguno */
       log("💾 Actualizando user_cosmetics…");
       let updated = 0, batchCount = 0;
       let batch = writeBatch(db), opsInBatch = 0;
       for (const [uid, earned] of userBannersEarned) {
-        const current = cosmDocs.get(uid) || new Set();
-        const toAdd   = [...earned].filter(id => !current.has(id));
-        if (!toAdd.length) continue;
-        batch.set(doc(db, "user_cosmetics", uid), { unlockedBanners: arrayUnion(...toAdd) }, { merge: true });
+        const { unlocked: current, equippedBanner } = cosmDocs.get(uid) || { unlocked: new Set(), equippedBanner: null };
+        const toAdd      = [...earned].filter(id => !current.has(id));
+        const needsEquip = !equippedBanner;
+        if (!toAdd.length && !needsEquip) continue;
+
+        const updateData = {};
+        if (toAdd.length) updateData.unlockedBanners = arrayUnion(...toAdd);
+        /* Auto-equipar el primer banner ganado si aún no tiene ninguno */
+        if (needsEquip) {
+          updateData.equippedBanner = toAdd.length ? toAdd[0] : [...earned][0];
+        }
+        batch.set(doc(db, "user_cosmetics", uid), updateData, { merge: true });
         opsInBatch++; updated++;
         if (opsInBatch >= 490) { await batch.commit(); batchCount++; batch = writeBatch(db); opsInBatch = 0; }
       }
