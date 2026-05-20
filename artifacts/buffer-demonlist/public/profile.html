@@ -83,6 +83,7 @@
     border-radius: 18px;
     padding: 30px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    overflow: hidden;
   }
 
   .profile-head {
@@ -679,6 +680,147 @@
     .lvl-aside { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
     .lvl-thumb { width: 70px; height: 50px; }
   }
+
+  /* ========== BANNER ZONE ========== */
+  .profile-banner-zone {
+    position: relative;
+    margin: -30px -30px 0;
+    width: calc(100% + 60px);
+    height: 155px;
+    background: linear-gradient(135deg, #0a1a05 0%, #1a4d1a 45%, #2a6a10 100%);
+    background-size: cover;
+    background-position: center;
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+    transition: box-shadow .3s;
+  }
+  @keyframes pBannerChroma {
+    0%   { box-shadow: inset 0 0 0 5px hsl(0,100%,60%); }
+    16%  { box-shadow: inset 0 0 0 5px hsl(60,100%,60%); }
+    33%  { box-shadow: inset 0 0 0 5px hsl(120,100%,55%); }
+    50%  { box-shadow: inset 0 0 0 5px hsl(180,100%,55%); }
+    66%  { box-shadow: inset 0 0 0 5px hsl(240,100%,70%); }
+    83%  { box-shadow: inset 0 0 0 5px hsl(300,100%,70%); }
+    100% { box-shadow: inset 0 0 0 5px hsl(360,100%,60%); }
+  }
+
+  /* ── Equipped badges inside banner ── */
+  .profile-equipped-badges {
+    position: absolute;
+    bottom: 10px; right: 14px;
+    display: flex; gap: 8px; z-index: 2;
+  }
+  .profile-badge-pip {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(0,0,0,.65);
+    border: 2px solid rgba(255,255,255,.25);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .2s, border-color .2s;
+    flex-shrink: 0;
+  }
+  .profile-badge-pip:hover { transform: scale(1.12); border-color: rgba(199,255,59,.6); }
+  .profile-badge-pip img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── Profile head offset to overlap banner ── */
+  .profile-head-with-banner {
+    margin-top: -62px;
+    position: relative; z-index: 2;
+    align-items: flex-end;
+  }
+  .profile-head-with-banner .profile-headinfo {
+    padding-bottom: 4px;
+  }
+  .profile-head-with-banner .profile-photo-ring {
+    box-shadow: 0 0 0 4px rgba(8,8,8,0.7), 0 0 22px rgba(124,252,0,0.30);
+  }
+
+  /* ========== RARITY TAGS ========== */
+  .rtag-profile {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: .62rem; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+  }
+  .rp-comun      { background: rgba(158,158,158,.18); color: #bdbdbd; border: 1px solid #9e9e9e55; }
+  .rp-raro       { background: rgba(33,150,243,.18);  color: #90caf9; border: 1px solid #2196f355; }
+  .rp-epico      { background: rgba(156,39,176,.18);  color: #ce93d8; border: 1px solid #9c27b055; }
+  .rp-legendario { background: rgba(255,152,0,.18);   color: #ffcc02; border: 1px solid #ff980055; }
+  .rp-mitico     { background: linear-gradient(90deg,rgba(255,107,107,.2),rgba(78,205,196,.2)); color:#fff; border:1px solid rgba(255,107,107,.4); }
+  .rp-exclusivo  { background: rgba(0,188,212,.18);   color: #80deea; border: 1px solid #00bcd455; }
+
+  /* ========== COSMETICS MODAL ========== */
+  .cosm-backdrop {
+    position: fixed; inset: 0; z-index: 99997;
+    background: rgba(0,0,0,.75); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .cosm-backdrop.open { display: flex; }
+  .cosm-modal {
+    width: 100%; max-width: 680px; max-height: 92vh; overflow-y: auto;
+    background: rgba(10,16,10,.98);
+    border: 1px solid rgba(199,255,59,.2);
+    border-radius: 18px; padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.75);
+  }
+  .cosm-modal h2 {
+    font-size: 1.18rem; margin-bottom: 4px;
+    background: linear-gradient(90deg,#7fff3b,#ffd700);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .cosm-tabs { display: flex; gap: 8px; margin: 12px 0; }
+  .cosm-tab {
+    padding: 6px 16px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: transparent; color: rgba(255,255,255,.6);
+    font-family: 'Montserrat',sans-serif; font-size: .82rem; font-weight: 700;
+    cursor: pointer; transition: all .18s;
+  }
+  .cosm-tab.active { background: rgba(199,255,59,.14); border-color: rgba(199,255,59,.5); color: #c7ff3b; }
+  .cosm-grid {
+    display: grid; grid-template-columns: repeat(auto-fill,minmax(130px,1fr));
+    gap: 10px; margin-top: 10px; min-height: 60px;
+  }
+  .cosm-item {
+    border-radius: 12px; overflow: hidden;
+    border: 2px solid rgba(255,255,255,.08);
+    cursor: pointer; transition: border-color .18s, transform .18s;
+    position: relative; background: rgba(255,255,255,.03);
+  }
+  .cosm-item:hover  { border-color: rgba(199,255,59,.4); transform: scale(1.02); }
+  .cosm-item.equipped { border-color: #c7ff3b; box-shadow: 0 0 12px rgba(199,255,59,.3); }
+  .cosm-banner-preview {
+    height: 72px; background-size: cover; background-position: center;
+    background-color: #1a2a1a;
+  }
+  .cosm-badge-preview {
+    height: 72px; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.45);
+  }
+  .cosm-badge-preview img { width: 48px; height: 48px; object-fit: contain; border-radius: 50%; }
+  .cosm-item-label {
+    padding: 5px 7px; font-size: .7rem; font-weight: 700;
+    background: rgba(0,0,0,.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cosm-equipped-tick {
+    position: absolute; top: 5px; right: 5px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #c7ff3b; color: #0a1a00;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; font-weight: 900;
+  }
+  .cosm-preview-box {
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px; padding: 14px; margin-top: 14px;
+  }
+  .cosm-preview-label {
+    font-size: .72rem; font-weight: 700; color: rgba(199,255,59,.75);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .cosm-preview-banner {
+    height: 110px; border-radius: 10px;
+    background-size: cover; background-position: center;
+    background-color: #1a2a1a; margin-bottom: 8px; transition: all .25s;
+  }
 </style>
 </head>
 <body>
@@ -699,6 +841,7 @@
       <a href="/guidelines.html">Guidelines</a>
       <a href="/panel.html" class="staff-only">Panel de Records</a>
       <a href="/staff-control.html" class="owner-only">Control Staff</a>
+      <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
     <div class="auth-slot" id="authSlot"></div>
     <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
@@ -710,8 +853,13 @@
 <div id="profileWrap" class="profile-wrap" style="display:none;">
   <div class="profile-card">
 
+    <!-- BANNER ZONE -->
+    <div class="profile-banner-zone" id="pBannerZone">
+      <div class="profile-equipped-badges" id="pEquippedBadges"></div>
+    </div>
+
     <!-- HEAD -->
-    <div class="profile-head">
+    <div class="profile-head profile-head-with-banner">
       <div class="profile-photo-ring">
         <img id="pPhoto" src="" alt="" class="profile-photo" style="display:none;">
         <div id="pPhotoFallback" class="profile-photo photo-fallback" style="display:none;"></div>
@@ -766,6 +914,7 @@
     <!-- ACCIONES (solo el dueño / Owner puede editar perfil ajeno) -->
     <div id="ownerActions" class="btn-row" style="display:none;">
       <button id="btnEdit" class="btn btn-primary">Editar perfil</button>
+      <button id="btnCosm" class="btn btn-secondary" style="display:none;">🎨 Cosméticos</button>
     </div>
 
     <!-- ACCIONES DE STAFF: ban / unban / eliminar cuenta (Admin+Owner) -->
@@ -1991,6 +2140,282 @@
       $("btnSave").textContent = "Guardar";
     }
   };
+</script>
+
+<!-- ═══════════════════ COSMETICS MODAL ═══════════════════ -->
+<div id="cosmBack" class="cosm-backdrop">
+  <div class="cosm-modal">
+    <h2>🎨 Cosméticos</h2>
+    <p style="color:rgba(255,255,255,.5);font-size:.82rem;margin-bottom:4px;">Equipa hasta 1 banner y 2 insignias. Tus cambios son visibles en tu perfil.</p>
+    <div class="cosm-tabs">
+      <button class="cosm-tab active" id="cosmTabBBtn">🖼 Banners</button>
+      <button class="cosm-tab" id="cosmTabGBtn">🏅 Insignias</button>
+    </div>
+    <div id="cosmBGrid" class="cosm-grid"></div>
+    <div id="cosmGGrid" class="cosm-grid" style="display:none;"></div>
+    <div class="cosm-preview-box">
+      <div class="cosm-preview-label">Vista previa</div>
+      <div class="cosm-preview-banner" id="cosmPBanner"></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:8px;" id="cosmPBadges"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:14px;flex-wrap:wrap;">
+      <div id="cosmErrMsg" style="flex:1;color:#ff9a9a;font-size:.8rem;display:none;"></div>
+      <button id="cosmCancelBtn" class="btn btn-secondary">Cancelar</button>
+      <button id="cosmSaveBtn"   class="btn btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ COSMETICS SCRIPT ═══════════════════ -->
+<script type="module">
+  import { db, onAuthChange } from "/auth.js";
+  import { doc, getDoc, setDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const $c = id => document.getElementById(id);
+
+  let cosmUid      = null;
+  let cosmIsOwner  = false;
+  let cosmData     = { equippedBanner: null, equippedBadges: [], unlockedBanners: [], unlockedBadges: [] };
+  let cosmBMap     = {};
+  let cosmGMap     = {};
+  let cosmModalLoaded = false;
+
+  let tempBanner = null;
+  let tempBadges = [];
+
+  /* ── Wait for ?id= to appear (set by main profile script) ── */
+  function waitForUid() {
+    return new Promise(resolve => {
+      const check = () => {
+        const v = new URLSearchParams(location.search).get("id");
+        if (v) resolve(v); else setTimeout(check, 150);
+      };
+      check();
+    });
+  }
+
+  /* ── Bootstrap ── */
+  (async () => {
+    cosmUid = await waitForUid();
+
+    onAuthChange(user => {
+      cosmIsOwner = !!user && user.uid === cosmUid;
+      const btn = $c("btnCosm");
+      if (btn) btn.style.display = cosmIsOwner ? "inline-flex" : "none";
+    });
+
+    await loadAndRenderCosmetics();
+  })();
+
+  /* ── Load + render banner/badges on profile ── */
+  async function loadAndRenderCosmetics() {
+    if (!cosmUid) return;
+    try {
+      const snap = await getDoc(doc(db, "user_cosmetics", cosmUid));
+      if (snap.exists()) cosmData = { ...cosmData, ...snap.data() };
+      await renderBannerZone();
+      await renderEquippedBadges();
+    } catch(e) { console.warn("[cosm]", e); }
+  }
+
+  async function renderBannerZone() {
+    const zone = $c("pBannerZone");
+    if (!zone) return;
+    if (!cosmData.equippedBanner) { applyDefaultBanner(zone); return; }
+    try {
+      const bData = await getBannerData(cosmData.equippedBanner);
+      if (bData) applyBannerToZone(zone, bData);
+      else        applyDefaultBanner(zone);
+    } catch { applyDefaultBanner(zone); }
+  }
+
+  async function getBannerData(id) {
+    if (cosmBMap[id]) return cosmBMap[id];
+    const s = await getDoc(doc(db, "banners", id));
+    if (s.exists()) { cosmBMap[id] = { id: s.id, ...s.data() }; return cosmBMap[id]; }
+    return null;
+  }
+
+  async function getBadgeData(id) {
+    if (cosmGMap[id]) return cosmGMap[id];
+    const s = await getDoc(doc(db, "badges", id));
+    if (s.exists()) { cosmGMap[id] = { id: s.id, ...s.data() }; return cosmGMap[id]; }
+    return null;
+  }
+
+  function applyBannerToZone(zone, b) {
+    if (b.imageUrl) {
+      zone.style.backgroundImage    = `url('${esc(b.imageUrl)}')`;
+      zone.style.backgroundSize     = "cover";
+      zone.style.backgroundPosition = "center";
+    } else {
+      zone.style.backgroundImage = "";
+    }
+    const ft = b.frameType || "none";
+    const fc = b.frameColor || "#c7ff3b";
+    if (ft === "solid")    { zone.style.boxShadow = `inset 0 0 0 5px ${fc}`; zone.style.animation = ""; }
+    else if (ft === "gradient") { zone.style.boxShadow = `inset 0 0 0 5px ${fc}`; zone.style.animation = ""; }
+    else if (ft === "chroma")  { zone.style.boxShadow = ""; zone.style.animation = "pBannerChroma 4s linear infinite"; }
+    else { zone.style.boxShadow = ""; zone.style.animation = ""; }
+  }
+
+  function applyDefaultBanner(zone) {
+    zone.style.backgroundImage = "";
+    zone.style.boxShadow = "";
+    zone.style.animation  = "";
+  }
+
+  async function renderEquippedBadges() {
+    const cont = $c("pEquippedBadges");
+    if (!cont) return;
+    cont.innerHTML = "";
+    const ids = cosmData.equippedBadges || [];
+    if (!ids.length) return;
+    const docs = await Promise.all(ids.map(id => getBadgeData(id)));
+    docs.filter(Boolean).forEach(b => {
+      const pip = document.createElement("div");
+      pip.className = "profile-badge-pip";
+      pip.title = b.name || "Insignia";
+      if (b.imageUrl) {
+        const img = document.createElement("img");
+        img.src = b.imageUrl; img.alt = b.name || "";
+        pip.appendChild(img);
+      }
+      cont.appendChild(pip);
+    });
+  }
+
+  /* ── Modal: open / close ── */
+  $c("btnCosm")?.addEventListener("click", openCosmModal);
+  $c("cosmCancelBtn")?.addEventListener("click", closeCosmModal);
+  $c("cosmBack")?.addEventListener("click", e => { if (e.target === $c("cosmBack")) closeCosmModal(); });
+
+  async function openCosmModal() {
+    if (!cosmUid || !cosmIsOwner) return;
+    tempBanner = cosmData.equippedBanner || null;
+    tempBadges = [...(cosmData.equippedBadges || [])];
+    if (!cosmModalLoaded) {
+      await Promise.all([
+        ...(cosmData.unlockedBanners || []).map(id => getBannerData(id)),
+        ...(cosmData.unlockedBadges  || []).map(id => getBadgeData(id)),
+      ]);
+      cosmModalLoaded = true;
+    }
+    renderCosmGrids();
+    updateCosmPreview();
+    $c("cosmErrMsg").style.display = "none";
+    $c("cosmBack").classList.add("open");
+  }
+
+  function closeCosmModal() { $c("cosmBack")?.classList.remove("open"); }
+
+  /* ── Tab switches ── */
+  $c("cosmTabBBtn")?.addEventListener("click", () => {
+    $c("cosmTabBBtn").classList.add("active"); $c("cosmTabGBtn").classList.remove("active");
+    $c("cosmBGrid").style.display = ""; $c("cosmGGrid").style.display = "none";
+  });
+  $c("cosmTabGBtn")?.addEventListener("click", () => {
+    $c("cosmTabGBtn").classList.add("active"); $c("cosmTabBBtn").classList.remove("active");
+    $c("cosmGGrid").style.display = ""; $c("cosmBGrid").style.display = "none";
+  });
+
+  /* ── Render grids ── */
+  function renderCosmGrids() {
+    const unB = cosmData.unlockedBanners || [];
+    const unG = cosmData.unlockedBadges  || [];
+
+    $c("cosmBGrid").innerHTML = !unB.length
+      ? `<p style="color:rgba(255,255,255,.4);font-size:.84rem;grid-column:1/-1;text-align:center;padding:18px;">No tienes banners desbloqueados aún.</p>`
+      : unB.map(id => {
+          const b = cosmBMap[id]; if (!b) return "";
+          const eq = tempBanner === id;
+          return `<div class="cosm-item${eq?" equipped":""}" onclick="cosmPickBanner('${id}')">
+            <div class="cosm-banner-preview" style="background-image:url('${esc(b.imageUrl||"")}')"></div>
+            <div class="cosm-item-label">${esc(b.name||"")}</div>
+            ${eq?`<div class="cosm-equipped-tick">✓</div>`:""}
+          </div>`;
+        }).join("");
+
+    $c("cosmGGrid").innerHTML = !unG.length
+      ? `<p style="color:rgba(255,255,255,.4);font-size:.84rem;grid-column:1/-1;text-align:center;padding:18px;">No tienes insignias desbloqueadas aún.</p>`
+      : unG.map(id => {
+          const b = cosmGMap[id]; if (!b) return "";
+          const eq = tempBadges.includes(id);
+          return `<div class="cosm-item${eq?" equipped":""}" onclick="cosmPickBadge('${id}')">
+            <div class="cosm-badge-preview">${b.imageUrl?`<img src="${esc(b.imageUrl)}" alt="">`:""}
+            </div>
+            <div class="cosm-item-label">${esc(b.name||"")}</div>
+            ${eq?`<div class="cosm-equipped-tick">✓</div>`:""}
+          </div>`;
+        }).join("");
+  }
+
+  /* Expose pick functions to inline onclick */
+  window.cosmPickBanner = id => {
+    tempBanner = tempBanner === id ? null : id;
+    renderCosmGrids(); updateCosmPreview();
+  };
+  window.cosmPickBadge = id => {
+    if (tempBadges.includes(id)) {
+      tempBadges = tempBadges.filter(x => x !== id);
+    } else if (tempBadges.length < 2) {
+      tempBadges = [...tempBadges, id];
+    } else {
+      $c("cosmErrMsg").textContent = "Máximo 2 insignias. Desequipa una primero.";
+      $c("cosmErrMsg").style.display = "block";
+      setTimeout(() => { $c("cosmErrMsg").style.display = "none"; }, 2500);
+      return;
+    }
+    renderCosmGrids(); updateCosmPreview();
+  };
+
+  /* ── Live preview ── */
+  function updateCosmPreview() {
+    const pb = $c("cosmPBanner");
+    const b  = tempBanner ? cosmBMap[tempBanner] : null;
+    pb.style.backgroundImage = b?.imageUrl ? `url('${esc(b.imageUrl)}')` : "";
+    if (b?.frameType === "solid")   { pb.style.boxShadow = `inset 0 0 0 4px ${b.frameColor||"#c7ff3b"}`; pb.style.animation=""; }
+    else if (b?.frameType==="chroma") { pb.style.animation="pBannerChroma 4s linear infinite"; pb.style.boxShadow=""; }
+    else { pb.style.boxShadow=""; pb.style.animation=""; }
+
+    $c("cosmPBadges").innerHTML = tempBadges.map(id => {
+      const bd = cosmGMap[id];
+      return `<div class="profile-badge-pip" title="${esc(bd?.name||"")}">
+        ${bd?.imageUrl?`<img src="${esc(bd.imageUrl)}" alt="">`:""}
+      </div>`;
+    }).join("");
+  }
+
+  /* ── Save ── */
+  $c("cosmSaveBtn")?.addEventListener("click", async () => {
+    if (!cosmUid || !cosmIsOwner) return;
+    $c("cosmSaveBtn").disabled = true;
+    $c("cosmSaveBtn").textContent = "Guardando…";
+    try {
+      await setDoc(doc(db, "user_cosmetics", cosmUid), {
+        equippedBanner: tempBanner || null,
+        equippedBadges: tempBadges,
+      }, { merge: true });
+      cosmData.equippedBanner = tempBanner || null;
+      cosmData.equippedBadges = [...tempBadges];
+      cosmModalLoaded = false;
+      closeCosmModal();
+      await renderBannerZone();
+      await renderEquippedBadges();
+    } catch(e) {
+      $c("cosmErrMsg").textContent = "Error al guardar: " + e.message;
+      $c("cosmErrMsg").style.display = "block";
+    } finally {
+      $c("cosmSaveBtn").disabled = false;
+      $c("cosmSaveBtn").textContent = "Guardar";
+    }
+  });
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c =>
+      ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  }
 </script>
 
 </body>

@@ -1,22 +1,27 @@
 // ============================================================
 // BFT Demon List — Firestore Security Rules
-// Versión: V18 (staff listing completamente público + Control Staff)
+// Versión: V20 (Sistema de cosméticos: banners, badges, user_cosmetics)
 // ============================================================
 //
-// CAMBIOS RESPECTO A V17:
+// CAMBIOS RESPECTO A V18:
 //
-//  1. /users/{uid} — Lectura ahora permitida a CUALQUIER usuario
-//     autenticado (antes solo el propio usuario o staff).
+//  1. /banners/{id}
+//     - Lectura pública (cualquiera puede ver los banners).
+//     - Escritura: solo Admin/Owner (gestión desde Admin Dev).
 //
-//     Motivo: la homepage muestra un bloque público de staff
-//     (Owners / Admins / Mods) consultando la colección users
-//     con where("role","in",["Owner","Admin","Mod"]).
-//     La página "Control Staff" también necesita leer todos los
-//     documentos de usuarios con roles de staff para agregar
-//     métricas de moderación.
+//  2. /badges/{id}
+//     - Lectura pública.
+//     - Escritura: solo Admin/Owner.
 //
-//     Las reglas de escritura NO cambian — siguen siendo igual
-//     de estrictas que en V17.
+//  3. /user_cosmetics/{uid}
+//     - Lectura: pública (perfiles muestran cosméticos equipados).
+//     - Crear: solo el propio usuario (doc vacío, sin unlocks).
+//     - Actualizar por el dueño: SOLO puede cambiar equippedBanner
+//       y equippedBadges. NO puede modificar unlockedBanners/Badges
+//       (evita auto-concederse cosméticos).
+//     - Actualizar por Admin/Owner: sin restricciones (para conceder
+//       desbloqueos y gestionar inventario).
+//     - Eliminar: solo Admin/Owner.
 //
 // ============================================================
 // INSTRUCCIONES DE DESPLIEGUE:
@@ -51,30 +56,16 @@ service cloud.firestore {
 
     // ── /users/{uid} ────────────────────────────────────────────
     match /users/{uid} {
-      // [V18] Lectura pública (if true).
-      //   Necesario para que TODOS los visitantes (sin login) puedan ver:
-      //   - Bloque "Nuestro Staff" en la homepage (query por role).
-      //   - Página "Control Staff" (Owner): métricas de moderación.
-      //   Los campos expuestos (name, photoURL, role) no son más
-      //   sensibles que los perfiles públicos ya existentes.
-      //   Las reglas de escritura permanecen igual de estrictas.
       allow read: if true;
 
-      // Creación: solo el propio usuario
       allow create: if isOwnerOf(uid);
 
-      // Actualización — tres niveles de permisos:
-      //
-      // (A) El propio usuario: puede actualizar todo EXCEPTO role y banned
       allow update: if isOwnerOf(uid) &&
         !("role"   in request.resource.data.diff(resource.data).affectedKeys()) &&
         !("banned" in request.resource.data.diff(resource.data).affectedKeys());
 
-      // (B) Owner: puede actualizar cualquier campo, incluidos role y banned
       allow update: if isOwner();
 
-      // (C) Admin: puede actualizar role (no a Admin/Owner) Y puede escribir
-      //     "banned" — PERO NO en cuentas con rol Owner.
       allow update: if isAdmin() &&
         (
           !("role" in request.resource.data.diff(resource.data).affectedKeys()) ||
@@ -85,12 +76,10 @@ service cloud.firestore {
           resource.data.get("role","Default") != "Owner"
         );
 
-      // (D) Mod: no puede tocar role ni banned
       allow update: if isMod() &&
         !("role"   in request.resource.data.diff(resource.data).affectedKeys()) &&
         !("banned" in request.resource.data.diff(resource.data).affectedKeys());
 
-      // Eliminación: solo Admin/Owner
       allow delete: if isAdminish();
     }
 
@@ -100,7 +89,6 @@ service cloud.firestore {
 
       allow create: if isOwnerOf(uid) || isStaff();
 
-      // El propio usuario y cualquier staff pueden actualizar
       allow update: if isOwnerOf(uid) || isStaff();
 
       allow delete: if isAdminish();
@@ -118,11 +106,9 @@ service cloud.firestore {
     match /records/{id} {
       allow read: if true;
 
-      // Crear record: usuario autenticado y no baneado
       allow create: if isAuth() &&
         !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("banned", false);
 
-      // Actualizar: el dueño (solo ciertos campos) o staff
       allow update: if isStaff() ||
         (isAuth() && resource.data.userId == meUid());
 
@@ -139,10 +125,9 @@ service cloud.firestore {
     }
 
     // ── /changelog/{id} ─────────────────────────────────────────
-    // Mini-changelog mostrado en la homepage (últimas 5 entradas).
     match /changelog/{id} {
-      allow read:   if true;       // lectura pública
-      allow create: if isStaff();  // solo staff puede escribir
+      allow read:   if true;
+      allow create: if isStaff();
       allow update: if isAdminish();
       allow delete: if isAdminish();
     }
@@ -155,6 +140,59 @@ service cloud.firestore {
         (isAuth() && resource.data.userId == meUid());
       allow delete: if isAdminish() ||
         (isAuth() && resource.data.userId == meUid());
+    }
+
+    // ── /banners/{id} ─────────────────────────────────────────────
+    // [V20] Catálogo global de banners cosméticos.
+    // Lectura pública para que los perfiles muestren el banner equipado.
+    // Solo Admin/Owner pueden crear/editar/eliminar banners.
+    match /banners/{id} {
+      allow read:   if true;
+      allow create: if isAdminish();
+      allow update: if isAdminish();
+      allow delete: if isAdminish();
+    }
+
+    // ── /badges/{id} ──────────────────────────────────────────────
+    // [V20] Catálogo global de insignias (badges).
+    // Lectura pública. Solo Admin/Owner pueden escribir.
+    match /badges/{id} {
+      allow read:   if true;
+      allow create: if isAdminish();
+      allow update: if isAdminish();
+      allow delete: if isAdminish();
+    }
+
+    // ── /user_cosmetics/{uid} ─────────────────────────────────────
+    // [V20] Inventario cosmético de cada usuario.
+    //
+    // Campos del documento:
+    //   equippedBanner  : string | null   → banner ID equipado
+    //   equippedBadges  : array<string>   → hasta 2 badge IDs
+    //   unlockedBanners : array<string>   → IDs desbloqueados
+    //   unlockedBadges  : array<string>   → IDs desbloqueados
+    //
+    // El dueño SOLO puede tocar equippedBanner / equippedBadges.
+    // Los admins pueden conceder unlocks (escriben unlockedBanners/Badges).
+    match /user_cosmetics/{uid} {
+      // Lectura pública: los perfiles muestran cosméticos equipados.
+      allow read: if true;
+
+      // Creación por el dueño: solo si NO viene con unlocks pre-populados.
+      allow create: if isOwnerOf(uid) &&
+        request.resource.data.get("unlockedBanners", []).size() == 0 &&
+        request.resource.data.get("unlockedBadges",  []).size() == 0;
+
+      // Actualización por el dueño: únicamente puede cambiar los campos de
+      // equip. Los arrays unlockedBanners/Badges no pueden ser tocados.
+      allow update: if isOwnerOf(uid) &&
+        !("unlockedBanners" in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !("unlockedBadges"  in request.resource.data.diff(resource.data).affectedKeys());
+
+      // Admin/Owner: acceso total para conceder/revocar desbloqueos.
+      allow create: if isAdminish();
+      allow update: if isAdminish();
+      allow delete: if isAdminish();
     }
 
   }

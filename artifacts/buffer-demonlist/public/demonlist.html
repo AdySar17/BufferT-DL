@@ -461,6 +461,36 @@
       transition: background 0.18s;
     }
     .tag-pill .tag-remove:hover { background: rgba(0,0,0,0.65); }
+    /* ===== Rewards selector ===== */
+    .rewards-section {
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 10px 0 6px;
+      background: rgba(255,255,255,.03);
+    }
+    .rewards-label {
+      color: #c7ff3b; font-size: .82rem; font-weight: 700;
+      margin-bottom: 3px; text-transform: uppercase; letter-spacing: .4px;
+    }
+    .rewards-hint { font-size: .72rem; color: rgba(255,255,255,.38); margin-bottom: 10px; }
+    .rewards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+      gap: 8px; min-height: 24px;
+    }
+    .reward-item {
+      display: flex; flex-direction: column; align-items: stretch;
+      border: 2px solid rgba(255,255,255,.08);
+      border-radius: 8px; overflow: hidden;
+      cursor: pointer; transition: border-color .18s, box-shadow .18s;
+      background: rgba(255,255,255,.03);
+    }
+    .reward-item:hover   { border-color: rgba(199,255,59,.35); }
+    .reward-item.sel     { border-color: #c7ff3b; box-shadow: 0 0 8px rgba(199,255,59,.25); }
+    .reward-thumb        { height: 48px; background-size: cover; background-position: center; background-color: #1a2a1a; }
+    .reward-name         { font-size: .63rem; font-weight: 700; padding: 4px 6px; text-align: center; background: rgba(0,0,0,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     .modal-btns { display: flex; gap: 10px; margin-top: 18px; }
     .modal-btns button {
       flex: 1; padding: 10px;
@@ -580,6 +610,7 @@
         <a href="/guidelines.html">Guidelines</a>
         <a href="/panel.html" class="staff-only">Panel de Records</a>
         <a href="/staff-control.html" class="owner-only">Control Staff</a>
+        <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
       </nav>
       <div class="auth-slot" id="authSlot"></div>
       <div class="menu-toggle" onclick="toggleMenu()">☰</div>
@@ -775,6 +806,15 @@
         <div class="tag-list" id="edit-tag-list"></div>
       </div>
 
+      <!-- RECOMPENSAS -->
+      <div class="rewards-section">
+        <div class="rewards-label">🎖 Recompensas de Banner</div>
+        <div class="rewards-hint">Al completar este nivel, el jugador desbloquea estos banners.</div>
+        <div id="edit-rewards-grid" class="rewards-grid">
+          <span style="color:rgba(255,255,255,.35);font-size:.78rem;">Cargando banners…</span>
+        </div>
+      </div>
+
       <div class="modal-btns">
         <button class="btn-update" onclick="guardarEdicion()">Guardar cambios</button>
         <button class="btn-cancel" onclick="cerrarModal('editModal')">Cancelar</button>
@@ -836,6 +876,8 @@
     }
     let _inpPrevGdId  = "";
     let _editPrevGdId = "";
+    let _allBannersCache   = null;
+    let _editSelectedRewards = [];
 
     /* Devuelve los niveles actuales ordenados por position (los sin position
        quedan al final, ordenados por value descendente como respaldo).      */
@@ -1265,6 +1307,44 @@
       }
     };
 
+    /* ========== REWARDS HELPERS ========== */
+    async function getAllBannersForRewards() {
+      if (_allBannersCache) return _allBannersCache;
+      try {
+        const { collection, getDocs, query, orderBy } = await import(
+          "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
+        );
+        const snap = await getDocs(query(collection(db, "banners"), orderBy("name")));
+        _allBannersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch(e) { console.warn("[rewards] load banners error", e); _allBannersCache = []; }
+      return _allBannersCache;
+    }
+
+    async function renderRewardsGrid(currentRewards) {
+      _editSelectedRewards = Array.isArray(currentRewards) ? [...currentRewards] : [];
+      const grid = document.getElementById("edit-rewards-grid");
+      if (!grid) return;
+      const banners = await getAllBannersForRewards();
+      if (!banners.length) {
+        grid.innerHTML = `<span style="color:rgba(255,255,255,.35);font-size:.78rem;">No hay banners creados aún.</span>`;
+        return;
+      }
+      grid.innerHTML = banners.map(b => {
+        const sel = _editSelectedRewards.includes(b.id) ? " sel" : "";
+        const bg  = b.imageUrl ? `background-image:url('${b.imageUrl.replace(/'/g,"\\'")}')` : "";
+        return `<div class="reward-item${sel}" onclick="toggleReward('${b.id}',this)">
+          <div class="reward-thumb" style="${bg}"></div>
+          <div class="reward-name" title="${b.name||""}">${b.name||"—"}</div>
+        </div>`;
+      }).join("");
+    }
+
+    window.toggleReward = function(id, el) {
+      const idx = _editSelectedRewards.indexOf(id);
+      if (idx === -1) { _editSelectedRewards.push(id); el.classList.add("sel"); }
+      else            { _editSelectedRewards.splice(idx, 1); el.classList.remove("sel"); }
+    };
+
     /* ========== ABRIR EDICIÓN ========== */
     window.abrirEdicion = function(nivel) {
       document.getElementById("edit-id").value         = nivel.id;
@@ -1302,6 +1382,7 @@
       /* Aplicar bloqueo de min% según la posición actual */
       document.getElementById("edit-position").dispatchEvent(new Event("input"));
 
+      renderRewardsGrid(nivel.rewards || []);
       document.getElementById("editModal").classList.add("open");
     };
 
@@ -1369,7 +1450,8 @@
           const _editPayload = {
             name, author, creators, thumbnail, background, video, glow, is2P,
             description, difficulty, minPercent, tags,
-            gdLevelId: gdLevelId ? String(gdLevelId) : ""
+            gdLevelId: gdLevelId ? String(gdLevelId) : "",
+            rewards: _editSelectedRewards
           };
           await updateDoc(doc(db, "levels", id), _editPayload);
           cerrarModal("editModal");
@@ -1390,6 +1472,7 @@
           name, author, creators, thumbnail, background, video, glow, is2P,
           description, difficulty, minPercent, tags,
           gdLevelId: gdLevelId ? String(gdLevelId) : "",
+          rewards: _editSelectedRewards,
           position: insertAt, value: newValue
         });
 

@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dev – BFT Demon List</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Montserrat', sans-serif;
+      color: #fff;
+      background: black url('https://iili.io/BrsOUyG.jpg') repeat top left fixed;
+      background-size: auto;
+      padding-top: 70px;
+    }
+
+    /* ── Header ── */
+    .top-header {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 15px; z-index: 9999;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+    }
+    .left { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .logo-img { width: 38px; height: 38px; }
+    .logo-text { color: white; font-weight: bold; font-size: 1.1rem; white-space: nowrap; }
+    .nav-links { display: flex; gap: 15px; align-items: center; }
+    .nav-links a { color: white; text-decoration: none; font-size: 0.95rem; }
+    .nav-links a:hover { color: #c7ff3b; }
+    .menu-toggle {
+      display: none; font-size: 28px; color: white;
+      width: 40px; height: 40px;
+      align-items: center; justify-content: center;
+      cursor: pointer; user-select: none;
+    }
+    .auth-slot { display: flex; align-items: center; }
+
+    @media (max-width: 768px) {
+      .menu-toggle { display: flex; }
+      .nav-links {
+        display: none; flex-direction: column;
+        position: absolute; top: 60px; right: 10px;
+        background: rgba(0,0,0,0.92);
+        padding: 10px; border-radius: 10px; gap: 8px;
+        min-width: 180px;
+      }
+      .nav-links.open { display: flex; }
+    }
+
+    /* ── Visibility classes ── */
+    body .owner-only, body .admin-only, body .staff-only { display: none; }
+    body.is-owner .owner-only { display: inline; }
+    body.is-admin .admin-only { display: inline; }
+    body.is-staff .staff-only { display: inline; }
+    body.is-owner .admin-only { display: inline; }
+    body.is-owner .staff-only { display: inline; }
+    body.is-admin .staff-only { display: inline; }
+
+    /* ── Page ── */
+    .page-wrap {
+      max-width: 1200px; margin: 0 auto; padding: 30px 20px 80px;
+    }
+    .page-title {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 900; margin-bottom: 6px;
+      background: linear-gradient(135deg,#7fff3b,#ffd700);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-subtitle { color: rgba(255,255,255,0.5); font-size: .88rem; margin-bottom: 28px; }
+
+    .state-msg { text-align: center; padding: 60px 20px; color: rgba(255,255,255,.55); font-size: 1rem; }
+    .state-msg.error { color: #ff9a9a; }
+
+    /* ── Editors grid ── */
+    .editors-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) { .editors-grid { grid-template-columns: 1fr; } }
+
+    .editor-panel {
+      background: rgba(8,16,8,0.88);
+      border: 1px solid rgba(124,252,0,0.12);
+      border-radius: 18px; padding: 20px;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .panel-title {
+      font-size: 1.05rem; font-weight: 800;
+      background: linear-gradient(90deg,#7fff3b,#ffd700);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .btn-add {
+      padding: 7px 16px; border-radius: 10px;
+      background: rgba(199,255,59,0.14); border: 1px solid rgba(199,255,59,0.4);
+      color: #c7ff3b; font-family: 'Montserrat',sans-serif;
+      font-size: .82rem; font-weight: 700; cursor: pointer; transition: all .18s;
+    }
+    .btn-add:hover { background: rgba(199,255,59,0.26); border-color: rgba(199,255,59,.7); }
+
+    /* ── Cosmetic list ── */
+    .cosm-list { display: flex; flex-direction: column; gap: 10px; }
+    .cosm-list-empty { color: rgba(255,255,255,.35); font-size: .85rem; text-align: center; padding: 20px; }
+
+    .cosm-card {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 12px; padding: 10px 12px;
+      transition: border-color .18s;
+    }
+    .cosm-card:hover { border-color: rgba(199,255,59,.25); }
+
+    /* Banner preview thumbnail */
+    .banner-thumb {
+      width: 72px; height: 44px; border-radius: 8px;
+      background-size: cover; background-position: center;
+      background-color: #1a1a1a;
+      flex-shrink: 0; position: relative; overflow: hidden;
+    }
+    /* Badge preview thumbnail */
+    .badge-thumb {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(0,0,0,.6); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .badge-thumb img { width: 36px; height: 36px; object-fit: contain; border-radius: 50%; }
+
+    .cosm-info { flex: 1; min-width: 0; }
+    .cosm-name {
+      font-size: .9rem; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .cosm-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+    /* Rarity tags */
+    .rtag {
+      padding: 2px 8px; border-radius: 999px;
+      font-size: .62rem; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+    }
+    .r-comun      { background: rgba(158,158,158,.18); color: #bdbdbd; border: 1px solid #9e9e9e55; }
+    .r-raro       { background: rgba(33,150,243,.18);  color: #90caf9; border: 1px solid #2196f355; }
+    .r-epico      { background: rgba(156,39,176,.18);  color: #ce93d8; border: 1px solid #9c27b055; }
+    .r-legendario { background: rgba(255,152,0,.18);   color: #ffcc02; border: 1px solid #ff980055; }
+    .r-mitico     {
+      background: linear-gradient(90deg,rgba(255,107,107,.22),rgba(78,205,196,.22));
+      color: #fff; border: 1px solid rgba(255,107,107,.4);
+    }
+    .r-exclusivo  { background: rgba(0,188,212,.18);   color: #80deea; border: 1px solid #00bcd455; }
+
+    .obtain-tag {
+      padding: 2px 8px; border-radius: 999px;
+      font-size: .6rem; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+      background: rgba(255,255,255,.08); color: rgba(255,255,255,.6);
+      border: 1px solid rgba(255,255,255,.1);
+    }
+
+    .cosm-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .btn-edit, .btn-del {
+      padding: 5px 12px; border-radius: 8px; font-family: 'Montserrat',sans-serif;
+      font-size: .75rem; font-weight: 700; cursor: pointer; transition: all .15s;
+    }
+    .btn-edit {
+      background: rgba(199,255,59,.1); border: 1px solid rgba(199,255,59,.3); color: #c7ff3b;
+    }
+    .btn-edit:hover { background: rgba(199,255,59,.22); }
+    .btn-del {
+      background: rgba(255,70,70,.1); border: 1px solid rgba(255,70,70,.3); color: #ff9a9a;
+    }
+    .btn-del:hover { background: rgba(255,70,70,.22); }
+
+    /* Frame indicators in banner thumb */
+    .frame-solid    { box-shadow: inset 0 0 0 3px var(--fc, #fff); }
+    .frame-gradient { box-shadow: inset 0 0 0 3px var(--fc, #fff); }
+    .frame-chroma   { animation: chromaOutline 4s linear infinite; }
+    @keyframes chromaOutline {
+      0%   { box-shadow: inset 0 0 0 3px hsl(0,100%,60%); }
+      16%  { box-shadow: inset 0 0 0 3px hsl(60,100%,60%); }
+      33%  { box-shadow: inset 0 0 0 3px hsl(120,100%,60%); }
+      50%  { box-shadow: inset 0 0 0 3px hsl(180,100%,60%); }
+      66%  { box-shadow: inset 0 0 0 3px hsl(240,100%,70%); }
+      83%  { box-shadow: inset 0 0 0 3px hsl(300,100%,70%); }
+      100% { box-shadow: inset 0 0 0 3px hsl(360,100%,60%); }
+    }
+
+    /* ── Modals ── */
+    .modal-back {
+      position: fixed; inset: 0; z-index: 99998;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(5px);
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-back.open { display: flex; }
+    .modal-box {
+      width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
+      background: rgba(10,18,10,.98);
+      border: 1px solid rgba(199,255,59,.2);
+      border-radius: 18px; padding: 26px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.7);
+    }
+    .modal-title {
+      font-size: 1.1rem; font-weight: 800; margin-bottom: 18px;
+      background: linear-gradient(90deg,#7fff3b,#ffd700);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .form-row { margin-bottom: 14px; }
+    .form-row label {
+      display: block; font-size: .75rem; font-weight: 700;
+      color: rgba(199,255,59,.8); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 5px;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 9px 12px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 9px; color: #fff;
+      font-family: 'Montserrat',sans-serif; font-size: .88rem;
+      outline: none; transition: border-color .2s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: rgba(199,255,59,.45);
+    }
+    .form-select option { background: #0a1a05; color: #fff; }
+
+    .color-row {
+      display: flex; gap: 10px; align-items: center;
+    }
+    .color-row input[type="color"] {
+      width: 44px; height: 38px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.15); cursor: pointer;
+      background: transparent; padding: 2px;
+    }
+    .color-row .form-input { flex: 1; }
+
+    .check-row {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px;
+    }
+    .check-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 12px; border-radius: 9px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      cursor: pointer; font-size: .82rem; user-select: none;
+      transition: border-color .18s;
+    }
+    .check-item:hover { border-color: rgba(199,255,59,.35); }
+    .check-item input { width: 16px; height: 16px; accent-color: #c7ff3b; }
+
+    /* Banner preview inside modal */
+    .modal-banner-preview-wrap {
+      margin-top: 14px; border-radius: 10px; overflow: hidden;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      padding: 12px;
+    }
+    .modal-banner-preview-label {
+      font-size: .72rem; font-weight: 700; color: rgba(199,255,59,.7);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+    }
+    .modal-banner-preview {
+      height: 100px; border-radius: 8px;
+      background-size: cover; background-position: center;
+      background-color: #1a2a1a; transition: all .2s;
+    }
+
+    /* Badge preview inside modal */
+    .modal-badge-preview {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(0,0,0,.5);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; margin: 12px auto 0;
+      border: 2px solid rgba(255,255,255,.15);
+    }
+    .modal-badge-preview img { width: 52px; height: 52px; object-fit: contain; border-radius: 50%; }
+
+    .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;
+    }
+    .btn-save {
+      padding: 9px 20px; border-radius: 10px;
+      background: linear-gradient(90deg,#1a4d1a,#4a8a1a,#c7ff3b);
+      border: none; color: #fff;
+      font-family: 'Montserrat',sans-serif; font-size: .88rem; font-weight: 700;
+      cursor: pointer; transition: opacity .18s;
+    }
+    .btn-save:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-cancel {
+      padding: 9px 20px; border-radius: 10px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+      color: #fff; font-family: 'Montserrat',sans-serif; font-size: .88rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-delete-cosm {
+      padding: 9px 16px; border-radius: 10px;
+      background: rgba(255,50,50,.12); border: 1px solid rgba(255,80,80,.3);
+      color: #ff9a9a; font-family: 'Montserrat',sans-serif; font-size: .88rem; font-weight: 700;
+      cursor: pointer; margin-right: auto;
+    }
+    .btn-delete-cosm:hover { background: rgba(255,50,50,.24); }
+
+    .form-err {
+      color: #ff9a9a; font-size: .78rem; margin-top: 10px;
+      display: none;
+    }
+
+    /* unlock meta dynamic fields */
+    #bMetaWrap, #badgeMetaWrap { margin-top: 0; }
+    .meta-hint { font-size: .75rem; color: rgba(255,255,255,.4); margin-top: 4px; }
+
+    .gradient-end-row { display: none; }
+    .gradient-end-row.show { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="top-header">
+  <div class="left">
+    <img src="https://iili.io/BN3Yhpp.png" class="logo-img" alt="Logo">
+    <span class="logo-text">BFT Demon List</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <nav class="nav-links" id="navLinks">
+      <a href="/">Home</a>
+      <a href="/demonlist.html">Demon List</a>
+      <a href="/leaderboards.html">Leaderboards</a>
+      <a href="/notifications.html">✉ Notificaciones</a>
+      <a href="/submit.html">Enviar Record</a>
+      <a href="/panel.html" class="staff-only">Panel de Records</a>
+      <a href="/staff-control.html" class="owner-only">Control Staff</a>
+      <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
+    </nav>
+    <div class="auth-slot" id="authSlot"></div>
+    <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('open')">☰</div>
+  </div>
+</header>
+
+<!-- State / guard -->
+<div id="stateMsg">
+  <div class="state-msg">Verificando acceso…</div>
+</div>
+
+<!-- Main content -->
+<div id="pageWrap" class="page-wrap" style="display:none;">
+  <h1 class="page-title">🛠 Admin Dev</h1>
+  <p class="page-subtitle">Gestión de cosméticos — Banners e Insignias</p>
+
+  <div class="editors-grid">
+    <!-- ── PANEL BANNERS ── -->
+    <div class="editor-panel">
+      <div class="panel-header">
+        <span class="panel-title">🖼 Banners</span>
+        <button class="btn-add" id="btnAddBanner">+ Añadir Banner</button>
+      </div>
+      <div class="cosm-list" id="bannerList">
+        <div class="cosm-list-empty">Cargando…</div>
+      </div>
+    </div>
+
+    <!-- ── PANEL BADGES ── -->
+    <div class="editor-panel">
+      <div class="panel-header">
+        <span class="panel-title">🏅 Insignias</span>
+        <button class="btn-add" id="btnAddBadge">+ Añadir Insignia</button>
+      </div>
+      <div class="cosm-list" id="badgeList">
+        <div class="cosm-list-empty">Cargando…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ BANNER MODAL ═══════════════════ -->
+<div id="bannerModal" class="modal-back">
+  <div class="modal-box">
+    <div class="modal-title" id="bannerModalTitle">Añadir Banner</div>
+
+    <div class="form-row">
+      <label>Nombre</label>
+      <input class="form-input" id="bName" maxlength="60" placeholder="Ej: Banner Guardián Verde">
+    </div>
+    <div class="form-row">
+      <label>URL de imagen</label>
+      <input class="form-input" id="bImageUrl" type="url" placeholder="https://iili.io/...jpg">
+    </div>
+    <div class="form-row">
+      <label>Rareza</label>
+      <select class="form-select" id="bRarity">
+        <option value="comun">Común</option>
+        <option value="raro">Raro</option>
+        <option value="epico">Épico</option>
+        <option value="legendario" selected>Legendario</option>
+        <option value="mitico">Mítico</option>
+        <option value="exclusivo">Exclusivo</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Tipo de marco</label>
+      <select class="form-select" id="bFrameType">
+        <option value="solid" selected>Sólido</option>
+        <option value="gradient">Gradiente</option>
+        <option value="chroma">Chroma (arcoíris)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Color del marco</label>
+      <div class="color-row">
+        <input type="color" id="bFrameColorPicker" value="#c7ff3b">
+        <input class="form-input" id="bFrameColor" value="#c7ff3b" maxlength="30" placeholder="#c7ff3b o rgba(...)">
+      </div>
+    </div>
+    <div class="form-row gradient-end-row" id="bGradientEndRow">
+      <label>Color secundario del gradiente</label>
+      <div class="color-row">
+        <input type="color" id="bFrameColor2Picker" value="#ff6b6b">
+        <input class="form-input" id="bFrameColor2" value="#ff6b6b" maxlength="30" placeholder="#ff6b6b">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Opciones</label>
+      <div class="check-row">
+        <label class="check-item"><input type="checkbox" id="bAnimated"> Animado</label>
+        <label class="check-item"><input type="checkbox" id="bObtainable" checked> Obtenible</label>
+        <label class="check-item"><input type="checkbox" id="bSeasonal"> Temporal</label>
+        <label class="check-item"><input type="checkbox" id="bExclusive"> Exclusivo</label>
+      </div>
+    </div>
+
+    <!-- Vista previa -->
+    <div class="modal-banner-preview-wrap">
+      <div class="modal-banner-preview-label">Vista previa</div>
+      <div class="modal-banner-preview" id="bPreview"></div>
+    </div>
+
+    <div class="form-err" id="bErr"></div>
+    <div class="modal-actions">
+      <button class="btn-delete-cosm" id="bDeleteBtn" style="display:none;">🗑 Eliminar</button>
+      <button class="btn-cancel" id="bCancelBtn">Cancelar</button>
+      <button class="btn-save" id="bSaveBtn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ BADGE MODAL ═══════════════════ -->
+<div id="badgeModal" class="modal-back">
+  <div class="modal-box">
+    <div class="modal-title" id="badgeModalTitle">Añadir Insignia</div>
+
+    <div class="form-row">
+      <label>Nombre</label>
+      <input class="form-input" id="bdName" maxlength="60" placeholder="Ej: Miembro Fundador">
+    </div>
+    <div class="form-row">
+      <label>URL de imagen</label>
+      <input class="form-input" id="bdImageUrl" type="url" placeholder="https://iili.io/...png">
+    </div>
+    <div class="form-row">
+      <label>Rareza</label>
+      <select class="form-select" id="bdRarity">
+        <option value="comun">Común</option>
+        <option value="raro">Raro</option>
+        <option value="epico">Épico</option>
+        <option value="legendario">Legendario</option>
+        <option value="mitico">Mítico</option>
+        <option value="exclusivo" selected>Exclusivo</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Tipo de obtención</label>
+      <select class="form-select" id="bdObtainType">
+        <option value="manual">Manual (admin lo da)</option>
+        <option value="completion">Completar niveles</option>
+        <option value="member">Miembro fundador</option>
+        <option value="booster">Server Booster</option>
+        <option value="event">Evento</option>
+        <option value="staff">Staff</option>
+        <option value="leaderboard">Leaderboard (posición)</option>
+      </select>
+    </div>
+
+    <!-- Metadatos dinámicos según tipo -->
+    <div id="badgeMetaWrap"></div>
+
+    <div class="form-row">
+      <label>Vista previa de imagen</label>
+      <div class="modal-badge-preview" id="bdPreview">
+        <img id="bdPreviewImg" src="" alt="" style="display:none;">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Opciones</label>
+      <div class="check-row">
+        <label class="check-item"><input type="checkbox" id="bdAnimated"> Animado</label>
+        <label class="check-item"><input type="checkbox" id="bdObtainable" checked> Obtenible</label>
+        <label class="check-item"><input type="checkbox" id="bdExclusive"> Exclusivo</label>
+        <label class="check-item"><input type="checkbox" id="bdSeasonal"> Temporal</label>
+      </div>
+    </div>
+
+    <div class="form-err" id="bdErr"></div>
+    <div class="modal-actions">
+      <button class="btn-delete-cosm" id="bdDeleteBtn" style="display:none;">🗑 Eliminar</button>
+      <button class="btn-cancel" id="bdCancelBtn">Cancelar</button>
+      <button class="btn-save" id="bdSaveBtn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { db, onAuthChange, isOwner, isAdmin, mountAuthUI } from "/auth.js";
+  import {
+    collection, getDocs, addDoc, updateDoc, deleteDoc,
+    doc, serverTimestamp, query, orderBy
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  mountAuthUI("authSlot");
+
+  const $ = id => document.getElementById(id);
+
+  /* ── Auth guard ─────────────────────────────────── */
+  let authHandled = false;
+  onAuthChange((user, data, loading) => {
+    if (loading) return;
+    if (authHandled) return;
+    authHandled = true;
+
+    if (!user) {
+      $("stateMsg").innerHTML = `<div class="state-msg error">Debes iniciar sesión para acceder.</div>`;
+      return;
+    }
+    if (!isOwner() && !isAdmin()) {
+      $("stateMsg").innerHTML = `<div class="state-msg error">Acceso restringido. Solo Admins y Owners pueden ver esta página.</div>`;
+      return;
+    }
+    $("stateMsg").style.display = "none";
+    $("pageWrap").style.display = "block";
+    initPage();
+  });
+
+  /* ══════════════════════════════════════════
+     DATA
+  ══════════════════════════════════════════ */
+  let bannersCache = [];
+  let badgesCache  = [];
+  let editingBanner = null;
+  let editingBadge  = null;
+
+  async function initPage() {
+    await Promise.all([loadBanners(), loadBadges()]);
+  }
+
+  /* ── Rarity helpers ── */
+  const RARITY_CLASS = {
+    comun:'r-comun', raro:'r-raro', epico:'r-epico',
+    legendario:'r-legendario', mitico:'r-mitico', exclusivo:'r-exclusivo'
+  };
+  const RARITY_LABEL = {
+    comun:'Común', raro:'Raro', epico:'Épico',
+    legendario:'Legendario', mitico:'Mítico', exclusivo:'Exclusivo'
+  };
+  const OBTAIN_LABEL = {
+    manual:'Manual', completion:'Completar niveles', member:'Miembro fundador',
+    booster:'Booster', event:'Evento', staff:'Staff', leaderboard:'Leaderboard'
+  };
+
+  /* ══════════════════════════════════════════
+     BANNERS
+  ══════════════════════════════════════════ */
+  async function loadBanners() {
+    $("bannerList").innerHTML = `<div class="cosm-list-empty">Cargando…</div>`;
+    try {
+      const snap = await getDocs(query(collection(db, "banners"), orderBy("createdAt","desc")));
+      bannersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderBannerList();
+    } catch(e) {
+      $("bannerList").innerHTML = `<div class="cosm-list-empty" style="color:#ff9a9a;">Error al cargar: ${e.message}</div>`;
+    }
+  }
+
+  function renderBannerList() {
+    if (!bannersCache.length) {
+      $("bannerList").innerHTML = `<div class="cosm-list-empty">Sin banners aún. ¡Añade el primero!</div>`;
+      return;
+    }
+    $("bannerList").innerHTML = bannersCache.map(b => {
+      const rc = RARITY_CLASS[b.rarity] || 'r-comun';
+      const rl = RARITY_LABEL[b.rarity] || b.rarity;
+      const frameClass = `frame-${b.frameType || 'solid'}`;
+      const frameStyle = b.frameType !== 'chroma'
+        ? `--fc:${b.frameColor || '#fff'};`
+        : '';
+      const bgStyle = b.imageUrl ? `background-image:url('${escHtml(b.imageUrl)}');` : '';
+      const flags = [
+        b.animated  ? '<span class="obtain-tag">✨ Anim</span>'   : '',
+        b.seasonal  ? '<span class="obtain-tag">🗓 Temp</span>'   : '',
+        b.exclusive ? '<span class="obtain-tag">💎 Excl</span>'  : '',
+        !b.obtainable ? '<span class="obtain-tag" style="color:#ff9a9a;">🔒 No obtenible</span>' : ''
+      ].filter(Boolean).join('');
+      return `
+      <div class="cosm-card">
+        <div class="banner-thumb ${frameClass}" style="${bgStyle}${frameStyle}"></div>
+        <div class="cosm-info">
+          <div class="cosm-name">${escHtml(b.name || 'Sin nombre')}</div>
+          <div class="cosm-meta">
+            <span class="rtag ${rc}">${rl}</span>
+            <span class="obtain-tag">${escHtml(b.frameType || 'solid')}</span>
+            ${flags}
+          </div>
+        </div>
+        <div class="cosm-actions">
+          <button class="btn-edit" onclick="openBannerEdit('${b.id}')">Editar</button>
+          <button class="btn-del"  onclick="deleteBanner('${b.id}')">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ── Banner Modal ── */
+  function openBannerModal(banner = null) {
+    editingBanner = banner;
+    $("bannerModalTitle").textContent = banner ? "Editar Banner" : "Añadir Banner";
+    $("bName").value        = banner?.name       || "";
+    $("bImageUrl").value    = banner?.imageUrl   || "";
+    $("bRarity").value      = banner?.rarity     || "legendario";
+    $("bFrameType").value   = banner?.frameType  || "solid";
+    const fc = banner?.frameColor  || "#c7ff3b";
+    const fc2= banner?.frameColor2 || "#ff6b6b";
+    $("bFrameColor").value        = fc;
+    $("bFrameColorPicker").value  = toHex(fc);
+    $("bFrameColor2").value       = fc2;
+    $("bFrameColor2Picker").value = toHex(fc2);
+    $("bAnimated").checked   = !!banner?.animated;
+    $("bObtainable").checked = banner?.obtainable !== false;
+    $("bSeasonal").checked   = !!banner?.seasonal;
+    $("bExclusive").checked  = !!banner?.exclusive;
+    $("bDeleteBtn").style.display = banner ? "inline-flex" : "none";
+    $("bErr").style.display = "none";
+    updateGradientRow();
+    updateBannerPreview();
+    $("bannerModal").classList.add("open");
+  }
+
+  window.openBannerEdit = id => {
+    const b = bannersCache.find(x => x.id === id);
+    if (b) openBannerModal(b);
+  };
+
+  function closeBannerModal() {
+    $("bannerModal").classList.remove("open");
+    editingBanner = null;
+  }
+
+  function updateGradientRow() {
+    const isGrad = $("bFrameType").value === "gradient";
+    $("bGradientEndRow").classList.toggle("show", isGrad);
+  }
+
+  function updateBannerPreview() {
+    const url = $("bImageUrl").value.trim();
+    const fc  = $("bFrameColor").value.trim();
+    const fc2 = $("bFrameColor2").value.trim();
+    const ft  = $("bFrameType").value;
+    const prev = $("bPreview");
+    prev.style.backgroundImage = url ? `url('${escHtml(url)}')` : "";
+    if (ft === "solid") {
+      prev.style.boxShadow = `inset 0 0 0 4px ${fc}, 0 0 12px ${fc}44`;
+      prev.style.animation = "";
+    } else if (ft === "gradient") {
+      prev.style.boxShadow = `inset 0 0 0 4px ${fc}`;
+      prev.style.animation = "";
+    } else {
+      prev.style.boxShadow = "";
+      prev.style.animation = "chromaPreview 4s linear infinite";
+    }
+  }
+
+  $("bFrameType").addEventListener("change", () => { updateGradientRow(); updateBannerPreview(); });
+  $("bImageUrl").addEventListener("input", updateBannerPreview);
+  $("bFrameColor").addEventListener("input", e => { $("bFrameColorPicker").value = toHex(e.target.value); updateBannerPreview(); });
+  $("bFrameColorPicker").addEventListener("input", e => { $("bFrameColor").value = e.target.value; updateBannerPreview(); });
+  $("bFrameColor2").addEventListener("input", e => { $("bFrameColor2Picker").value = toHex(e.target.value); });
+  $("bFrameColor2Picker").addEventListener("input", e => { $("bFrameColor2").value = e.target.value; });
+
+  $("btnAddBanner").onclick = () => openBannerModal();
+  $("bCancelBtn").onclick   = closeBannerModal;
+  $("bDeleteBtn").onclick   = () => editingBanner && deleteBanner(editingBanner.id);
+
+  $("bSaveBtn").onclick = async () => {
+    const name = $("bName").value.trim();
+    if (!name) { showErr("bErr","El nombre es obligatorio."); return; }
+    $("bSaveBtn").disabled = true;
+    $("bSaveBtn").textContent = "Guardando…";
+    try {
+      const payload = {
+        name,
+        imageUrl:   $("bImageUrl").value.trim(),
+        frameType:  $("bFrameType").value,
+        frameColor: $("bFrameColor").value.trim(),
+        frameColor2:$("bFrameColor2").value.trim(),
+        rarity:     $("bRarity").value,
+        animated:   $("bAnimated").checked,
+        obtainable: $("bObtainable").checked,
+        seasonal:   $("bSeasonal").checked,
+        exclusive:  $("bExclusive").checked,
+        updatedAt:  serverTimestamp(),
+      };
+      if (editingBanner) {
+        await updateDoc(doc(db,"banners",editingBanner.id), payload);
+      } else {
+        payload.createdAt = serverTimestamp();
+        await addDoc(collection(db,"banners"), payload);
+      }
+      closeBannerModal();
+      await loadBanners();
+    } catch(e) {
+      showErr("bErr","Error al guardar: " + e.message);
+    } finally {
+      $("bSaveBtn").disabled = false;
+      $("bSaveBtn").textContent = "Guardar";
+    }
+  };
+
+  async function deleteBanner(id) {
+    if (!confirm("¿Eliminar este banner? Esta acción no se puede deshacer.")) return;
+    try {
+      await deleteDoc(doc(db,"banners",id));
+      closeBannerModal();
+      await loadBanners();
+    } catch(e) { alert("Error al eliminar: " + e.message); }
+  }
+
+  /* ══════════════════════════════════════════
+     BADGES
+  ══════════════════════════════════════════ */
+  async function loadBadges() {
+    $("badgeList").innerHTML = `<div class="cosm-list-empty">Cargando…</div>`;
+    try {
+      const snap = await getDocs(query(collection(db,"badges"), orderBy("createdAt","desc")));
+      badgesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderBadgeList();
+    } catch(e) {
+      $("badgeList").innerHTML = `<div class="cosm-list-empty" style="color:#ff9a9a;">Error al cargar: ${e.message}</div>`;
+    }
+  }
+
+  function renderBadgeList() {
+    if (!badgesCache.length) {
+      $("badgeList").innerHTML = `<div class="cosm-list-empty">Sin insignias aún. ¡Añade la primera!</div>`;
+      return;
+    }
+    $("badgeList").innerHTML = badgesCache.map(b => {
+      const rc = RARITY_CLASS[b.rarity] || 'r-comun';
+      const rl = RARITY_LABEL[b.rarity] || b.rarity;
+      const ot = OBTAIN_LABEL[b.obtainType] || b.obtainType || '?';
+      const imgHtml = b.imageUrl
+        ? `<img src="${escHtml(b.imageUrl)}" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:50%;">`
+        : `<span style="color:rgba(255,255,255,.3);font-size:.7rem;">?</span>`;
+      const flags = [
+        b.animated  ? '<span class="obtain-tag">✨ Anim</span>' : '',
+        b.seasonal  ? '<span class="obtain-tag">🗓 Temp</span>' : '',
+        b.exclusive ? '<span class="obtain-tag">💎 Excl</span>' : '',
+        !b.obtainable ? '<span class="obtain-tag" style="color:#ff9a9a;">🔒 No obtenible</span>' : ''
+      ].filter(Boolean).join('');
+      return `
+      <div class="cosm-card">
+        <div class="badge-thumb">${imgHtml}</div>
+        <div class="cosm-info">
+          <div class="cosm-name">${escHtml(b.name || 'Sin nombre')}</div>
+          <div class="cosm-meta">
+            <span class="rtag ${rc}">${rl}</span>
+            <span class="obtain-tag">${escHtml(ot)}</span>
+            ${flags}
+          </div>
+        </div>
+        <div class="cosm-actions">
+          <button class="btn-edit" onclick="openBadgeEdit('${b.id}')">Editar</button>
+          <button class="btn-del"  onclick="deleteBadge('${b.id}')">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ── Badge Modal ── */
+  const OBTAIN_META_FIELDS = {
+    manual:       ``,
+    completion:   `<div class="form-row" id="bm-qty"><label>Cantidad de niveles</label><input class="form-input" id="meta_qty" type="number" min="1" value="10" placeholder="10"><p class="meta-hint">Número de niveles requeridos</p></div>
+                   <div class="form-row" id="bm-diff"><label>Dificultad mínima</label><select class="form-select" id="meta_diff"><option>Extreme Demon</option><option>Hard Demon</option><option>Medium Demon</option><option>Easy Demon</option><option>Insane Demon</option></select></div>`,
+    member:       `<div class="form-row"><label>Año de membresía</label><input class="form-input" id="meta_year" type="number" min="2020" value="2024" placeholder="2024"></div>`,
+    booster:      ``,
+    event:        `<div class="form-row"><label>Nombre del evento</label><input class="form-input" id="meta_event" placeholder="Ej: Torneo Verano 2025"></div>`,
+    staff:        ``,
+    leaderboard:  `<div class="form-row"><label>Posición requerida (top)</label><select class="form-select" id="meta_rank"><option value="1">🥇 1er lugar</option><option value="3">🥈 Top 3</option><option value="10">🥉 Top 10</option></select></div>`,
+  };
+
+  function openBadgeModal(badge = null) {
+    editingBadge = badge;
+    $("badgeModalTitle").textContent = badge ? "Editar Insignia" : "Añadir Insignia";
+    $("bdName").value       = badge?.name       || "";
+    $("bdImageUrl").value   = badge?.imageUrl   || "";
+    $("bdRarity").value     = badge?.rarity     || "exclusivo";
+    $("bdObtainType").value = badge?.obtainType || "manual";
+    $("bdAnimated").checked  = !!badge?.animated;
+    $("bdObtainable").checked= badge?.obtainable !== false;
+    $("bdExclusive").checked = !!badge?.exclusive;
+    $("bdSeasonal").checked  = !!badge?.seasonal;
+    $("bdDeleteBtn").style.display = badge ? "inline-flex" : "none";
+    $("bdErr").style.display = "none";
+    renderBadgeMeta(badge);
+    updateBadgePreview();
+    $("badgeModal").classList.add("open");
+  }
+
+  window.openBadgeEdit = id => {
+    const b = badgesCache.find(x => x.id === id);
+    if (b) openBadgeModal(b);
+  };
+
+  function closeBadgeModal() {
+    $("badgeModal").classList.remove("open");
+    editingBadge = null;
+  }
+
+  function renderBadgeMeta(badge = null) {
+    const type = $("bdObtainType").value;
+    const wrap = $("badgeMetaWrap");
+    wrap.innerHTML = OBTAIN_META_FIELDS[type] || "";
+    if (!badge?.unlockMeta) return;
+    const m = badge.unlockMeta;
+    if (type === "completion") {
+      if ($("meta_qty"))  $("meta_qty").value  = m.quantity  || 10;
+      if ($("meta_diff")) $("meta_diff").value = m.difficulty || "Extreme Demon";
+    } else if (type === "member") {
+      if ($("meta_year")) $("meta_year").value = m.year || 2024;
+    } else if (type === "event") {
+      if ($("meta_event")) $("meta_event").value = m.eventName || "";
+    } else if (type === "leaderboard") {
+      if ($("meta_rank")) $("meta_rank").value = m.rank || "1";
+    }
+  }
+
+  $("bdObtainType").addEventListener("change", () => renderBadgeMeta(editingBadge));
+
+  function updateBadgePreview() {
+    const url = $("bdImageUrl").value.trim();
+    const img = $("bdPreviewImg");
+    if (url) { img.src = url; img.style.display = "block"; }
+    else      { img.src = ""; img.style.display = "none"; }
+  }
+
+  $("bdImageUrl").addEventListener("input", updateBadgePreview);
+  $("btnAddBadge").onclick = () => openBadgeModal();
+  $("bdCancelBtn").onclick  = closeBadgeModal;
+  $("bdDeleteBtn").onclick  = () => editingBadge && deleteBadge(editingBadge.id);
+
+  function collectBadgeMeta() {
+    const type = $("bdObtainType").value;
+    const meta = {};
+    if (type === "completion") {
+      meta.quantity   = parseInt($("meta_qty")?.value) || 10;
+      meta.difficulty = $("meta_diff")?.value || "Extreme Demon";
+    } else if (type === "member") {
+      meta.year = parseInt($("meta_year")?.value) || 2024;
+    } else if (type === "event") {
+      meta.eventName = $("meta_event")?.value.trim() || "";
+    } else if (type === "leaderboard") {
+      meta.rank = parseInt($("meta_rank")?.value) || 1;
+    }
+    return meta;
+  }
+
+  $("bdSaveBtn").onclick = async () => {
+    const name = $("bdName").value.trim();
+    if (!name) { showErr("bdErr","El nombre es obligatorio."); return; }
+    $("bdSaveBtn").disabled = true;
+    $("bdSaveBtn").textContent = "Guardando…";
+    try {
+      const payload = {
+        name,
+        imageUrl:    $("bdImageUrl").value.trim(),
+        rarity:      $("bdRarity").value,
+        obtainType:  $("bdObtainType").value,
+        unlockMeta:  collectBadgeMeta(),
+        animated:    $("bdAnimated").checked,
+        obtainable:  $("bdObtainable").checked,
+        exclusive:   $("bdExclusive").checked,
+        seasonal:    $("bdSeasonal").checked,
+        updatedAt:   serverTimestamp(),
+      };
+      if (editingBadge) {
+        await updateDoc(doc(db,"badges",editingBadge.id), payload);
+      } else {
+        payload.createdAt = serverTimestamp();
+        await addDoc(collection(db,"badges"), payload);
+      }
+      closeBadgeModal();
+      await loadBadges();
+    } catch(e) {
+      showErr("bdErr","Error al guardar: " + e.message);
+    } finally {
+      $("bdSaveBtn").disabled = false;
+      $("bdSaveBtn").textContent = "Guardar";
+    }
+  };
+
+  async function deleteBadge(id) {
+    if (!confirm("¿Eliminar esta insignia? Esta acción no se puede deshacer.")) return;
+    try {
+      await deleteDoc(doc(db,"badges",id));
+      closeBadgeModal();
+      await loadBadges();
+    } catch(e) { alert("Error al eliminar: " + e.message); }
+  }
+
+  /* Close modals clicking backdrop */
+  $("bannerModal").addEventListener("click", e => { if (e.target === $("bannerModal")) closeBannerModal(); });
+  $("badgeModal").addEventListener("click",  e => { if (e.target === $("badgeModal"))  closeBadgeModal(); });
+
+  /* ── Helpers ── */
+  function escHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c =>
+      ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  }
+  function showErr(id, msg) {
+    const el = $(id);
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+  function toHex(color) {
+    if (!color || !color.startsWith("#")) return "#c7ff3b";
+    if (color.length === 7) return color;
+    if (color.length === 4) {
+      return "#" + color[1]+color[1]+color[2]+color[2]+color[3]+color[3];
+    }
+    return "#c7ff3b";
+  }
+</script>
+
+<style>
+  @keyframes chromaPreview {
+    0%   { box-shadow: inset 0 0 0 4px hsl(0,100%,60%),   0 0 10px hsl(0,100%,60%)44; }
+    16%  { box-shadow: inset 0 0 0 4px hsl(60,100%,60%),  0 0 10px hsl(60,100%,60%)44; }
+    33%  { box-shadow: inset 0 0 0 4px hsl(120,100%,55%), 0 0 10px hsl(120,100%,55%)44; }
+    50%  { box-shadow: inset 0 0 0 4px hsl(180,100%,55%), 0 0 10px hsl(180,100%,55%)44; }
+    66%  { box-shadow: inset 0 0 0 4px hsl(240,100%,70%), 0 0 10px hsl(240,100%,70%)44; }
+    83%  { box-shadow: inset 0 0 0 4px hsl(300,100%,70%), 0 0 10px hsl(300,100%,70%)44; }
+    100% { box-shadow: inset 0 0 0 4px hsl(360,100%,60%), 0 0 10px hsl(360,100%,60%)44; }
+  }
+</style>
+</body>
+</html>
