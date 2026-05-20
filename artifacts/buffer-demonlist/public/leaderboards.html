@@ -513,15 +513,23 @@
           const dkey = (lvl.difficulty && [
             "Extreme Demon","Insane Demon","Hard Demon","Medium Demon","Easy Demon"
           ].includes(lvl.difficulty)) ? lvl.difficulty : "Extreme Demon";
-          /* Posición del nivel: en una demon-list, posición 1 = el más
-             difícil, posiciones grandes = más fáciles. Lo usamos para
-             saber cuál es el nivel más difícil completado por cada jugador. */
           [r.userId, r.player2Id].forEach(uid => {
             if (!uid) return;
             const u = bump(uid);
             u.points += earned;
             u.total  += 1;
-            if (pct === 100) u[dkey] += 1;
+            if (pct === 100) {
+              u[dkey] += 1;
+              /* Rastrear el nivel más difícil completado al 100%
+                 (posición más baja = más difícil en la demon list).
+                 Guardamos el bannerId del rewards[0] de ese nivel. */
+              const lvlPos = Number(lvl.position) || Infinity;
+              const lvlBanner = (Array.isArray(lvl.rewards) && lvl.rewards.length) ? lvl.rewards[0] : null;
+              if (lvlBanner && lvlPos < (u._hardestPos || Infinity)) {
+                u._hardestPos    = lvlPos;
+                u._hardestBanner = lvlBanner;
+              }
+            }
           });
         });
 
@@ -543,18 +551,27 @@
         });
 
         /* 5) Banners equipados — user_cosmetics (1 sola lectura lista)
-              Usa equippedBanner si existe; si no, cae al primer banner
-              desbloqueado (para usuarios que aún no equiparon manualmente). */
+              Prioridad: equippedBanner > banner del hardest completado
+              que esté en unlockedBanners > primer unlockedBanner. */
         const cosmSnap = await getDocs(collection(db, "user_cosmetics"));
         const bannerIds = new Set();
         cosmSnap.forEach(cs => {
           const uid = cs.id;
           const d   = cs.data() || {};
           if (!map.has(uid)) return;
-          const activeBanner = d.equippedBanner
-            || (Array.isArray(d.unlockedBanners) && d.unlockedBanners.length ? d.unlockedBanners[0] : null);
+          const u        = map.get(uid);
+          const unlocked = Array.isArray(d.unlockedBanners) ? d.unlockedBanners : [];
+          let activeBanner = d.equippedBanner || null;
+          if (!activeBanner && unlocked.length) {
+            /* Sin banner equipado: mostrar el del hardest level completado
+               (si ese banner está en su inventario), si no, el primero. */
+            const hardest = u._hardestBanner;
+            activeBanner = (hardest && unlocked.includes(hardest))
+              ? hardest
+              : unlocked[0];
+          }
           if (activeBanner) {
-            map.get(uid)._equippedBanner = activeBanner;
+            u._equippedBanner = activeBanner;
             bannerIds.add(activeBanner);
           }
         });

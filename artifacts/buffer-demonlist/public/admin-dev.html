@@ -774,8 +774,11 @@
         .filter(r => r.status === "Accepted" && Number(r.percent) === 100);
       log(`✅ ${records.length} records al 100%.`);
 
-      /* 5) Determinar qué banners ganó cada usuario */
+      /* 5) Determinar qué banners ganó cada usuario
+            Y cuál es el banner de su nivel más difícil completado
+            (posición más baja en la lista = más difícil) */
       const userBannersEarned = new Map();
+      const userHardestBanner = new Map(); // uid → { pos, bannerId }
       const addEarned = (uid, bId) => {
         if (!uid || !bId) return;
         if (!userBannersEarned.has(uid)) userBannersEarned.set(uid, new Set());
@@ -787,6 +790,15 @@
         bannerIds.forEach(bid => {
           addEarned(r.userId, bid);
           if (r.player2Id) addEarned(r.player2Id, bid);
+        });
+        /* Rastrear hardest: busca el nivel en allLevels por ID */
+        const lvlData = allLevels.find(l => l.id === r.levelId);
+        const pos     = Number(lvlData?.position) || Infinity;
+        const bid0    = bannerIds[0];
+        [r.userId, r.player2Id].forEach(uid => {
+          if (!uid || !bid0) return;
+          const cur = userHardestBanner.get(uid);
+          if (!cur || pos < cur.pos) userHardestBanner.set(uid, { pos, bannerId: bid0 });
         });
       });
       log(`✅ ${userBannersEarned.size} usuario(s) con banners ganados.`);
@@ -823,9 +835,15 @@
 
         const updateData = {};
         if (toAdd.length) updateData.unlockedBanners = arrayUnion(...toAdd);
-        /* Auto-equipar el primer banner ganado si aún no tiene ninguno */
+        /* Auto-equipar el banner del hardest level si aún no tiene ninguno */
         if (needsEquip) {
-          updateData.equippedBanner = toAdd.length ? toAdd[0] : [...earned][0];
+          const hardest    = userHardestBanner.get(uid);
+          const hardestBid = hardest ? hardest.bannerId : null;
+          /* Usar el banner del hardest level si está entre los ganados,
+             si no, el primero nuevo, si no, el primero de earned */
+          updateData.equippedBanner = (hardestBid && earned.has(hardestBid))
+            ? hardestBid
+            : (toAdd.length ? toAdd[0] : [...earned][0]);
         }
         batch.set(doc(db, "user_cosmetics", uid), updateData, { merge: true });
         opsInBatch++; updated++;

@@ -91,7 +91,8 @@
 
   /* RECORD CARD */
   .record-card { display: grid; grid-template-columns: minmax(0, 1fr) 175px; gap: 18px; align-items: start; }
-  .record-card .left { min-width: 0; }
+  /* Sobreescribe la clase global .left { display:flex } del header */
+  .record-card .left { min-width: 0; display: block !important; }
   .record-card .right { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 175px; flex-shrink: 0; }
 
   /* Nombre de jugador: truncar con ellipsis, nunca romper letra por letra */
