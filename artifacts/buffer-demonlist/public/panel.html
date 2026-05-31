@@ -680,17 +680,13 @@
               <span style="opacity:.55;font-size:.85rem;">ID: ${escapeHtml(rec.levelId || "—")}</span>
             </div>`;
 
-    /* Botón de aceptar — etiqueta y comportamiento dependen del tipo.
-       Para reclamos de nuevo nivel se ofrecen DOS rutas:
-       1) "+ Aceptar y añadir al lista"  → crea el nivel en la Lista (requiere rellenar el modal)
-       2) "✓ Aceptar sin añadir"         → acepta SOLO el record; el nivel NO se añade a la Lista.
-          Cualquier staff (Mod/Admin/Owner) puede usar esta segunda ruta. */
+    /* Botón de aceptar — para reclamos de nuevo nivel el único flujo
+       válido es "+ Aceptar y añadir al lista" (que crea el nivel en Firestore)
+       o rechazar la solicitud.  No existe una ruta de "aceptar sin añadir"
+       para mantener la integridad de la Demon List. */
     const acceptBtnHtml = isClaim
       ? (meCanAccept
-          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir al lista</button>
-             <button class="btn" data-action="accept"
-               style="margin-top:5px;background:rgba(199,255,59,0.1);border:1px solid rgba(199,255,59,0.3);font-size:.82rem;"
-               title="Acepta el record sin crear el nivel en la Lista">✓ Aceptar sin añadir</button>`
+          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir al lista</button>`
           : `<button class="btn" disabled style="opacity:.55; cursor:not-allowed;" title="Solo staff puede aceptar reclamos de Nuevo nivel">Solo Staff</button>`)
       : `<button class="btn btn-accept" data-action="accept">Aceptar</button>`;
 
@@ -829,10 +825,7 @@
     const meCanAccept = !isClaim || isStaff();
     const acceptBtnHtml = isClaim
       ? (meCanAccept
-          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir al lista</button>
-             <button class="btn" data-action="accept"
-               style="margin-top:5px;background:rgba(199,255,59,0.1);border:1px solid rgba(199,255,59,0.3);font-size:.82rem;"
-               title="Acepta el record sin crear el nivel en la Lista">✓ Aceptar sin añadir</button>`
+          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir al lista</button>`
           : `<button class="btn" disabled style="opacity:.55; cursor:not-allowed;">Solo Staff</button>`)
       : `<button class="btn btn-accept" data-action="accept">Aceptar</button>`;
     right.innerHTML = `

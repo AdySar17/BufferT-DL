@@ -869,17 +869,21 @@
       for (const [uid, earned] of userBannersEarned) {
         const { unlocked: current, equippedBanner } = cosmDocs.get(uid) || { unlocked: new Set(), equippedBanner: null };
         const toAdd      = [...earned].filter(id => !current.has(id));
-        const needsEquip = !equippedBanner;
+        /* needsEquip:
+           - Sin banner equipado                                    → asignar
+           - Banner equipado que NO pertenece a sus banners ganados → inválido/stale, reasignar
+           - Banner equipado que SÍ está entre sus banners ganados  → elección manual, no tocar */
+        const needsEquip = !equippedBanner || !earned.has(equippedBanner);
         if (!toAdd.length && !needsEquip) continue;
 
         const updateData = {};
         if (toAdd.length) updateData.unlockedBanners = arrayUnion(...toAdd);
-        /* Auto-equipar el banner del hardest level si aún no tiene ninguno */
+        /* Auto-equipar el banner del nivel más difícil completado
+           (migración + usuarios sin hardest banner válido) */
         if (needsEquip) {
           const hardest    = userHardestBanner.get(uid);
           const hardestBid = hardest ? hardest.bannerId : null;
-          /* Usar el banner del hardest level si está entre los ganados,
-             si no, el primero nuevo, si no, el primero de earned */
+          /* Preferir el banner del hardest; si no, el primero nuevo; si no, el primero ganado */
           updateData.equippedBanner = (hardestBid && earned.has(hardestBid))
             ? hardestBid
             : (toAdd.length ? toAdd[0] : [...earned][0]);

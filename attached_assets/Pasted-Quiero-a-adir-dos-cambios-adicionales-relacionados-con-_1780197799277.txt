@@ -1,0 +1,107 @@
+Quiero añadir dos cambios adicionales relacionados con la moderación y el sistema de banners.
+
+━━━━━━━━━━━━━━━━━━━━
+
+1. RECORDS CON isNewLevelClaim = true
+   ━━━━━━━━━━━━━━━━━━━━
+
+Actualmente existe el botón:
+
+"Aceptar record sin añadir nivel"
+
+Quiero eliminar completamente este botón para todos los records que tengan:
+
+isNewLevelClaim = true
+
+Motivo:
+
+Ese botón rompe la mecánica de la Lista.
+
+Cuando un record está marcado como:
+
+isNewLevelClaim = true
+
+significa que:
+
+- el usuario está reclamando un nuevo nivel
+- el nivel debe ser procesado correctamente
+- el flujo correcto es añadir el nivel o rechazar la solicitud
+
+NO debe existir una opción que permita aceptar el record ignorando la creación del nivel.
+
+Objetivo:
+
+- Ocultar completamente ese botón en records con isNewLevelClaim = true
+- Evitar que el staff pueda saltarse accidentalmente el proceso de añadir el nivel
+- Mantener la integridad de la Demon List
+
+━━━━━━━━━━━━━━━━━━━━
+2. ACTUALIZAR DATA - RECALCULAR HARDEST BANNERS
+━━━━━━━━━━━━━━━━━━━━
+
+Actualmente el botón:
+
+"Actualizar Data"
+
+ya actualizará banners cuando cambien:
+
+- Background Level
+- Glow
+- Datos del nivel
+
+Pero necesito una función adicional.
+
+Cuando se ejecute "Actualizar Data":
+
+También debe revisar usuarios antiguos y recalcular automáticamente el Hardest Banner.
+
+Problema actual:
+
+Existen usuarios creados antes de este sistema.
+
+Por lo tanto:
+
+- tienen Hardest válido
+- pero no tienen equipado el banner correcto
+
+Objetivo:
+
+Durante Actualizar Data:
+
+- Recalcular el Hardest actual de cada usuario
+- Verificar cuál debería ser su Hardest Banner
+- Equipar automáticamente el banner correcto si es necesario
+
+IMPORTANTE:
+
+- Solo para migración y sincronización de datos
+- Debe poder actualizar perfiles antiguos
+- No debe crear banners duplicados
+- No debe sobrescribir configuraciones manuales que el usuario haya elegido voluntariamente (a menos que el sistema detecte que nunca tuvo asignado un Hardest Banner válido)
+
+━━━━━━━━━━━━━━━━━━━━
+REQUISITOS IMPORTANTES
+━━━━━━━━━━━━━━━━━━━━
+
+- NO romper Vercel
+
+- NO romper builds
+
+- NO romper pnpm workspace
+
+- Mantener compatibilidad con:
+  • Vite
+  • React
+  • Firebase
+  • Firestore
+
+- Evitar lecturas masivas innecesarias
+
+- Procesar únicamente los datos afectados
+
+- Mantener el rendimiento del sistema
+
+Objetivo final:
+
+- Eliminar el flujo incorrecto de aceptación de records para nuevos niveles.
+- Permitir que Actualizar Data sincronice correctamente los Hardest Banners de usuarios antiguos.
