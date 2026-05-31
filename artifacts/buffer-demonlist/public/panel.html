@@ -671,7 +671,14 @@
         <div style="font-size:.86rem; color:rgba(230,230,230,0.7); margin:-2px 0 6px;">
           ID declarado: <b style="color:#c7ff3b; font-family:monospace;">${escapeHtml(rec.claimedLevelId || "—")}</b>
         </div>`
-      : `<div class="rc-level">${escapeHtml(lvl.name || "Nivel desconocido")}</div>`;
+      : rec._level
+          ? `<div class="rc-level">${escapeHtml(lvl.name)}</div>`
+          : `<div class="rc-level" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+              <span style="padding:2px 8px;border-radius:6px;font-size:.72rem;letter-spacing:.4px;
+                           background:rgba(255,80,80,0.18);border:1px solid rgba(255,80,80,0.45);
+                           color:#ff8080;font-weight:700;">⚠️ Nivel eliminado de la lista</span>
+              <span style="opacity:.55;font-size:.85rem;">ID: ${escapeHtml(rec.levelId || "—")}</span>
+            </div>`;
 
     /* Botón de aceptar — etiqueta y comportamiento dependen del tipo */
     const acceptBtnHtml = isClaim

@@ -327,7 +327,17 @@ function useChangelog() {
 /* ─── Helpers ─── */
 function timeAgo(ts: any): string {
   if (!ts) return "";
-  const d: Date = ts.toDate ? ts.toDate() : new Date(ts);
+  let d: Date;
+  if (typeof ts.toDate === "function") {
+    // Firestore Timestamp en vivo
+    d = ts.toDate();
+  } else if (typeof ts === "object" && typeof ts.seconds === "number") {
+    // Firestore Timestamp serializado desde localStorage ({seconds, nanoseconds})
+    d = new Date(ts.seconds * 1000);
+  } else {
+    d = new Date(ts);
+  }
+  if (isNaN(d.getTime())) return "";
   const diff = (Date.now() - d.getTime()) / 1000;
   if (diff < 60) return "hace un momento";
   if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;

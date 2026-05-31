@@ -990,7 +990,16 @@
     /* ── Submit ─────────────────────────────────────── */
     $("submitBtn").addEventListener("click", handleSubmit);
 
+    /* Evita envíos duplicados por doble clic o clics rápidos
+       mientras se procesan las validaciones asíncronas. */
+    let _submitting = false;
     async function handleSubmit() {
+      if (_submitting) return;
+      _submitting = true;
+      const btn = $("submitBtn");
+      btn.disabled = true;
+      btn.textContent = "Verificando…";
+      try {
       hideMsg();
 
       if (!me) { showMsg("Debes iniciar sesión para enviar un récord.", "err"); return; }
@@ -1156,9 +1165,7 @@
         }
       }
 
-      const btn = $("submitBtn");
-      btn.disabled = true;
-      btn.textContent = "Enviando...";
+      btn.textContent = "Enviando…";
 
       try {
         const payload = {
@@ -1214,7 +1221,11 @@
         console.error("[submit] addDoc error:", err);
         const detail = (err.code ? err.code + " · " : "") + (err.message || "desconocido");
         showMsg("Error al guardar el récord: " + detail, "err");
+      }
       } finally {
+        /* Outer finally: siempre libera el flag y el botón,
+           incluso cuando hay un return temprano en la validación. */
+        _submitting = false;
         btn.disabled = false;
         btn.textContent = "Enviar Record";
       }
