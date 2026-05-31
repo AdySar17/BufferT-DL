@@ -755,6 +755,44 @@
         log("ℹ️ Todos los niveles ya tienen banner asignado.");
       }
 
+      /* 2b) Actualizar banners de niveles donde cambió background, glow o nombre */
+      log("🔍 Verificando banners existentes por cambios (background/glow/nombre)…");
+      const conBanner = allLevels.filter(l => l.rewards && l.rewards.length);
+      let bannerUpdated = 0;
+      for (const lvl of conBanner) {
+        const bannerId = lvl.rewards[0];
+        if (!bannerId) continue;
+        try {
+          const bSnap = await getDoc(doc(db, "banners", bannerId));
+          if (!bSnap.exists()) continue;
+          const bData       = bSnap.data();
+          const glowClass   = lvl.glow || '';
+          const isChroma    = glowClass === 'glow-arcoiris';
+          const expFrame    = isChroma ? 'chroma' : 'solid';
+          const expColor    = isChroma ? '#FF0000' : (GLOW_TO_HEX[glowClass] || '#c7ff3b');
+          const expImage    = lvl.background || '';
+          const expName     = lvl.name || 'Banner';
+          const diff = {};
+          if (bData.imageUrl   !== expImage)  diff.imageUrl   = expImage;
+          if (bData.frameType  !== expFrame)  diff.frameType  = expFrame;
+          if (bData.frameColor !== expColor)  diff.frameColor = expColor;
+          if (bData.name       !== expName)   diff.name       = expName;
+          if (Object.keys(diff).length) {
+            await updateDoc(doc(db, "banners", bannerId), diff);
+            bannerUpdated++;
+            log(`  🔄 "${lvl.name}" → banner sincronizado (${bannerId})`);
+          }
+        } catch(e) {
+          log(`  ⚠️ No se pudo verificar banner de "${lvl.name}": ${e.message}`);
+        }
+      }
+      if (bannerUpdated > 0) {
+        log(`✅ ${bannerUpdated} banner(es) actualizados por cambios en background/glow/nombre.`);
+        await loadBanners();
+      } else {
+        log("ℹ️ Todos los banners existentes ya están sincronizados.");
+      }
+
       /* 3) Construir mapa nivel → lista de banner IDs (desde rewards) */
       const levelBannerMap = new Map();
       allLevels.forEach(lvl => {

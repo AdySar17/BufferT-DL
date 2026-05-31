@@ -680,11 +680,18 @@
               <span style="opacity:.55;font-size:.85rem;">ID: ${escapeHtml(rec.levelId || "—")}</span>
             </div>`;
 
-    /* Botón de aceptar — etiqueta y comportamiento dependen del tipo */
+    /* Botón de aceptar — etiqueta y comportamiento dependen del tipo.
+       Para reclamos de nuevo nivel se ofrecen DOS rutas:
+       1) "+ Aceptar y añadir al lista"  → crea el nivel en la Lista (requiere rellenar el modal)
+       2) "✓ Aceptar sin añadir"         → acepta SOLO el record; el nivel NO se añade a la Lista.
+          Cualquier staff (Mod/Admin/Owner) puede usar esta segunda ruta. */
     const acceptBtnHtml = isClaim
       ? (meCanAccept
-          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir nivel</button>`
-          : `<button class="btn" disabled style="opacity:.55; cursor:not-allowed;" title="Solo Admin/Owner pueden aceptar reclamos de Nuevo nivel">Solo Admin/Owner</button>`)
+          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir al lista</button>
+             <button class="btn" data-action="accept"
+               style="margin-top:5px;background:rgba(199,255,59,0.1);border:1px solid rgba(199,255,59,0.3);font-size:.82rem;"
+               title="Acepta el record sin crear el nivel en la Lista">✓ Aceptar sin añadir</button>`
+          : `<button class="btn" disabled style="opacity:.55; cursor:not-allowed;" title="Solo staff puede aceptar reclamos de Nuevo nivel">Solo Staff</button>`)
       : `<button class="btn btn-accept" data-action="accept">Aceptar</button>`;
 
     wrap.innerHTML = `
@@ -822,8 +829,11 @@
     const meCanAccept = !isClaim || isStaff();
     const acceptBtnHtml = isClaim
       ? (meCanAccept
-          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir nivel</button>`
-          : `<button class="btn" disabled style="opacity:.55; cursor:not-allowed;">Solo Admin/Owner</button>`)
+          ? `<button class="btn btn-accept" data-action="accept-claim">+ Aceptar y añadir al lista</button>
+             <button class="btn" data-action="accept"
+               style="margin-top:5px;background:rgba(199,255,59,0.1);border:1px solid rgba(199,255,59,0.3);font-size:.82rem;"
+               title="Acepta el record sin crear el nivel en la Lista">✓ Aceptar sin añadir</button>`
+          : `<button class="btn" disabled style="opacity:.55; cursor:not-allowed;">Solo Staff</button>`)
       : `<button class="btn btn-accept" data-action="accept">Aceptar</button>`;
     right.innerHTML = `
       ${renderClaimSection(rec)}
@@ -1420,6 +1430,67 @@
     }
   }
 
+  /* ══ Auto-equipar el banner del nuevo Hardest al aceptar un record ══════
+     Solo se activa para records al 100% de niveles en la Lista con banner.
+     Corre en background (fire-and-forget) — no bloquea la UI.
+     Actualiza user_cosmetics/{uid}.equippedBanner solo si el nivel recién
+     aceptado es el nuevo más difícil (posición más baja) del jugador.  */
+  async function tryAutoEquipHardestBannerOnAccept(rec) {
+    const uid = rec.userId;
+    if (!uid || Number(rec.percent) !== 100) return;
+    if (!rec._level || !(Number(rec._level.position) > 0) || !rec._level.rewards?.length) return;
+    try {
+      /* Obtener todos los records aceptados al 100% del jugador */
+      const [snap1, snap2] = await Promise.all([
+        getDocs(query(collection(db,"records"), where("userId","==",uid), where("status","==","Accepted"))),
+        getDocs(query(collection(db,"records"), where("player2Id","==",uid), where("status","==","Accepted")))
+      ]);
+      const lvlIds = new Set();
+      snap1.forEach(d => { const r = d.data(); if (Number(r.percent)===100 && r.levelId) lvlIds.add(r.levelId); });
+      snap2.forEach(d => { const r = d.data(); if (Number(r.percent)===100 && r.levelId) lvlIds.add(r.levelId); });
+      if (rec.levelId) lvlIds.add(rec.levelId); /* asegurar el recién aceptado (posible lag Firestore) */
+
+      /* Obtener datos de nivel (posición + rewards) usando el cache local primero */
+      const lvlDataMap = new Map();
+      await Promise.all([...lvlIds].map(async id => {
+        const cached = levelCache.get(id);
+        if (cached) { lvlDataMap.set(id, cached); return; }
+        try {
+          const s = await getDoc(doc(db,"levels",id));
+          if (s.exists()) lvlDataMap.set(id, s.data());
+        } catch(_) {}
+      }));
+
+      /* Encontrar el nivel con menor posición (más difícil) que tenga banner */
+      let hardestPos = Infinity;
+      let hardestBannerId = null;
+      lvlDataMap.forEach(lvlData => {
+        const pos = Number(lvlData?.position || 0);
+        if (pos > 0 && pos < hardestPos && lvlData.rewards?.length) {
+          hardestPos = pos;
+          hardestBannerId = lvlData.rewards[0];
+        }
+      });
+
+      if (!hardestBannerId) return;
+
+      /* Solo equipar si el nivel RECIÉN aceptado es el nuevo hardest */
+      const newPos = Number(rec._level.position);
+      if (newPos !== hardestPos) return; /* otro nivel más difícil ya existía antes */
+
+      /* Verificar que no esté ya equipado correctamente */
+      const cosmSnap = await getDoc(doc(db,"user_cosmetics",uid));
+      const currentEquipped = cosmSnap.exists() ? (cosmSnap.data()?.equippedBanner || null) : null;
+      if (currentEquipped === hardestBannerId) return;
+
+      /* Equipar el banner del nuevo hardest */
+      await setDoc(doc(db,"user_cosmetics",uid), { equippedBanner: hardestBannerId }, { merge: true });
+      console.log(`[panel] Banner auto-equipado (nuevo hardest #${hardestPos}) para ${uid}: ${hardestBannerId}`);
+    } catch(e) {
+      console.warn("[panel] tryAutoEquipHardestBannerOnAccept error:", e);
+    }
+  }
+
   async function moderate(recordId, action, wrap, staffnotes) {
     const buttons = wrap.querySelectorAll("button");
     buttons.forEach(b => b.disabled = true);
@@ -1445,7 +1516,8 @@
 
         /* Conceder insignias de completion si fue aceptado al 100% */
         if (action === "accept" && recObj) {
-          tryGrantBadgesOnAccept(recObj); /* silencioso, no se espera */
+          tryGrantBadgesOnAccept(recObj);              /* silencioso, no se espera */
+          tryAutoEquipHardestBannerOnAccept(recObj);   /* silencioso, no se espera */
         }
       } catch (e) { console.warn("[panel] discord records notify fail:", e); }
 
