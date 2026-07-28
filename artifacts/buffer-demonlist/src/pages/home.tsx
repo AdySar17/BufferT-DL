@@ -46,14 +46,15 @@ type LiveStats = {
   recent: number;
 };
 
-const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 horas
+const CACHE_TTL_MS       = 5 * 60 * 1000;  // 5 minutos — records y changelog cambian frecuentemente
+const CACHE_TTL_STAFF_MS = 12 * 60 * 60 * 1000; // 12 horas — el staff cambia raramente
 
-function readCache<T>(key: string): T | null {
+function readCache<T>(key: string, ttl = CACHE_TTL_MS): T | null {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
-    if (Date.now() - ts < CACHE_TTL_MS) return data as T;
+    if (Date.now() - ts < ttl) return data as T;
   } catch {}
   return null;
 }
@@ -231,7 +232,7 @@ function useStaffMembers() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const cached = readCache<StaffMember[]>("home_staff");
+      const cached = readCache<StaffMember[]>("home_staff", CACHE_TTL_STAFF_MS);
       if (cached) {
         setStaffMembers(cached);
         setLoadingStaff(false);

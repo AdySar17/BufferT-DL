@@ -1244,7 +1244,20 @@
         ));
       } catch (_) { /* no bloqueante */ }
 
-      /* 4b) Aviso al webhook de Discord (vecinos en el orden tras insertar)
+      /* 4b) Entrada en el changelog (sección "Últimos cambios" en home)
+             Mismo formato que logChangelog() en demonlist.html. */
+      try {
+        await addDoc(collection(db, "changelog"), {
+          type:        "NEW",
+          levelId:     newRef.id,
+          levelName:   name,
+          newPosition: newPos,
+          oldPosition: null,
+          createdAt:   serverTimestamp()
+        });
+      } catch (e) { console.warn("[panel] changelog write failed:", e); }
+
+      /* 4c) Aviso al webhook de Discord (vecinos en el orden tras insertar)
              OJO con la terminología que pidió el usuario:
                · "por encima de" = el nivel con NÚMERO de top mayor (más fácil)
                · "por debajo de" = el nivel con NÚMERO de top menor (más difícil) */
