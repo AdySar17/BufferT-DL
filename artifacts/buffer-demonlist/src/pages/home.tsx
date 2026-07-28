@@ -285,41 +285,42 @@ type ChangelogEntry = {
   createdAt?: any;
 };
 
-/* ─── Hook que carga los últimos 5 eventos del changelog ─── */
+/* ─── Hook que escucha el changelog en tiempo real (onSnapshot) ─── */
 function useChangelog() {
   const [entries, setEntries] = useState<ChangelogEntry[]>([]);
   const [loadingCl, setLoadingCl] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+    let unsub: (() => void) | null = null;
+
     (async () => {
-      const cached = readCache<ChangelogEntry[]>("home_changelog");
-      if (cached) {
-        setEntries(cached);
-        setLoadingCl(false);
-        return;
-      }
       try {
         const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
         const auth = await dynImport("/auth.js");
         const fs   = await dynImport("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
         const { db } = auth as any;
-        const { collection, query, orderBy, limit, getDocs } = fs as any;
+        const { collection, query, orderBy, limit, onSnapshot } = fs as any;
 
-        const snap = await getDocs(
-          query(collection(db, "changelog"), orderBy("createdAt", "desc"), limit(5))
+        unsub = onSnapshot(
+          query(collection(db, "changelog"), orderBy("createdAt", "desc"), limit(5)),
+          (snap: any) => {
+            const rows: ChangelogEntry[] = [];
+            snap.forEach((d: any) => rows.push({ id: d.id, ...d.data() }));
+            setEntries(rows);
+            setLoadingCl(false);
+          },
+          (e: any) => {
+            console.warn("[home] changelog listener failed:", e);
+            setLoadingCl(false);
+          }
         );
-        const rows: ChangelogEntry[] = [];
-        snap.forEach((d: any) => rows.push({ id: d.id, ...d.data() }));
-        writeCache("home_changelog", rows);
-        if (!cancelled) setEntries(rows);
       } catch (e) {
-        console.warn("[home] changelog load failed:", e);
-      } finally {
-        if (!cancelled) setLoadingCl(false);
+        console.warn("[home] changelog setup failed:", e);
+        setLoadingCl(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => { if (unsub) unsub(); };
   }, []);
 
   return { entries, loadingCl };

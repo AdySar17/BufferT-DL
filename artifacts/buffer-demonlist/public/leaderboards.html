@@ -736,29 +736,14 @@
           location.href = `/profile.html?id=${encodeURIComponent(u.uid)}`;
         });
 
-        /* Fondo: banner equipado por el jugador */
+        /* Fondo: banner equipado por el jugador (solo imagen, sin glow ni frame) */
         if (u._banner && u._banner.imageUrl) {
-          const b      = u._banner;
-          const safeBg = b.imageUrl.replace(/"/g, "%22");
-          const ft     = b.frameType  || "none";
-          const fc     = b.frameColor  || "#c7ff3b";
-          const fc2    = b.frameColor2 || "#ff6b6b";
+          const safeBg = u._banner.imageUrl.replace(/"/g, "%22");
           const vig    = `radial-gradient(ellipse 100% 130% at center,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 28%,rgba(0,0,0,0.55) 60%,rgba(0,0,0,0.95) 100%)`;
-          if (ft === "gradient") {
-            row.style.border             = "3px solid transparent";
-            row.style.backgroundImage    = `${vig},url("${safeBg}"),linear-gradient(135deg,${fc},${fc2})`;
-            row.style.backgroundOrigin   = "padding-box,padding-box,border-box";
-            row.style.backgroundClip     = "padding-box,padding-box,border-box";
-            row.style.backgroundSize     = "cover,cover,100%";
-            row.style.backgroundPosition = "center,center,center";
-          } else if (ft === "chroma") {
-            row.style.backgroundImage    = `${vig},url("${safeBg}")`;
-            row.style.animation          = "lbChroma 4s linear infinite";
-          } else {
-            row.style.backgroundImage    = `${vig},url("${safeBg}")`;
-            if (ft === "solid") row.style.boxShadow = `inset 0 0 0 3px ${fc},inset 0 8px 30px rgba(0,0,0,0.5)`;
-          }
-          row.style.textShadow = "0 1px 3px rgba(0,0,0,0.85)";
+          row.style.backgroundImage    = `${vig},url("${safeBg}")`;
+          row.style.backgroundSize     = "cover";
+          row.style.backgroundPosition = "center";
+          row.style.textShadow         = "0 1px 3px rgba(0,0,0,0.85)";
         }
 
         const valNum = Number(u[field] || 0);
