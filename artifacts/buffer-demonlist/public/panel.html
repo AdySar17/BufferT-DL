@@ -166,6 +166,54 @@
   .claim-tag.mine { color: #c7ff8a; }
   .claim-tag.mine b { color: #d8ffa0; }
 
+  /* ── Panel de Mis Reclamos ───────────────────────────────── */
+  #myClaimsBox { display:none; margin-bottom: 22px; }
+  .mcp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+  }
+  .mcp-title {
+    font-size: 1rem; font-weight: 800; letter-spacing: .6px;
+    text-transform: uppercase; color: #c7ff3b;
+  }
+  .mcp-counter {
+    font-size: .78rem; font-weight: 600; padding: 3px 10px;
+    border-radius: 20px; background: rgba(199,255,59,0.12);
+    border: 1px solid rgba(199,255,59,0.3); color: #c7ff3b;
+  }
+  .mcp-counter.full { background: rgba(255,100,80,0.18); border-color: rgba(255,100,80,0.4); color: #ff9a80; }
+  .mcp-item {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 8px;
+  }
+  .mcp-item.bugged {
+    background: rgba(255,150,50,0.08);
+    border-color: rgba(255,150,50,0.35);
+  }
+  .mcp-item-info { flex: 1; min-width: 0; }
+  .mcp-item-name { font-weight: 700; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mcp-item-meta { font-size: .75rem; color: rgba(230,230,230,0.55); margin-top: 2px; }
+  .mcp-badge {
+    font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 12px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .mcp-badge.pending  { background: rgba(199,255,59,0.15); color: #c7ff3b; border: 1px solid rgba(199,255,59,0.3); }
+  .mcp-badge.accepted { background: rgba(255,150,50,0.2);  color: #ffaa60; border: 1px solid rgba(255,150,50,0.4); }
+  .mcp-badge.rejected { background: rgba(255,100,100,0.2); color: #ff9a9a; border: 1px solid rgba(255,100,100,0.35); }
+  .mcp-btn-release {
+    font-size: .75rem; font-weight: 700; padding: 5px 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(255,100,80,0.5); background: rgba(255,100,80,0.12);
+    color: #ff9a80; transition: background .15s, transform .1s; white-space: nowrap; flex-shrink: 0;
+  }
+  .mcp-btn-release:hover  { background: rgba(255,100,80,0.25); }
+  .mcp-btn-release:active { transform: scale(.96); }
+  .mcp-all-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.07); }
+  .mcp-all-title { font-size: .8rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: rgba(230,230,230,0.55); margin-bottom: 10px; }
+  .mcp-empty { color: rgba(230,230,230,0.45); font-size: .85rem; text-align: center; padding: 14px 0; }
+
   .rc-level {
     font-weight: 700; font-size: 1.1rem;
     margin-bottom: 12px;
@@ -353,6 +401,15 @@
 
   <div id="stateBox">
     <div class="card state-msg">Cargando sesión...</div>
+  </div>
+
+  <!-- Panel de Mis Reclamos: visible para todo el Staff -->
+  <div id="myClaimsBox">
+    <div class="card" style="padding:16px 18px; border:1px solid rgba(199,255,59,0.22);">
+      <div id="myClaimsContent">
+        <div class="mcp-empty">Cargando reclamos...</div>
+      </div>
+    </div>
   </div>
 
   <!-- Sólo Owner: recalcular los puntos de TODOS los niveles con la
@@ -850,13 +907,13 @@
       showToast("Solo el staff puede reclamar revisiones.", true);
       return;
     }
-    /* REGLA UX: solo se permite UN reclamo activo a la vez por staff.
-       Si ya tienes otro record reclamado, debes soltarlo primero. */
-    const active = window.__myActiveClaim;
-    if (active && active.recordId && active.recordId !== rec.id) {
+    /* REGLA UX: máximo 3 reclamos activos por staff.
+       Si ya tienes 3 y este record no está entre ellos, debes soltar uno primero. */
+    const activeClaims = window.__myActiveClaims || [];
+    if (activeClaims.length >= 3 && !activeClaims.some(c => c.recordId === rec.id)) {
       showToast(
-        `❌ Ya tienes una revisión reclamada: "${active.levelName}". ` +
-        `Suelta esa primero para reclamar otra.`,
+        `❌ Ya tienes 3 revisiones reclamadas. ` +
+        `Suelta una desde tu Panel de Reclamos antes de reclamar otra.`,
         true
       );
       return;
@@ -877,7 +934,9 @@
       });
       rec.reviewClaimedBy     = myUid;
       rec.reviewClaimedByName = myName;
-      window.__myActiveClaim = { recordId: rec.id, levelName: recLabel(rec) };
+      const prev = (window.__myActiveClaims || []).filter(c => c.recordId !== rec.id);
+      window.__myActiveClaims = [...prev, { recordId: rec.id, levelName: recLabel(rec) }];
+      renderMyClaimsPanel();
       refreshClaimUI(rec, wrap);
       showToast("Revisión reclamada. Otros staff verán que estás revisándolo.");
     } catch (err) {
@@ -920,9 +979,8 @@
       delete rec.reviewClaimedBy;
       delete rec.reviewClaimedByName;
       delete rec.reviewClaimedAt;
-      if (window.__myActiveClaim && window.__myActiveClaim.recordId === rec.id) {
-        window.__myActiveClaim = null;
-      }
+      window.__myActiveClaims = (window.__myActiveClaims || []).filter(c => c.recordId !== rec.id);
+      renderMyClaimsPanel();
       refreshClaimUI(rec, wrap);
       showToast("Reclamación quitada. Cualquier staff puede revisarlo.");
     } catch (err) {
@@ -1243,8 +1301,9 @@
         if (!listBox.querySelector(".record-card")) renderEmpty();
       }, 260);
       /* Limpiar el active claim: el record fue aceptado como nuevo nivel */
-      if (alContext && window.__myActiveClaim && window.__myActiveClaim.recordId === alContext.rec.id) {
-        window.__myActiveClaim = null;
+      if (alContext) {
+        window.__myActiveClaims = (window.__myActiveClaims || []).filter(c => c.recordId !== alContext.rec.id);
+        renderMyClaimsPanel();
       }
       showToast(`Nivel "${name}" añadido y record aceptado.`);
       closeAddLevelModal();
@@ -1497,9 +1556,8 @@
       await updateDoc(doc(db, "records", recordId), base);
 
       /* Limpiar el active claim: el record ya fue moderado */
-      if (window.__myActiveClaim && window.__myActiveClaim.recordId === recordId) {
-        window.__myActiveClaim = null;
-      }
+      window.__myActiveClaims = (window.__myActiveClaims || []).filter(c => c.recordId !== recordId);
+      renderMyClaimsPanel();
 
       /* Aviso al webhook de Discord de records */
       try {
@@ -1569,16 +1627,14 @@
       window.__pendingRecords = records;   // disponible para el webhook tras moderar
 
       /* Escanear si YO ya tengo algún record reclamado (de una sesión
-         anterior o de otro tab).  Si lo encuentro, lo guardo en
-         window.__myActiveClaim para bloquear nuevos reclamos hasta
-         que suelte ese.  Solo puede haber UN reclamo activo a la vez. */
+         anterior o de otro tab).  Sincronizamos __myActiveClaims con
+         los reclamos Pending visibles.  Los reclamos "stuck" (status≠Pending)
+         se detectan en loadMyClaimsPanel() con su propia query. */
       const myUidNow = window.__currentUser ? window.__currentUser.uid : null;
-      window.__myActiveClaim = null;
+      window.__myActiveClaims = [];
       if (myUidNow) {
-        const mine = records.find(r => r.reviewClaimedBy === myUidNow);
-        if (mine) {
-          window.__myActiveClaim = { recordId: mine.id, levelName: recLabel(mine) };
-        }
+        const mine = records.filter(r => r.reviewClaimedBy === myUidNow);
+        window.__myActiveClaims = mine.map(r => ({ recordId: r.id, levelName: recLabel(r) }));
       }
 
       records.sort((a, b) => {
@@ -1750,6 +1806,177 @@
   }
   $("btnRecalcPoints").addEventListener("click", recalcAllPoints);
 
+  /* ============================================================
+   *   PANEL DE RECLAMOS — Mis reclamos activos (y todos para Admin/Owner)
+   * ============================================================
+   * Query propia que detecta reclamos "stuck" (status ≠ Pending)
+   * y permite quitar cualquier reclamo propio, o forzar cualquiera
+   * siendo Admin/Owner.
+   */
+  async function loadMyClaimsPanel() {
+    const myUid = meUid();
+    const box = $("myClaimsBox");
+    if (!myUid || !isStaff()) { box.style.display = "none"; return; }
+    box.style.display = "block";
+
+    try {
+      /* 1) Mis reclamos (cualquier status, para atrapar los "stuck") */
+      const mySnap = await getDocs(query(
+        collection(db, "records"),
+        where("reviewClaimedBy", "==", myUid)
+      ));
+      const myClaimed = [];
+      mySnap.forEach(d => myClaimed.push({ id: d.id, ...d.data() }));
+
+      /* Sincronizar __myActiveClaims con la realidad fresca de Firestore */
+      window.__myActiveClaims = myClaimed
+        .filter(r => r.status === "Pending")
+        .map(r => ({ recordId: r.id, levelName: recLabel(r) }));
+
+      /* 2) Para Admin/Owner: todos los reclamos activos de otros staff */
+      let allClaimed = [];
+      if (isAdmin() || isOwner()) {
+        const allSnap = await getDocs(query(
+          collection(db, "records"),
+          where("status", "==", "Pending")
+        ));
+        allSnap.forEach(d => {
+          const data = d.data();
+          if (data.reviewClaimedBy && data.reviewClaimedBy !== myUid) {
+            allClaimed.push({ id: d.id, ...data });
+          }
+        });
+      }
+
+      renderMyClaimsPanel(myClaimed, allClaimed);
+    } catch (err) {
+      console.error("[panel] loadMyClaimsPanel error:", err);
+      $("myClaimsContent").innerHTML =
+        `<div class="mcp-empty" style="color:#ff9a9a;">Error cargando reclamos: ${err.message || err.code}</div>`;
+    }
+  }
+
+  function renderMyClaimsPanel(myClaimed, allClaimed) {
+    /* Versión liviana: usa __myActiveClaims cuando no se pasa data fresca */
+    const box = $("myClaimsBox");
+    const content = $("myClaimsContent");
+    if (!box || !content) return;
+    const myUid = meUid();
+    if (!myUid || !isStaff()) { box.style.display = "none"; return; }
+    box.style.display = "block";
+
+    const claims = myClaimed !== undefined ? myClaimed
+      : (window.__myActiveClaims || []).map(c => ({
+          id: c.recordId,
+          status: "Pending",
+          _syntheticLabel: c.levelName
+        }));
+    const others = allClaimed || [];
+    const count  = (window.__myActiveClaims || []).length;
+    const isFull = count >= 3;
+
+    let html = `
+      <div class="mcp-header">
+        <div class="mcp-title">📋 Mis Reclamos Activos</div>
+        <div class="mcp-counter${isFull ? " full" : ""}">${count} / 3</div>
+      </div>`;
+
+    if (!claims.length) {
+      html += `<div class="mcp-empty">No tienes revisiones reclamadas actualmente.</div>`;
+    } else {
+      for (const r of claims) {
+        const isBugged = r.status && r.status !== "Pending";
+        const statusLabel = r.status === "Accepted" ? "Aceptado ⚠"
+                          : r.status === "Rejected"  ? "Rechazado ⚠"
+                          : "Pendiente";
+        const statusClass = r.status === "Accepted" ? "accepted"
+                          : r.status === "Rejected"  ? "rejected"
+                          : "pending";
+        const levelName = (r._level && r._level.name)
+          || r.claimedLevelName
+          || r._syntheticLabel
+          || `Record #${(r.id || "").slice(0,6)}`;
+        const playerName = (r._profile && r._profile.name) || r.playerName || r.userId || "";
+        html += `
+          <div class="mcp-item${isBugged ? " bugged" : ""}">
+            <div class="mcp-item-info">
+              <div class="mcp-item-name">${escapeHtml(levelName)}</div>
+              ${playerName ? `<div class="mcp-item-meta">Jugador: ${escapeHtml(playerName)}${isBugged ? " — <b style='color:#ffaa60'>Reclamo bloqueado</b>" : ""}</div>` : ""}
+            </div>
+            <div class="mcp-badge ${statusClass}">${statusLabel}</div>
+            <button class="mcp-btn-release" data-recid="${escapeHtml(r.id)}">Quitar reclamo</button>
+          </div>`;
+      }
+    }
+
+    /* Sección de reclamos de otros staff (solo Admin/Owner) */
+    if ((isAdmin() || isOwner()) && others.length > 0) {
+      html += `<div class="mcp-all-section">
+        <div class="mcp-all-title">Reclamos activos de otros Staff (${others.length})</div>`;
+      for (const r of others) {
+        const levelName = (r._level && r._level.name)
+          || r.claimedLevelName
+          || `Record #${(r.id || "").slice(0,6)}`;
+        const byName = r.reviewClaimedByName || "Staff";
+        html += `
+          <div class="mcp-item">
+            <div class="mcp-item-info">
+              <div class="mcp-item-name">${escapeHtml(levelName)}</div>
+              <div class="mcp-item-meta">Reclamado por: <b>${escapeHtml(byName)}</b></div>
+            </div>
+            <div class="mcp-badge pending">Pendiente</div>
+            <button class="mcp-btn-release" data-recid="${escapeHtml(r.id)}" data-force="1">Forzar liberación</button>
+          </div>`;
+      }
+      html += `</div>`;
+    } else if ((isAdmin() || isOwner()) && others.length === 0 && myClaimed !== undefined) {
+      html += `<div class="mcp-all-section">
+        <div class="mcp-all-title">Reclamos activos de otros Staff</div>
+        <div class="mcp-empty">Ningún otro staff tiene reclamos activos.</div>
+      </div>`;
+    }
+
+    content.innerHTML = html;
+
+    /* Bind botones de liberar */
+    content.querySelectorAll(".mcp-btn-release").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const recId = btn.dataset.recid;
+        const isForce = !!btn.dataset.force;
+        if (!recId) return;
+        btn.disabled = true;
+        btn.textContent = "Quitando...";
+        try {
+          await updateDoc(doc(db, "records", recId), {
+            reviewClaimedBy:     deleteField(),
+            reviewClaimedByName: deleteField(),
+            reviewClaimedAt:     deleteField()
+          });
+          window.__myActiveClaims = (window.__myActiveClaims || []).filter(c => c.recordId !== recId);
+          showToast(isForce ? "Reclamo de staff liberado." : "Reclamo quitado correctamente.");
+          /* Refrescar el panel con data fresca */
+          await loadMyClaimsPanel();
+          /* Si el record aún está en la lista visual (Pending), actualizar su UI */
+          const pendingRecs = window.__pendingRecords || [];
+          const rec = pendingRecs.find(r => r.id === recId);
+          if (rec) {
+            const wrap = document.querySelector(`[data-id="${recId}"]`);
+            if (wrap) {
+              delete rec.reviewClaimedBy;
+              delete rec.reviewClaimedByName;
+              delete rec.reviewClaimedAt;
+              refreshClaimUI(rec, wrap);
+            }
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = isForce ? "Forzar liberación" : "Quitar reclamo";
+          showToast("Error al quitar reclamo: " + (err.message || err.code || ""), true);
+        }
+      });
+    });
+  }
+
   /* Gate por rol */
   let initialized = false;
   onAuthChange((user, data, loading) => {
@@ -1765,21 +1992,26 @@
     }
     if (loading) {
       setState("Cargando sesión...");
+      $("myClaimsBox").style.display  = "none";
       $("ownerToolsBox").style.display = "none";
       return;
     }
     if (!user) {
       setState("Debes iniciar sesión con una cuenta del staff para acceder al panel.", true);
+      $("myClaimsBox").style.display  = "none";
       $("ownerToolsBox").style.display = "none";
       return;
     }
     if (!isStaff()) {
       setState("Acceso restringido. Solo Mod, Admin u Owner pueden acceder a este panel.", true);
+      $("myClaimsBox").style.display  = "none";
       $("ownerToolsBox").style.display = "none";
       return;
     }
     /* Sólo Owner ve la herramienta de recálculo. */
     $("ownerToolsBox").style.display = isOwner() ? "block" : "none";
+    /* Panel de reclamos visible para todo el staff */
+    loadMyClaimsPanel();
     if (!initialized) {
       initialized = true;
       loadPending();
