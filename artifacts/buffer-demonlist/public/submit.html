@@ -574,6 +574,7 @@
         <label for="player2Select">Segundo jugador</label>
         <select id="player2Select">
           <option value="">— Selecciona un usuario —</option>
+          <option value="__unregistered__">👤 Usuario No registrado</option>
         </select>
 
         <label for="mode2P">Modo 2P</label>
@@ -875,6 +876,7 @@
           if (sel) {
             sel.innerHTML =
               `<option value="">— Selecciona un usuario —</option>` +
+              `<option value="__unregistered__">👤 Usuario No registrado</option>` +
               profilesCache.map(p =>
                 `<option value="${p.uid}">${escapeHtml(p.name || "Sin nombre")}</option>`
               ).join("");
@@ -1062,14 +1064,20 @@
       }
 
       const is2P = $("tg2P").checked;
-      let player2Id = null, video2 = "", mobile2P = false, mode2P = null;
+      let player2Id = null, player2Unregistered = false, video2 = "", mobile2P = false, mode2P = null;
       if (is2P) {
-        player2Id = $("player2Select").value || null;
-        if (!player2Id) { showMsg("Selecciona el segundo jugador.", "err"); return; }
-        if (player2Id === submitterUid) { showMsg("El 1.º y el 2.º jugador no pueden ser el mismo.", "err"); return; }
-        mode2P    = $("mode2P").value;
-        mobile2P  = $("tgMobile2P").checked;
-        video2    = (mode2P === "local") ? "" : $("video2").value.trim();
+        const p2val = $("player2Select").value;
+        if (!p2val) { showMsg("Selecciona el segundo jugador.", "err"); return; }
+        if (p2val === "__unregistered__") {
+          player2Id           = null;
+          player2Unregistered = true;
+        } else {
+          player2Id = p2val;
+          if (player2Id === submitterUid) { showMsg("El 1.º y el 2.º jugador no pueden ser el mismo.", "err"); return; }
+        }
+        mode2P   = $("mode2P").value;
+        mobile2P = $("tgMobile2P").checked;
+        video2   = (mode2P === "local") ? "" : $("video2").value.trim();
         if (video2 && !/^https?:\/\//i.test(video2)) {
           showMsg("El link del vídeo del 2.º jugador no es válido.", "err"); return;
         }
@@ -1170,7 +1178,8 @@
       try {
         const payload = {
           userId:     submitterUid,
-          player2Id:  player2Id,
+          player2Id:           player2Id,
+          player2Unregistered: player2Unregistered,
           /* Quien hizo el envío real: util para auditoría cuando un Owner
            * registra el record en nombre de otro jugador. */
           submittedBy: me.uid,
