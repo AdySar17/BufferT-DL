@@ -1,19 +1,22 @@
 // ============================================================
 // BFT Demon List — Firestore Security Rules
-// Versión: V22 (user_cosmetics: Staff puede conceder badges a otros)
+// Versión: V23 (levels/banners: Staff puede update para re-shift y auto-banner)
 // ============================================================
 //
-// CAMBIOS RESPECTO A V21:
+// CAMBIOS RESPECTO A V22:
 //
-//  1. /user_cosmetics/{uid}
-//     - Staff (Mod/Admin/Owner) ahora puede actualizar el doc
-//       de cosméticos de OTROS usuarios (no el propio).
-//       Esto permite que al aceptar un record al 100%, el panel
-//       conceda insignias de completion automáticamente.
-//     - Un Staff NO puede modificar sus propios cosméticos más
-//       allá de equippedBanner / equippedBadges (regla anterior
-//       del dueño sigue vigente).
-//     - Owner mantiene acceso total sin restricción de uid.
+//  1. /levels/{id}
+//     - Staff (Mod/Admin/Owner) ahora puede hacer UPDATE en niveles.
+//       Esto es necesario para que los Mods puedan ejecutar el
+//       re-shift de posiciones al aceptar un reclamo de nuevo nivel,
+//       y para actualizar el campo `rewards` con el banner auto-creado.
+//       Antes solo Admin/Owner podían, lo que causaba que el batch
+//       fallara y generara posiciones duplicadas.
+//
+//  2. /banners/{id}
+//     - Staff (Mod/Admin/Owner) ahora puede CREATE banners.
+//       Necesario para el auto-banner al aceptar reclamos de nivel.
+//       Update y Delete siguen restringidos a Admin/Owner.
 //
 // INSTRUCCIONES DE DESPLIEGUE:
 //
@@ -89,7 +92,9 @@ service cloud.firestore {
     match /levels/{id} {
       allow read:   if true;
       allow create: if isStaff();
-      allow update: if isAdminish();
+      // [V23] Staff puede update: necesario para re-shift de posiciones
+      // y para escribir el campo `rewards` al aceptar reclamos de nivel.
+      allow update: if isStaff();
       allow delete: if isAdminish();
     }
 
@@ -136,10 +141,12 @@ service cloud.firestore {
     // ── /banners/{id} ─────────────────────────────────────────────
     // [V20] Catálogo global de banners cosméticos.
     // Lectura pública para que los perfiles muestren el banner equipado.
-    // Admin/Owner pueden crear/editar/eliminar banners del catálogo.
+    // [V23] Staff puede CREATE banners: necesario para el auto-banner
+    //       que se genera al aceptar un reclamo de nuevo nivel.
+    //       Update y Delete siguen restringidos a Admin/Owner.
     match /banners/{id} {
       allow read:   if true;
-      allow create: if isAdminish();
+      allow create: if isStaff();
       allow update: if isAdminish();
       allow delete: if isAdminish();
     }
