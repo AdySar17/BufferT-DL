@@ -1,0 +1,130 @@
+/*
+ * BFT Demon List — Estilos compartidos
+ * Enlazar en todos los .html de /public/ con:
+ *   <link rel="stylesheet" href="/shared.css">
+ */
+
+/* ═══════════════════════════════════════════════
+   LOGO GLOW
+═══════════════════════════════════════════════ */
+.logo-img {
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1.5px rgba(124,252,0,0.18),
+    0 0 12px rgba(124,252,0,0.22),
+    0 0 24px rgba(124,252,0,0.10);
+  transition: box-shadow 0.3s ease;
+}
+@media (hover: hover) {
+  .logo-img:hover {
+    box-shadow:
+      0 0 0 1.5px rgba(124,252,0,0.35),
+      0 0 18px rgba(124,252,0,0.42),
+      0 0 36px rgba(124,252,0,0.18);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   NAV LINKS — transición suave
+═══════════════════════════════════════════════ */
+.nav-links a {
+  transition: color 0.18s ease, opacity 0.18s ease !important;
+}
+
+/* ═══════════════════════════════════════════════
+   BOTONES — zoom + brillo + press
+   Aplica a cualquier <button>, .btn, y selectores
+   comunes usados en las páginas del sitio.
+═══════════════════════════════════════════════ */
+button,
+.btn,
+.add-btn,
+.submit-btn,
+.action-btn,
+.mod-btn,
+.rc-video,
+[class$="-btn"],
+[class*=" btn-"],
+input[type="submit"],
+input[type="button"] {
+  transition:
+    transform  0.14s ease,
+    filter     0.14s ease,
+    box-shadow 0.14s ease !important;
+}
+
+/* Desktop-only hover: no afecta táctil */
+@media (hover: hover) {
+  button:not(:disabled):hover,
+  .btn:hover,
+  .add-btn:hover,
+  .submit-btn:hover,
+  .action-btn:hover,
+  .mod-btn:hover,
+  [class$="-btn"]:not(:disabled):hover,
+  [class*=" btn-"]:not(:disabled):hover,
+  input[type="submit"]:not(:disabled):hover,
+  input[type="button"]:not(:disabled):hover {
+    transform: scale(1.04);
+    filter: brightness(1.12);
+  }
+
+  /* Tarjetas clickeables */
+  .lb-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4) !important;
+  }
+  .level-item:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* Presión al hacer click */
+button:not(:disabled):active,
+.btn:active,
+.add-btn:active,
+.submit-btn:active,
+.action-btn:active,
+.mod-btn:active,
+[class$="-btn"]:not(:disabled):active,
+input[type="submit"]:not(:disabled):active {
+  transform: scale(0.97) !important;
+  filter: brightness(0.94) !important;
+  transition-duration: 0.07s !important;
+}
+
+/* ═══════════════════════════════════════════════
+   SPINNER DE CARGA
+═══════════════════════════════════════════════ */
+@keyframes bft-spin {
+  to { transform: rotate(360deg); }
+}
+
+.bft-spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(124,252,0,0.15);
+  border-top-color: #7cfc00;
+  border-radius: 50%;
+  animation: bft-spin 0.65s linear infinite;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.bft-spinner--sm {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+/* Contenedor centrado para el spinner */
+.bft-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 0;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.88rem;
+  font-family: 'Montserrat', sans-serif;
+}

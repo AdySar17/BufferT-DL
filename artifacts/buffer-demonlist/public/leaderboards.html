@@ -8,6 +8,7 @@
   <meta http-equiv="expires" content="0">
   <title>Leaderboards — BFT Demon List</title>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -402,7 +403,7 @@
       <input id="searchBar" type="text" placeholder="Buscar jugador por nombre..." />
     </div>
 
-    <div id="stateMsg">Cargando leaderboards...</div>
+    <div id="stateMsg"><div class="bft-loading"><span class="bft-spinner"></span></div></div>
 
     <div class="lb-list" id="lbList"></div>
 
@@ -482,6 +483,7 @@
     let page = 1;
     let aggregates = [];   // [{uid, name, country, points, total, "Extreme Demon": n, ...}]
     let levelsCache = new Map();   // id -> {value, difficulty}
+    let dataLoaded  = false;       // true solo cuando loadAll() terminó con éxito
 
     async function loadAll() {
       try {
@@ -595,6 +597,7 @@
         });
 
         aggregates = [...map.values()];
+        dataLoaded  = true;
         $("stateMsg").style.display = "none";
         renderTabs();
         renderList();
@@ -677,8 +680,9 @@
       }
 
       if (!rows.length) {
+        if (!dataLoaded) return; // todavía cargando — no mostrar "sin resultados"
         $("stateMsg").style.display = "block";
-        $("stateMsg").textContent = aggregates.length ? "No hay países que mostrar." : "Cargando...";
+        $("stateMsg").textContent = "No hay países que mostrar.";
         return;
       }
       $("stateMsg").style.display = "none";
@@ -715,6 +719,7 @@
       list.innerHTML = "";
 
       if (!rows.length) {
+        if (!dataLoaded) return; // todavía cargando — no mostrar "sin resultados"
         $("stateMsg").style.display = "block";
         $("stateMsg").textContent = "No hay jugadores que mostrar en esta categoría.";
         $("pager").style.display = "none";

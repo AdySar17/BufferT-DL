@@ -65,6 +65,35 @@ function writeCache(key: string, data: unknown) {
   } catch {}
 }
 
+/** Lee la cache sin comprobar TTL (para stale-while-revalidate). */
+function readCacheRaw<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data } = JSON.parse(raw);
+    return data as T ?? null;
+  } catch {}
+  return null;
+}
+
+/* ─── Spinner de carga (inline, usa @keyframes bft-spin del CSS inyectado) ─── */
+function LoadingSpinner() {
+  return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "28px 0" }}>
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          border: "3px solid rgba(124,252,0,0.15)",
+          borderTop: "3px solid #7cfc00",
+          borderRadius: "50%",
+          animation: "bft-spin 0.65s linear infinite",
+        }}
+      />
+    </div>
+  );
+}
+
 /* ─── Hook que carga todo desde Firestore ─── */
 function useLiveData() {
   const [stats, setStats] = useState<LiveStats>({ records: 0, players: 0, levels: 0, recent: 0 });
@@ -224,20 +253,24 @@ type StaffMember = {
   _profile: { name?: string; photoURL?: string } | null;
 };
 
-/* ─── Hook que carga los miembros del staff ─── */
+/* ─── Hook que carga los miembros del staff (stale-while-revalidate) ───
+ *  - Si hay cache (aunque esté caducada): muestra inmediatamente, sin spinner.
+ *  - Recarga en background si el TTL expiró o no hay cache.
+ *  - Spinner solo cuando no hay absolutamente ningún dato en cache.
+ * ─────────────────────────────────────────────────────────────────────── */
 function useStaffMembers() {
-  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
-  const [loadingStaff, setLoadingStaff] = useState(true);
+  const stale = readCacheRaw<StaffMember[]>("home_staff");
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>(stale ?? []);
+  const [loadingStaff,  setLoadingStaff]  = useState(!stale);
 
   useEffect(() => {
+    // Si el cache sigue fresco no hace falta refetch
+    const fresh = readCache<StaffMember[]>("home_staff", CACHE_TTL_STAFF_MS);
+    if (fresh) { setLoadingStaff(false); return; }
+
+    // Cache caducado o vacío → fetch en background
     let cancelled = false;
     (async () => {
-      const cached = readCache<StaffMember[]>("home_staff", CACHE_TTL_STAFF_MS);
-      if (cached) {
-        setStaffMembers(cached);
-        setLoadingStaff(false);
-        return;
-      }
       try {
         const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
         const auth = await dynImport("/auth.js");
@@ -465,8 +498,19 @@ export default function Home() {
         .home-top-thumb { display: none !important; }
         .home-top-pos   { font-size: 1.15rem !important; min-width: 32px !important; }
       }
+      @keyframes bft-spin { to { transform: rotate(360deg); } }
     `;
     document.head.appendChild(style);
+
+    /* Inyectar shared.css para logo glow y animaciones de botones */
+    const sharedId = "bft-shared-css";
+    if (!document.getElementById(sharedId)) {
+      const link = document.createElement("link");
+      link.id   = sharedId;
+      link.rel  = "stylesheet";
+      link.href = "/shared.css";
+      document.head.appendChild(link);
+    }
 
     // Toggle del menú hamburguesa (igual que en demonlist.html)
     (window as any).toggleMenu = () => {
@@ -573,11 +617,7 @@ export default function Home() {
       >
         <SectionTitle>Últimos cambios en la lista</SectionTitle>
 
-        {loadingCl && (
-          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
-            Cargando…
-          </p>
-        )}
+        {loadingCl && <LoadingSpinner />}
 
         {!loadingCl && changelogEntries.length === 0 && (
           <p style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "0.9rem" }}>
@@ -681,11 +721,7 @@ export default function Home() {
       >
         <SectionTitle>Nuestro Staff</SectionTitle>
 
-        {loadingStaff && (
-          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.55)" }}>
-            Cargando staff…
-          </p>
-        )}
+        {loadingStaff && <LoadingSpinner />}
 
         {!loadingStaff && staffMembers.length === 0 && (
           <p style={{ textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: "0.9rem" }}>
@@ -868,11 +904,7 @@ export default function Home() {
       >
         <SectionTitle>Top 10 Demons</SectionTitle>
 
-        {loading && (
-          <p style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
-            Cargando niveles…
-          </p>
-        )}
+        {loading && <LoadingSpinner />}
 
         {!loading && top10.length === 0 && (
           <p style={{ textAlign: "center", color: "rgba(255,255,255,0.6)" }}>
