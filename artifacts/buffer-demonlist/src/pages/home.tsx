@@ -524,7 +524,7 @@ export default function Home() {
       {/* ───────── HEADER (idéntico al de demonlist.html, con hamburguesa) ───────── */}
       <header className="top-header">
         <div className="left">
-          <img src="https://iili.io/BN3Yhpp.png" className="logo-img" alt="Logo" />
+          <img src="/logo.png" className="logo-img" alt="Logo" />
           <div className="logo-text">BFT Demon List</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
