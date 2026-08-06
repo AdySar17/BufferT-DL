@@ -464,6 +464,20 @@
         <div id="fvnList" class="hist-body hist-collapsed"></div>
       </div>
 
+      <!-- IDs Custom -->
+      <div class="card" id="customIdsCard" style="display:none;">
+        <div class="records-head hist-toggle" id="customIdsToggle" role="button" tabindex="0" aria-expanded="false">
+          <div>
+            <div class="records-title">IDs CUSTOM</div>
+            <div class="records-min">IDs alternativas asociadas a este nivel</div>
+          </div>
+          <span class="hist-arrow" id="customIdsArrow">▼</span>
+        </div>
+        <div id="customIdsBody" class="hist-body hist-collapsed">
+          <div id="customIdsContent"></div>
+        </div>
+      </div>
+
       <!-- Historial de posiciones -->
       <div class="card">
         <div class="records-head hist-toggle" id="histToggle" role="button" tabindex="0" aria-expanded="false">
@@ -493,8 +507,23 @@
 
 </div>
 
-<!-- ESTILOS BANNERS + HISTORIAL -->
+<!-- ESTILOS BANNERS + HISTORIAL + CUSTOM IDs -->
 <style>
+  /* ── Custom IDs (tabla collapsible) ── */
+  .cid-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+  .cid-table th {
+    text-align:left; padding:7px 12px;
+    color:rgba(230,230,230,0.5); font-weight:700; font-size:.72rem;
+    text-transform:uppercase; letter-spacing:.6px;
+    border-bottom:1px solid rgba(255,255,255,0.07);
+  }
+  .cid-table td { padding:8px 12px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+  .cid-table tr:last-child td { border-bottom:none; }
+  .cid-id-mono  { font-family:monospace; color:#c7ff3b; font-size:.9rem; font-weight:700; letter-spacing:.5px; }
+  .cid-ok       { color:#9bdc4d; font-weight:700; }
+  .cid-no       { color:#ff9a9a; font-weight:700; }
+  .cid-empty    { color:rgba(230,230,230,0.4); font-size:.84rem; text-align:center; padding:14px 0; }
+
   @keyframes lvlBannerChroma {
     0%   { background-position: 0% 50%, 0% 50%; }
     100% { background-position: 200% 50%, 200% 50%; }
@@ -684,6 +713,9 @@
       document.getElementById("lvlCreators").textContent = creators.join(", ");
       document.getElementById("lvlCreatorsCard").style.display = "block";
     }
+
+    /* IDs Custom */
+    renderLevelCustomIds(nivel.customIds);
 
     /* Etiquetas (tags) — array */
     const tagsEl = document.getElementById("lvlTags");
@@ -1169,6 +1201,74 @@
         }
       });
     }
+  }
+
+  /* ── Custom IDs: render + toggle ────────────────────── */
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function renderLevelCustomIds(customIds) {
+    const card    = document.getElementById("customIdsCard");
+    const content = document.getElementById("customIdsContent");
+    if (!card || !content) return;
+    const ids = Array.isArray(customIds) ? customIds.filter(c => c && c.id) : [];
+    if (!ids.length) {
+      content.innerHTML = `<div class="cid-empty">Este nivel no tiene IDs Custom registradas.</div>`;
+    } else {
+      content.innerHTML = `
+        <table class="cid-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Por</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ids.map(c => `
+              <tr>
+                <td class="cid-id-mono">${escapeHtml(String(c.id))}</td>
+                <td>${escapeHtml(c.por || "—")}</td>
+                <td class="${c.status === 'Aceptada' ? 'cid-ok' : 'cid-no'}">${escapeHtml(c.status || "—")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>`;
+    }
+    card.style.display = "block";
+  }
+
+  const customIdsToggle = document.getElementById("customIdsToggle");
+  const customIdsBody   = document.getElementById("customIdsBody");
+  const customIdsArrow  = document.getElementById("customIdsArrow");
+  if (customIdsToggle) {
+    customIdsToggle.addEventListener("click", () => {
+      const isOpen = !customIdsBody.classList.contains("hist-collapsed");
+      if (isOpen) {
+        customIdsBody.style.maxHeight = customIdsBody.scrollHeight + "px";
+        requestAnimationFrame(() => {
+          customIdsBody.classList.add("hist-collapsed");
+          customIdsBody.style.maxHeight = "";
+        });
+        customIdsArrow.classList.remove("open");
+        customIdsToggle.setAttribute("aria-expanded", "false");
+      } else {
+        customIdsBody.classList.remove("hist-collapsed");
+        customIdsBody.style.maxHeight = customIdsBody.scrollHeight + "px";
+        customIdsArrow.classList.add("open");
+        customIdsToggle.setAttribute("aria-expanded", "true");
+        customIdsBody.addEventListener("transitionend", function onEnd() {
+          if (!customIdsBody.classList.contains("hist-collapsed")) {
+            customIdsBody.style.maxHeight = "none";
+          }
+          customIdsBody.removeEventListener("transitionend", onEnd);
+        });
+      }
+    });
+    customIdsToggle.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customIdsToggle.click(); }
+    });
   }
 
   /* ── Toggle historial de posiciones ────────────────── */

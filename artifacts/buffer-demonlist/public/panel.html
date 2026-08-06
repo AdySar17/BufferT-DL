@@ -573,6 +573,31 @@
       </div>
     </div>
 
+    <!-- IDs Custom -->
+    <div style="margin-top:10px;">
+      <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;">
+        IDs Custom <span style="text-transform:none;letter-spacing:0;color:rgba(230,230,230,0.45);">(opcional)</span>
+      </label>
+      <div id="al-customids-list" style="margin-bottom:6px;"></div>
+      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;">
+        <input id="al-cid-id" type="text" inputmode="numeric" maxlength="20" class="al-input" placeholder="ID (ej: 822737)" style="margin:0;">
+        <select id="al-cid-por" class="al-input" style="margin:0;width:auto;">
+          <option value="LDM">LDM</option>
+          <option value="ULDM">ULDM</option>
+          <option value="Fix">Fix</option>
+          <option value="Globed">Globed</option>
+        </select>
+        <select id="al-cid-status" class="al-input" style="margin:0;width:auto;">
+          <option value="Aceptada">Aceptada</option>
+          <option value="Rechazada">Rechazada</option>
+        </select>
+        <button type="button" onclick="addCustomId('al')"
+          style="padding:7px 11px;background:rgba(199,255,59,0.12);border:1px solid rgba(199,255,59,0.35);border-radius:7px;color:#c7ff3b;font-size:.82rem;cursor:pointer;white-space:nowrap;">
+          + Añadir
+        </button>
+      </div>
+    </div>
+
     <div id="alErr" style="display:none; margin-top:12px; padding:10px 13px; background:rgba(255,80,80,0.12); border:1px solid rgba(255,80,80,0.4); border-radius:8px; color:#ffb0b0; font-size:.86rem;"></div>
 
     <div style="display:flex; gap:10px; margin-top:18px; justify-content:flex-end; flex-wrap:wrap;">
@@ -995,6 +1020,48 @@
    * ============================================================ */
   let alContext = null;   // {rec, wrap}
 
+  /* ── Custom IDs para el modal "Añadir nivel" ──────────────────── */
+  let _alCustomIds = [];
+
+  function renderAlCustomIds() {
+    const list = document.getElementById("al-customids-list");
+    if (!list) return;
+    if (!_alCustomIds.length) {
+      list.innerHTML = `<div style="color:rgba(255,255,255,.35);font-size:.78rem;text-align:center;padding:5px 0;">Sin IDs Custom</div>`;
+      return;
+    }
+    list.innerHTML = _alCustomIds.map((item, idx) => `
+      <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;
+                  padding:5px 8px;border-radius:7px;background:rgba(255,255,255,.05);
+                  margin-bottom:5px;font-size:.82rem;">
+        <div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">
+          <span style="font-family:monospace;color:#c7ff3b;font-weight:700;">${escapeHtml(String(item.id))}</span>
+          <span style="color:rgba(255,255,255,.75);"> — ${escapeHtml(item.por)}</span>
+          <span style="color:${item.status === 'Aceptada' ? '#9bdc4d' : '#ff9a9a'};font-weight:700;"> — ${escapeHtml(item.status)}</span>
+        </div>
+        <button type="button" onclick="removeAlCustomId(${idx})"
+          style="padding:3px 7px;border-radius:5px;border:1px solid rgba(255,100,100,.35);
+                 background:rgba(255,80,80,.08);color:#ff9a9a;font-size:.75rem;cursor:pointer;">✕</button>
+      </div>
+    `).join("");
+  }
+
+  window.addCustomId = function(prefix) {
+    if (prefix !== "al") return;
+    const idVal  = (document.getElementById("al-cid-id").value || "").trim();
+    const por    = document.getElementById("al-cid-por").value;
+    const status = document.getElementById("al-cid-status").value;
+    if (!idVal) { showToast("Ingresa la ID custom.", true); return; }
+    _alCustomIds.push({ id: idVal, por, status });
+    document.getElementById("al-cid-id").value = "";
+    renderAlCustomIds();
+  };
+
+  window.removeAlCustomId = function(idx) {
+    _alCustomIds.splice(idx, 1);
+    renderAlCustomIds();
+  };
+
   /* ── Background Level automático ──────────────────────────────────
      NO es thumbnail. Se usa exclusivamente como fondo/banner visual.
      Formato: https://levelthumbs.prevter.me/thumbnail/LEVEL_ID       */
@@ -1044,6 +1111,9 @@
     $("alStaffNotes").value = "";
     $("alErr").style.display = "none";
     $("alPointsPreview").textContent = "Puntos automáticos: —";
+    /* Resetear IDs Custom */
+    _alCustomIds.length = 0;
+    renderAlCustomIds();
     $("alBackdrop").style.display = "flex";
   }
   function closeAddLevelModal() { $("alBackdrop").style.display = "none"; alContext = null; }
@@ -1119,6 +1189,7 @@
                           .map(s => s.trim())
                           .filter(Boolean)
                           .slice(0, 12);
+    const customIds = _alCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }));
 
     function showErr(t) { $("alErr").textContent = t; $("alErr").style.display = "block"; }
     $("alErr").style.display = "none";
@@ -1154,7 +1225,8 @@
         thumbnail, background, video,
         glow, is2P: false,
         description, difficulty, minPercent,
-        tags
+        tags,
+        customIds
       };
       /* gdLevelId final: lo que el staff dejó en el input del modal
          (prellenado con rec.claimedLevelId, pero editable). */

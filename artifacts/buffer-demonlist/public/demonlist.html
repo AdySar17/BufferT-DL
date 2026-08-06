@@ -182,9 +182,6 @@
     .btn-delete { display: none; }
     body.is-owner .btn-delete { display: inline-block; }
 
-    /* "+ Añadir nivel" solo para admins */
-    #openFormBtn { display: none; }
-    body.is-admin #openFormBtn { display: block; }
 
     .btn-edit, .btn-delete {
       padding: 5px 11px;
@@ -462,6 +459,73 @@
       transition: background 0.18s;
     }
     .tag-pill .tag-remove:hover { background: rgba(0,0,0,0.65); }
+    /* ===== Custom IDs mini-editor ===== */
+    .custom-ids-section {
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 10px 0 6px;
+      background: rgba(255,255,255,.03);
+    }
+    .custom-ids-label {
+      color: #c7ff3b; font-size: .82rem; font-weight: 700;
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: .4px;
+    }
+    .custom-ids-hint { text-transform:none; letter-spacing:0; color:rgba(255,255,255,.45); font-weight:400; }
+    .custom-ids-list { margin-bottom: 6px; }
+    .cid-row-edit {
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      gap: 6px; align-items: center;
+      padding: 5px 8px; border-radius: 7px;
+      background: rgba(255,255,255,.05);
+      margin-bottom: 5px; font-size: .82rem;
+    }
+    .cid-row-edit .cid-info { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .cid-mono { font-family:monospace; color:#c7ff3b; font-weight:700; }
+    .cid-por-txt { color:rgba(255,255,255,.75); }
+    .cid-ok  { color:#9bdc4d; font-weight:700; }
+    .cid-no  { color:#ff9a9a; font-weight:700; }
+    .cid-empty-edit { color:rgba(255,255,255,.35); font-size:.78rem; text-align:center; padding:6px 0; }
+    .custom-ids-add-row {
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      gap: 6px; align-items: center; margin-top: 8px;
+    }
+    .custom-ids-input {
+      padding: 7px 10px; border-radius: 7px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.07); color: #fff;
+      font-family: 'Montserrat', sans-serif; font-size: .84rem;
+    }
+    .custom-ids-input::placeholder { color:rgba(255,255,255,.35); }
+    .custom-ids-select {
+      padding: 7px 8px; border-radius: 7px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(30,40,30,.9); color: #fff;
+      font-family: 'Montserrat', sans-serif; font-size: .84rem;
+      cursor: pointer;
+    }
+    .custom-ids-add-btn {
+      padding: 7px 11px; border-radius: 7px;
+      border: 1px solid rgba(199,255,59,.35);
+      background: rgba(199,255,59,.1); color: #c7ff3b;
+      font-family: 'Montserrat', sans-serif; font-size: .82rem;
+      cursor: pointer; white-space: nowrap;
+      transition: background .15s;
+    }
+    .custom-ids-add-btn:hover { background: rgba(199,255,59,.22); }
+    .cid-remove-btn {
+      padding: 3px 7px; border-radius: 5px;
+      border: 1px solid rgba(255,100,100,.35);
+      background: rgba(255,80,80,.08); color: #ff9a9a;
+      font-size: .75rem; cursor: pointer;
+      transition: background .15s;
+    }
+    .cid-remove-btn:hover { background: rgba(255,80,80,.2); }
+    @media (max-width: 520px) {
+      .custom-ids-add-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+      .custom-ids-add-btn { grid-column: 1 / -1; }
+    }
+
     /* ===== Rewards selector ===== */
     .rewards-section {
       border: 1px solid rgba(255,255,255,.08);
@@ -716,7 +780,6 @@
     <div id="searchContainer">
       <input type="text" id="searchBar" placeholder="🔍 Buscar nivel...">
     </div>
-    <button id="openFormBtn" class="add-btn">+ Añadir nivel</button>
     <div id="loadingMsg"><div class="bft-loading"><span class="bft-spinner"></span></div></div>
     <div class="level-container" id="levelContainer"></div>
   </div>
@@ -819,6 +882,26 @@
         </div>
       </div>
 
+      <!-- IDs Custom (añadir) -->
+      <div class="custom-ids-section">
+        <div class="custom-ids-label">IDs Custom <span class="custom-ids-hint">(opcional)</span></div>
+        <div id="inp-customids-list" class="custom-ids-list"></div>
+        <div class="custom-ids-add-row">
+          <input id="inp-cid-id" type="text" inputmode="numeric" maxlength="20" placeholder="ID (ej: 822737)" class="custom-ids-input">
+          <select id="inp-cid-por" class="custom-ids-select">
+            <option value="LDM">LDM</option>
+            <option value="ULDM">ULDM</option>
+            <option value="Fix">Fix</option>
+            <option value="Globed">Globed</option>
+          </select>
+          <select id="inp-cid-status" class="custom-ids-select">
+            <option value="Aceptada">Aceptada</option>
+            <option value="Rechazada">Rechazada</option>
+          </select>
+          <button type="button" class="custom-ids-add-btn" onclick="addCustomId('inp')">+ Añadir</button>
+        </div>
+      </div>
+
       <div class="modal-btns">
         <button class="btn-save"   onclick="agregarNivel()">Guardar</button>
         <button class="btn-cancel" onclick="cerrarModal('formModal')">Cancelar</button>
@@ -917,6 +1000,26 @@
         </div>
       </div>
 
+      <!-- IDs Custom (editar) -->
+      <div class="custom-ids-section">
+        <div class="custom-ids-label">IDs Custom <span class="custom-ids-hint">(opcional)</span></div>
+        <div id="edit-customids-list" class="custom-ids-list"></div>
+        <div class="custom-ids-add-row">
+          <input id="edit-cid-id" type="text" inputmode="numeric" maxlength="20" placeholder="ID (ej: 822737)" class="custom-ids-input">
+          <select id="edit-cid-por" class="custom-ids-select">
+            <option value="LDM">LDM</option>
+            <option value="ULDM">ULDM</option>
+            <option value="Fix">Fix</option>
+            <option value="Globed">Globed</option>
+          </select>
+          <select id="edit-cid-status" class="custom-ids-select">
+            <option value="Aceptada">Aceptada</option>
+            <option value="Rechazada">Rechazada</option>
+          </select>
+          <button type="button" class="custom-ids-add-btn" onclick="addCustomId('edit')">+ Añadir</button>
+        </div>
+      </div>
+
       <div class="modal-btns">
         <button class="btn-update" onclick="guardarEdicion()">Guardar cambios</button>
         <button class="btn-cancel" onclick="cerrarModal('editModal')">Cancelar</button>
@@ -1010,6 +1113,54 @@
     let _allBannersCache     = null;
     let _editSelectedRewards = [];
     let _inpSelectedRewards  = [];
+
+    /* ===== Custom IDs state ===== */
+    let _inpCustomIds  = [];
+    let _editCustomIds = [];
+
+    function _cidRef(prefix) {
+      return prefix === "inp" ? _inpCustomIds : _editCustomIds;
+    }
+
+    function escapeHtmlCid(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function renderCustomIds(prefix, ids) {
+      const list = document.getElementById(`${prefix}-customids-list`);
+      if (!list) return;
+      if (!ids.length) {
+        list.innerHTML = `<div class="cid-empty-edit">Sin IDs Custom</div>`;
+        return;
+      }
+      list.innerHTML = ids.map((item, idx) => `
+        <div class="cid-row-edit">
+          <div class="cid-info">
+            <span class="cid-mono">${escapeHtmlCid(item.id)}</span>
+            <span class="cid-por-txt"> — ${escapeHtmlCid(item.por)}</span>
+            <span class="${item.status === 'Aceptada' ? 'cid-ok' : 'cid-no'}"> — ${escapeHtmlCid(item.status)}</span>
+          </div>
+          <button type="button" class="cid-remove-btn" onclick="removeCustomId('${prefix}',${idx})">✕</button>
+        </div>
+      `).join("");
+    }
+
+    window.addCustomId = function(prefix) {
+      const ids    = _cidRef(prefix);
+      const idVal  = (document.getElementById(`${prefix}-cid-id`).value || "").trim();
+      const por    = document.getElementById(`${prefix}-cid-por`).value;
+      const status = document.getElementById(`${prefix}-cid-status`).value;
+      if (!idVal) { alert("Ingresa la ID custom."); return; }
+      ids.push({ id: idVal, por, status });
+      document.getElementById(`${prefix}-cid-id`).value = "";
+      renderCustomIds(prefix, ids);
+    };
+
+    window.removeCustomId = function(prefix, idx) {
+      const ids = _cidRef(prefix);
+      ids.splice(idx, 1);
+      renderCustomIds(prefix, ids);
+    };
 
     /* Devuelve los niveles actuales ordenados por position (los sin position
        quedan al final, ordenados por value descendente como respaldo).      */
@@ -1402,7 +1553,8 @@
           name, author, creators, position: newPos, value: newValue,
           thumbnail, background, video, glow, is2P,
           description, difficulty, minPercent, tags,
-          rewards: _inpSelectedRewards
+          rewards: _inpSelectedRewards,
+          customIds: _inpCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
         };
         if (gdLevelId) _addPayload.gdLevelId = String(gdLevelId);
         const newRef   = await addDoc(collection(db, "levels"), _addPayload);
@@ -1613,6 +1765,13 @@
       document.getElementById("edit-position").dispatchEvent(new Event("input"));
 
       renderRewardsGrid(nivel.rewards || []);
+
+      /* Cargar IDs Custom existentes en el editor */
+      _editCustomIds = Array.isArray(nivel.customIds)
+        ? nivel.customIds.map(c => ({ id: String(c.id||""), por: c.por||"LDM", status: c.status||"Aceptada" }))
+        : [];
+      renderCustomIds("edit", _editCustomIds);
+
       document.getElementById("editModal").classList.add("open");
     };
 
@@ -1681,7 +1840,8 @@
             name, author, creators, thumbnail, background, video, glow, is2P,
             description, difficulty, minPercent, tags,
             gdLevelId: gdLevelId ? String(gdLevelId) : "",
-            rewards: _editSelectedRewards
+            rewards: _editSelectedRewards,
+            customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
           };
           await updateDoc(doc(db, "levels", id), _editPayload);
           cerrarModal("editModal");
@@ -1703,6 +1863,7 @@
           description, difficulty, minPercent, tags,
           gdLevelId: gdLevelId ? String(gdLevelId) : "",
           rewards: _editSelectedRewards,
+          customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status })),
           position: insertAt, value: newValue
         });
 
@@ -1859,15 +2020,23 @@
     }
     window.cerrarModal = cerrarModal;
 
-    document.getElementById("openFormBtn").addEventListener("click", () => {
-      /* Reset descripción + tags al abrir */
-      const descEl = document.getElementById("inp-description");
-      if (descEl) descEl.value = "";
-      setTags("inp", []);
-      _inpSelectedRewards = [];
-      renderInpRewardsGrid([]);
-      document.getElementById("formModal").classList.add("open");
-    });
+    /* openFormBtn removido — añadir niveles se hace desde el Panel de Staff */
+    /* Al cerrar el formModal, resetear el estado de IDs Custom */
+    const _origCerrarModal = window.cerrarModal;
+    window.cerrarModal = function(id) {
+      _origCerrarModal(id);
+      if (id === "formModal") {
+        _inpCustomIds.length = 0;
+        renderCustomIds("inp", _inpCustomIds);
+      }
+      if (id === "editModal") {
+        _editCustomIds.length = 0;
+        renderCustomIds("edit", _editCustomIds);
+      }
+    };
+    /* Inicializar listas vacías para los modales al cargar la página */
+    renderCustomIds("inp", _inpCustomIds);
+    renderCustomIds("edit", _editCustomIds);
 
     /* ============== TAG EDITOR (modales Añadir/Editar) ============== */
     /* State por scope. scope = "inp" (modal añadir) | "edit" (modal editar) */
