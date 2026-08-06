@@ -43,12 +43,35 @@ export const COUNTRY_NAMES = {
   'tz':'Tanzania','ua':'Ucrania','ug':'Uganda','us':'Estados Unidos','uy':'Uruguay',
   'uz':'Uzbekistán','vc':'San Vicente y las Granadinas','ve':'Venezuela',
   'vn':'Vietnam','vu':'Vanuatu','ws':'Samoa','xk':'Kosovo','ye':'Yemen',
-  'za':'Sudáfrica','zm':'Zambia','zw':'Zimbabue'
+  'za':'Sudáfrica','zm':'Zambia','zw':'Zimbabue',
+  /* Territorios y regiones especiales */
+  'pr':'Puerto Rico','vi':'Islas Vírgenes de EE.UU.','gu':'Guam',
+  'mp':'Islas Marianas del Norte','as':'Samoa Americana',
+  'hk':'Hong Kong','mo':'Macao','tw':'Taiwán',
+  'gi':'Gibraltar','im':'Isla de Man','je':'Jersey','gg':'Guernsey',
+  'fo':'Islas Feroe','gl':'Greenlandia','aw':'Aruba','cw':'Curazao',
+  'sx':'Sint Maarten','bq':'Caribe Neerlandés','ai':'Anguila',
+  'bm':'Bermudas','ky':'Islas Caimán','ms':'Montserrat',
+  'tc':'Islas Turcas y Caicos','vg':'Islas Vírgenes Británicas',
+  'gp':'Guadalupe','mq':'Martinica','re':'Reunión','yt':'Mayotte',
+  'nc':'Nueva Caledonia','pf':'Polinesia Francesa','pm':'San Pedro y Miquelón',
+  'bl':'San Bartolomé','mf':'Saint-Martin','gf':'Guayana Francesa',
+  'tf':'Tierras Australes Francesas','wf':'Wallis y Futuna',
+  'ck':'Islas Cook','nu':'Niue','tk':'Tokelau','nf':'Isla Norfolk',
+  'cx':'Isla de Navidad','cc':'Islas Cocos','fk':'Islas Malvinas',
+  'gs':'Georgia del Sur e Islas Sandwich del Sur',
+  'sh':'Santa Elena, Ascensión y Tristán de Acuña',
+  'io':'Territorio Británico del Océano Índico',
+  'pn':'Islas Pitcairn','sj':'Svalbard y Jan Mayen',
+  'ps':'Palestina','eh':'Sahara Occidental'
 };
 
-export function flagUrl(code) {
+export function flagUrl(code, size) {
   if (!code) return "";
-  return `https://flagcdn.com/w40/${code.toLowerCase()}.png`;
+  const c = code.toLowerCase();
+  // SVG for best quality; size param accepts 'small'|'large' for PNG fallback
+  if (size === 'large') return `https://flagcdn.com/w320/${c}.png`;
+  return `https://flagcdn.com/${c}.svg`;
 }
 
 export function countryName(code) {

@@ -60,10 +60,10 @@
   }
 
   /* ── LAYOUT ── */
-  .page-wrap { max-width: 900px; margin: 0 auto; padding: 30px 20px 60px; }
+  .page-wrap { max-width: 920px; margin: 0 auto; padding: 28px 16px 70px; }
 
   .back-btn {
-    display: inline-flex; align-items: center; gap: 7px; margin-bottom: 20px;
+    display: inline-flex; align-items: center; gap: 7px; margin-bottom: 24px;
     padding: 7px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15);
     background: rgba(255,255,255,0.06); color: rgba(220,240,220,.8);
     font-family: 'Montserrat', sans-serif; font-size: 0.88rem; font-weight: 600;
@@ -73,69 +73,174 @@
 
   /* ── CARD ── */
   .card {
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 18px;
-    padding: 22px;
-    box-shadow: 0 6px 30px rgba(0,0,0,0.6);
-    margin-bottom: 18px;
+    background: rgba(5,12,5,0.65);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(124,252,0,0.1);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+    margin-bottom: 20px;
   }
 
-  /* ── HEADER DE PAÍS ── */
-  .country-header { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
-  .country-flag-big { width: 90px; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.55); flex-shrink: 0; }
-  .country-info h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 4px; }
-  .country-code-tag {
-    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .72rem;
-    font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
-    background: rgba(124,252,0,.12); border: 1px solid rgba(124,252,0,.28); color: #a8ff5b;
-    margin-bottom: 8px;
+  /* ── HERO COUNTRY HEADER ── */
+  .country-hero {
+    display: flex;
+    align-items: center;
+    gap: 28px;
   }
-  .country-stats-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 14px; }
-  .cstat { text-align: center; }
-  .cstat-val { font-size: 1.4rem; font-weight: 800; color: #c7ff3b; }
-  .cstat-lbl { font-size: .7rem; color: rgba(200,220,200,.65); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+
+  .flag-wrapper {
+    flex-shrink: 0;
+    width: 100px;
+    height: 70px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.7), 0 0 0 2px rgba(124,252,0,0.18);
+    background: rgba(255,255,255,0.04);
+  }
+  .country-flag-big {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .country-info { flex: 1; min-width: 0; }
+  .country-code-tag {
+    display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: .68rem;
+    font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+    background: rgba(124,252,0,.1); border: 1px solid rgba(124,252,0,.3); color: #a8ff5b;
+    margin-bottom: 6px;
+  }
+  .country-info h1 {
+    font-size: 1.9rem; font-weight: 800; line-height: 1.1;
+    letter-spacing: -.3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── STATS ROW ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .stat-tile {
+    background: rgba(124,252,0,0.05);
+    border: 1px solid rgba(124,252,0,0.1);
+    border-radius: 14px;
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .stat-tile-val {
+    font-size: 1.35rem; font-weight: 800; color: #c7ff3b;
+    line-height: 1;
+  }
+  .stat-tile-lbl {
+    font-size: .66rem; color: rgba(199,240,180,.55); font-weight: 700;
+    text-transform: uppercase; letter-spacing: .6px; margin-top: 5px;
+  }
 
   /* ── SECTION LABEL ── */
   .sec-label {
-    font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .9px;
-    color: rgba(199,255,59,.75); margin-bottom: 12px;
+    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    color: rgba(199,255,59,.6); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sec-label::after {
+    content: ""; flex: 1; height: 1px; background: rgba(124,252,0,0.1);
   }
 
   /* ── TOP PLAYERS ── */
   .tp-row {
     display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    border-radius: 10px; background: rgba(255,255,255,0.03);
+    border-radius: 12px; background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.05); margin-bottom: 6px;
-    cursor: pointer; transition: background .15s; text-decoration: none; color: #e8f5e9;
+    cursor: pointer; transition: background .15s, border-color .15s;
+    text-decoration: none; color: #e8f5e9;
   }
-  .tp-row:hover { background: rgba(255,255,255,0.07); }
-  .tp-pos { width: 34px; font-weight: 700; font-size: .85rem; color: rgba(200,220,200,.6); text-align: center; flex-shrink: 0; }
+  .tp-row:hover { background: rgba(124,252,0,0.06); border-color: rgba(124,252,0,0.15); }
+  .tp-pos { width: 32px; font-weight: 700; font-size: .82rem; color: rgba(200,220,200,.55); text-align: center; flex-shrink: 0; }
   .tp-pos.gold   { color: #ffd700; }
   .tp-pos.silver { color: #c0c0c0; }
   .tp-pos.bronze { color: #cd7f32; }
   .tp-photo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.05); }
-  .tp-photo-fb { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(124,252,0,.12); font-size: .75rem; font-weight: 700; flex-shrink: 0; }
+  .tp-photo-fb { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(124,252,0,.12); font-size: .72rem; font-weight: 700; color: #a8ff5b; flex-shrink: 0; }
   .tp-name { font-weight: 600; font-size: .9rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tp-pts  { font-size: .88rem; font-weight: 700; color: #7cfc00; white-space: nowrap; }
+  .tp-pts  { font-size: .85rem; font-weight: 700; color: #7cfc00; white-space: nowrap; }
+  .tp-badge { font-size: .65rem; padding: 2px 7px; border-radius: 6px; margin-left: 4px; font-weight: 700; }
+  .tp-badge-1 { background: rgba(255,215,0,.15); color: #ffd700; border: 1px solid rgba(255,215,0,.25); }
+  .tp-badge-2 { background: rgba(192,192,192,.12); color: #c0c0c0; border: 1px solid rgba(192,192,192,.22); }
+  .tp-badge-3 { background: rgba(205,127,50,.13); color: #cd7f32; border: 1px solid rgba(205,127,50,.23); }
 
-  /* ── FVN ── */
-  .fvn-row {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    border-radius: 10px; background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05); margin-bottom: 6px;
-    text-decoration: none; color: #e8f5e9; transition: background .15s;
+  /* ── FVN TABLE — horizontal scroll on mobile ── */
+  .fvn-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* subtle hint that it scrolls */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(124,252,0,0.25) transparent;
+    border-radius: 10px;
   }
-  .fvn-row:hover { background: rgba(255,255,255,0.07); }
-  .fvn-pos  { font-size: .72rem; font-weight: 700; color: rgba(199,255,59,.7); white-space: nowrap; padding: 2px 7px; border-radius: 6px; background: rgba(124,252,0,.08); }
-  .fvn-lvl  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: .9rem; }
-  .fvn-player { font-size: .8rem; color: rgba(200,220,200,.65); white-space: nowrap; }
-  .fvn-date   { font-size: .74rem; color: rgba(180,180,180,.45); white-space: nowrap; }
+  .fvn-scroll-wrap::-webkit-scrollbar { height: 4px; }
+  .fvn-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+  .fvn-scroll-wrap::-webkit-scrollbar-thumb { background: rgba(124,252,0,0.25); border-radius: 4px; }
+
+  .fvn-table {
+    width: 100%;
+    min-width: 520px; /* forces scroll on narrow screens */
+    border-collapse: collapse;
+  }
+  .fvn-table thead th {
+    font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+    color: rgba(199,255,59,.5); padding: 6px 10px 10px; text-align: left;
+    border-bottom: 1px solid rgba(124,252,0,0.1);
+    white-space: nowrap;
+  }
+  .fvn-table thead th:last-child { text-align: right; }
+  .fvn-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background .12s;
+    cursor: pointer;
+  }
+  .fvn-table tbody tr:last-child { border-bottom: none; }
+  .fvn-table tbody tr:hover { background: rgba(124,252,0,0.05); }
+  .fvn-table td { padding: 9px 10px; font-size: .88rem; white-space: nowrap; }
+  .fvn-td-pos {
+    font-size: .72rem; font-weight: 700; color: rgba(199,255,59,.75);
+    padding: 3px 9px; border-radius: 7px; background: rgba(124,252,0,.08);
+    display: inline-block;
+  }
+  .fvn-td-name { font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fvn-td-player { color: rgba(200,220,200,.65); }
+  .fvn-td-date { color: rgba(180,180,180,.45); font-size: .76rem; text-align: right; }
 
   /* ── EMPTY / STATE ── */
-  .empty-msg { text-align: center; padding: 28px 0; color: rgba(200,220,200,.6); font-size: .9rem; }
-  #stateMsg { text-align: center; padding: 60px 20px; color: rgba(200,220,200,.7); font-size: .95rem; }
+  .empty-msg { text-align: center; padding: 32px 0; color: rgba(200,220,200,.5); font-size: .9rem; }
+  #stateMsg {
+    text-align: center; padding: 80px 20px;
+    color: rgba(200,220,200,.7); font-size: .95rem;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .state-spinner {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 3px solid rgba(124,252,0,0.15);
+    border-top-color: rgba(124,252,0,0.6);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .country-hero { gap: 16px; }
+    .flag-wrapper { width: 72px; height: 50px; border-radius: 10px; }
+    .country-info h1 { font-size: 1.4rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat-tile-val { font-size: 1.1rem; }
+    .card { padding: 16px 14px; border-radius: 16px; }
+    .page-wrap { padding: 20px 12px 60px; }
+  }
 </style>
   <script src="/i18n.js"></script>
   <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
@@ -180,30 +285,51 @@
   window.toggleMenu = toggleMenu;
 </script>
 
-<div id="stateMsg">Cargando...</div>
+<div id="stateMsg">
+  <div class="state-spinner"></div>
+  Cargando...
+</div>
 
 <div class="page-wrap" id="pageWrap" style="display:none;">
   <a href="/leaderboards.html?cat=countries" class="back-btn">&#8592; Volver a Leaderboards</a>
 
+  <!-- HERO -->
   <div class="card">
-    <div class="country-header">
-      <img id="cpFlag" class="country-flag-big" src="" alt="">
+    <div class="country-hero">
+      <div class="flag-wrapper">
+        <img id="cpFlag" class="country-flag-big" src="" alt="">
+      </div>
       <div class="country-info">
         <div class="country-code-tag" id="cpCode"></div>
         <h1 id="cpName">—</h1>
-        <div class="country-stats-row" id="cpStats"></div>
       </div>
     </div>
+    <div class="stats-grid" id="cpStats"></div>
   </div>
 
+  <!-- TOP PLAYERS -->
   <div class="card">
     <div class="sec-label">Top Jugadores</div>
     <div id="topPlayersList"><div class="empty-msg">Cargando...</div></div>
   </div>
 
+  <!-- FIRST VICTORS -->
   <div class="card" id="fvCard" style="display:none;">
-    <div class="sec-label" id="fvTitle">First Victor por País — niveles completados</div>
-    <div id="fvList"></div>
+    <div class="sec-label" id="fvTitle">First Victor por País</div>
+    <!-- scroll wrapper -->
+    <div class="fvn-scroll-wrap">
+      <table class="fvn-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nivel</th>
+            <th>Jugador</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="fvList"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -216,7 +342,8 @@
   const code = (new URLSearchParams(location.search).get("code") || "").toLowerCase();
 
   if (!code) {
-    document.getElementById("stateMsg").textContent = "Código de país no especificado.";
+    const s = document.getElementById("stateMsg");
+    s.innerHTML = "Código de país no especificado.";
   } else {
     document.title = `${code.toUpperCase()} — BFT Demon List`;
     init(code);
@@ -234,7 +361,7 @@
       });
 
       if (!countryProfiles.size) {
-        state.textContent = `Ningún jugador registrado de ${countryName(code) || code.toUpperCase()}.`;
+        state.innerHTML = `Ningún jugador registrado de <b>${countryName(code) || code.toUpperCase()}</b>.`;
         return;
       }
 
@@ -291,7 +418,7 @@
       state.style.display = "none";
       document.getElementById("pageWrap").style.display = "block";
     } catch (err) {
-      state.textContent = "Error al cargar: " + (err.message || err);
+      state.innerHTML = "Error al cargar: " + escHtml(err.message || String(err));
       console.error("[country-profile]", err);
     }
   }
@@ -299,16 +426,28 @@
   function renderHeader(code, players, pts, recs, hardest) {
     const name = countryName(code) || code.toUpperCase();
     document.title = `${name} — BFT Demon List`;
-    document.getElementById("cpFlag").src = flagUrl(code);
-    document.getElementById("cpFlag").alt = name;
+
+    const flagEl = document.getElementById("cpFlag");
+    flagEl.src = flagUrl(code);
+    flagEl.alt = name;
+    /* SVG fallback: if browser can't load SVG, try large PNG */
+    flagEl.onerror = () => { flagEl.src = flagUrl(code, 'large'); flagEl.onerror = null; };
+
     document.getElementById("cpCode").textContent = code.toUpperCase();
     document.getElementById("cpName").textContent = name;
-    document.getElementById("cpStats").innerHTML = `
-      <div class="cstat"><div class="cstat-val">${players}</div><div class="cstat-lbl">Jugadores</div></div>
-      <div class="cstat"><div class="cstat-val">${pts.toLocaleString()}</div><div class="cstat-lbl">Puntos</div></div>
-      <div class="cstat"><div class="cstat-val">${recs}</div><div class="cstat-lbl">Completes</div></div>
-      ${hardest ? `<div class="cstat"><div class="cstat-val">#${hardest.position}</div><div class="cstat-lbl" title="${hardest.name || ''}">Hardest: ${hardest.name || '—'}</div></div>` : ""}
-    `;
+
+    const statsGrid = document.getElementById("cpStats");
+    const tiles = [
+      { val: players, lbl: "Jugadores" },
+      { val: pts.toLocaleString("es"), lbl: "Puntos totales" },
+      { val: recs, lbl: "Completes" },
+    ];
+    if (hardest) tiles.push({ val: `#${hardest.position}`, lbl: hardest.name || "Hardest" });
+    statsGrid.innerHTML = tiles.map(t => `
+      <div class="stat-tile">
+        <div class="stat-tile-val">${t.val}</div>
+        <div class="stat-tile-lbl">${escHtml(t.lbl)}</div>
+      </div>`).join("");
   }
 
   function renderTopPlayers(playerStats, profiles) {
@@ -318,19 +457,22 @@
     list.innerHTML = "";
     sorted.forEach(([uid, st], i) => {
       const p       = profiles.get(uid) || {};
-      const pts     = (Math.round(st.points * 100) / 100).toLocaleString();
+      const pts     = (Math.round(st.points * 100) / 100).toLocaleString("es");
       const posClass = i === 0 ? "gold" : i === 1 ? "silver" : i === 2 ? "bronze" : "";
       const initials = (p.name || "?").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
       const photoHtml = p.photoURL
         ? `<img class="tp-photo" src="${p.photoURL}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
         : `<div class="tp-photo-fb">${initials}</div>`;
+      const medalBadge = i < 3
+        ? `<span class="tp-badge tp-badge-${i+1}">${["🥇","🥈","🥉"][i]}</span>`
+        : "";
       const row = document.createElement("a");
       row.className = "tp-row";
       row.href = `/profile.html?id=${encodeURIComponent(uid)}`;
       row.innerHTML = `
         <div class="tp-pos ${posClass}">#${i + 1}</div>
         ${photoHtml}
-        <div class="tp-name">${escHtml(p.name || "Sin nombre")}</div>
+        <div class="tp-name">${escHtml(p.name || "Sin nombre")}${medalBadge}</div>
         <div class="tp-pts">${pts} pts</div>
       `;
       list.appendChild(row);
@@ -341,12 +483,12 @@
     if (!fvnMap.size) return;
     const card  = document.getElementById("fvCard");
     const title = document.getElementById("fvTitle");
-    const list  = document.getElementById("fvList");
+    const tbody = document.getElementById("fvList");
     const entries = [...fvnMap.values()]
       .map(e => ({ ...e, level: levelsMap.get(e.levelId) }))
       .filter(e => e.level)
       .sort((a, b) => (Number(a.level.position) || 9999) - (Number(b.level.position) || 9999));
-    title.textContent = `First Victor por País — ${entries.length} nivel${entries.length !== 1 ? "es" : ""}`;
+    title.textContent = `First Victor — ${entries.length} nivel${entries.length !== 1 ? "es" : ""}`;
     card.style.display = "block";
     entries.forEach(e => {
       const p       = profiles.get(e.uid) || {};
@@ -354,16 +496,16 @@
       const dateStr = e.date?.toDate
         ? e.date.toDate().toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit", year:"numeric" })
         : "—";
-      const row = document.createElement("a");
-      row.className = "fvn-row";
-      row.href = `/level.html?id=${encodeURIComponent(e.levelId)}`;
-      row.innerHTML = `
-        <div class="fvn-pos">#${lvl.position || "?"}</div>
-        <div class="fvn-lvl">${escHtml(lvl.name || "Nivel")}</div>
-        <div class="fvn-player">${escHtml(p.name || "?")}</div>
-        <div class="fvn-date">${dateStr}</div>
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => { location.href = `/level.html?id=${encodeURIComponent(e.levelId)}`; });
+      tr.innerHTML = `
+        <td><span class="fvn-td-pos">#${lvl.position || "?"}</span></td>
+        <td class="fvn-td-name">${escHtml(lvl.name || "Nivel")}</td>
+        <td class="fvn-td-player">${escHtml(p.name || "?")}</td>
+        <td class="fvn-td-date">${dateStr}</td>
       `;
-      list.appendChild(row);
+      tbody.appendChild(tr);
     });
   }
 
