@@ -486,19 +486,24 @@
     .cid-ok  { color:#9bdc4d; font-weight:700; }
     .cid-no  { color:#ff9a9a; font-weight:700; }
     .cid-empty-edit { color:rgba(255,255,255,.35); font-size:.78rem; text-align:center; padding:6px 0; }
+    /* Layout: ID input ocupa toda la fila; Por + Status + botón en la fila siguiente */
     .custom-ids-add-row {
-      display: grid; grid-template-columns: 1fr auto auto auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
       gap: 6px; align-items: center; margin-top: 8px;
     }
     .custom-ids-input {
-      padding: 7px 10px; border-radius: 7px;
+      /* ocupa las 3 columnas → fila propia */
+      grid-column: 1 / -1;
+      min-width: 0; width: 100%; box-sizing: border-box;
+      padding: 8px 12px; border-radius: 7px;
       border: 1px solid rgba(255,255,255,.18);
       background: rgba(255,255,255,.07); color: #fff;
-      font-family: 'Montserrat', sans-serif; font-size: .84rem;
+      font-family: 'Montserrat', sans-serif; font-size: .88rem;
     }
     .custom-ids-input::placeholder { color:rgba(255,255,255,.35); }
     .custom-ids-select {
-      padding: 7px 8px; border-radius: 7px;
+      min-width: 0; padding: 7px 8px; border-radius: 7px;
       border: 1px solid rgba(255,255,255,.18);
       background: rgba(30,40,30,.9); color: #fff;
       font-family: 'Montserrat', sans-serif; font-size: .84rem;
@@ -522,7 +527,9 @@
     }
     .cid-remove-btn:hover { background: rgba(255,80,80,.2); }
     @media (max-width: 520px) {
-      .custom-ids-add-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+      /* En móvil: ID sigue full-width (ya es grid-column:1/-1),
+         los selects quedan en 1fr 1fr, el botón en fila propia */
+      .custom-ids-add-row { grid-template-columns: 1fr 1fr; }
       .custom-ids-add-btn { grid-column: 1 / -1; }
     }
 
@@ -1161,6 +1168,31 @@
       ids.splice(idx, 1);
       renderCustomIds(prefix, ids);
     };
+
+    /* ── Reemplazar cerrarModal para que también resetee IDs Custom ──
+       El script no-módulo ya definió window.cerrarModal (cierra el modal).
+       Aquí lo envolvemos dentro del scope del módulo donde los arrays
+       _inpCustomIds / _editCustomIds y renderCustomIds están disponibles. */
+    {
+      const _baseCerrar = window.cerrarModal || ((id) => {
+        document.getElementById(id)?.classList.remove("open");
+      });
+      window.cerrarModal = function(id) {
+        _baseCerrar(id);
+        if (id === "formModal") {
+          _inpCustomIds.length = 0;
+          renderCustomIds("inp", _inpCustomIds);
+        }
+        if (id === "editModal") {
+          _editCustomIds.length = 0;
+          renderCustomIds("edit", _editCustomIds);
+        }
+      };
+    }
+
+    /* Inicializar listas vacías en ambos modales al arrancar */
+    renderCustomIds("inp",  _inpCustomIds);
+    renderCustomIds("edit", _editCustomIds);
 
     /* Devuelve los niveles actuales ordenados por position (los sin position
        quedan al final, ordenados por value descendente como respaldo).      */
@@ -2021,22 +2053,6 @@
     window.cerrarModal = cerrarModal;
 
     /* openFormBtn removido — añadir niveles se hace desde el Panel de Staff */
-    /* Al cerrar el formModal, resetear el estado de IDs Custom */
-    const _origCerrarModal = window.cerrarModal;
-    window.cerrarModal = function(id) {
-      _origCerrarModal(id);
-      if (id === "formModal") {
-        _inpCustomIds.length = 0;
-        renderCustomIds("inp", _inpCustomIds);
-      }
-      if (id === "editModal") {
-        _editCustomIds.length = 0;
-        renderCustomIds("edit", _editCustomIds);
-      }
-    };
-    /* Inicializar listas vacías para los modales al cargar la página */
-    renderCustomIds("inp", _inpCustomIds);
-    renderCustomIds("edit", _editCustomIds);
 
     /* ============== TAG EDITOR (modales Añadir/Editar) ============== */
     /* State por scope. scope = "inp" (modal añadir) | "edit" (modal editar) */

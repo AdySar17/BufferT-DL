@@ -579,15 +579,19 @@
         IDs Custom <span style="text-transform:none;letter-spacing:0;color:rgba(230,230,230,0.45);">(opcional)</span>
       </label>
       <div id="al-customids-list" style="margin-bottom:6px;"></div>
-      <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;">
-        <input id="al-cid-id" type="text" inputmode="numeric" maxlength="20" class="al-input" placeholder="ID (ej: 822737)" style="margin:0;">
-        <select id="al-cid-por" class="al-input" style="margin:0;width:auto;">
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;">
+        <!-- ID Custom: fila propia (ocupa las 3 columnas) -->
+        <input id="al-cid-id" type="text" inputmode="numeric" maxlength="20" class="al-input"
+               placeholder="ID Custom (ej: 822737)"
+               style="margin:0;grid-column:1/-1;min-width:0;width:100%;box-sizing:border-box;font-size:.88rem;">
+        <!-- Por + Status + botón en la fila siguiente -->
+        <select id="al-cid-por" class="al-input" style="margin:0;min-width:0;">
           <option value="LDM">LDM</option>
           <option value="ULDM">ULDM</option>
           <option value="Fix">Fix</option>
           <option value="Globed">Globed</option>
         </select>
-        <select id="al-cid-status" class="al-input" style="margin:0;width:auto;">
+        <select id="al-cid-status" class="al-input" style="margin:0;min-width:0;">
           <option value="Aceptada">Aceptada</option>
           <option value="Rechazada">Rechazada</option>
         </select>
