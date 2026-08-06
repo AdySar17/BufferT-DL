@@ -468,7 +468,7 @@ export default function Home() {
       <header className="top-header">
         <div className="left">
           <img src="/logo.png" className="logo-img" alt="Logo" />
-          <div className="logo-text">BFT Demon List</div>
+          <div className="logo-text"><span className="logo-full">BFT Demon List</span><span className="logo-short">BFT DL</span></div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <nav className="nav-links" id="navLinks">

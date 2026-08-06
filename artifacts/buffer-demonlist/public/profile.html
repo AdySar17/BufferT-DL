@@ -823,6 +823,8 @@
   }
 </style>
   <link rel="stylesheet" href="/shared.css">
+  <script src="/i18n.js"></script>
+  <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
 </head>
 <body>
 
@@ -830,7 +832,7 @@
 <header class="top-header">
   <div class="left">
     <img src="/logo.png" class="logo-img" alt="Logo">
-    <div class="logo-text">BFT Demon List</div>
+    <div class="logo-text"><span class="logo-full">BFT Demon List</span><span class="logo-short">BFT DL</span></div>
   </div>
   <div style="display:flex; align-items:center; gap:14px;">
     <nav class="nav-links" id="navLinks">
@@ -844,6 +846,7 @@
       <a href="/staff-control.html" class="owner-only">Control Staff</a>
       <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
+    <div id="langSlot"></div>
     <div class="auth-slot" id="authSlot"></div>
     <div class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')">☰</div>
   </div>

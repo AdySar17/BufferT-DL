@@ -260,6 +260,10 @@
         '}',
         '.bft-lang-btn:hover{background:rgba(124,252,0,0.12);color:#fff;}',
         '.bft-lang-btn.active{color:#c7ff3b;font-weight:700;}',
+        /* Responsive logo title */
+        '.logo-full{display:inline;}',
+        '.logo-short{display:none;}',
+        '@media(max-width:500px){.logo-full{display:none;}.logo-short{display:inline;}}',
       ].join('');
       document.head.appendChild(style);
     },

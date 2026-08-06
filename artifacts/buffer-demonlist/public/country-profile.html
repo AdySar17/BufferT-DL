@@ -137,13 +137,15 @@
   .empty-msg { text-align: center; padding: 28px 0; color: rgba(200,220,200,.6); font-size: .9rem; }
   #stateMsg { text-align: center; padding: 60px 20px; color: rgba(200,220,200,.7); font-size: .95rem; }
 </style>
+  <script src="/i18n.js"></script>
+  <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
 </head>
 <body>
 
 <header class="top-header">
   <div class="left">
     <img src="/logo.png" class="logo-img" alt="Logo">
-    <div class="logo-text">BFT Demon List</div>
+    <div class="logo-text"><span class="logo-full">BFT Demon List</span><span class="logo-short">BFT DL</span></div>
   </div>
   <div style="display:flex; align-items:center; gap:14px;">
     <nav class="nav-links" id="navLinks">
@@ -157,6 +159,7 @@
       <a href="/staff-control.html" class="owner-only">Control Staff</a>
       <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
     </nav>
+    <div id="langSlot"></div>
     <div class="auth-slot" id="authSlot"></div>
     <div class="menu-toggle" onclick="toggleMenu()">☰</div>
   </div>
