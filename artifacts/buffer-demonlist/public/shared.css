@@ -5,6 +5,60 @@
  */
 
 /* ═══════════════════════════════════════════════
+   HERO BUTTONS (home.tsx)
+═══════════════════════════════════════════════ */
+.bft-hero-btn {
+  display: inline-block;
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.3px;
+  position: relative;
+  transition:
+    transform   0.22s cubic-bezier(.34,1.56,.64,1),
+    box-shadow  0.22s ease,
+    background  0.18s ease,
+    filter      0.18s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bft-hero-btn-primary {
+  background: linear-gradient(135deg, #1a4d1a 0%, #7cfc00 100%);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(124,252,0,0.35), 0 4px 14px rgba(0,0,0,0.3);
+}
+.bft-hero-btn-secondary {
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(124,252,0,0.4);
+  color: #fff;
+  box-shadow: none;
+}
+@media (hover: hover) {
+  .bft-hero-btn-primary:hover {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow:
+      0 0 32px rgba(124,252,0,0.55),
+      0 8px 24px rgba(0,0,0,0.35);
+    filter: brightness(1.08);
+  }
+  .bft-hero-btn-secondary:hover {
+    transform: translateY(-3px) scale(1.04);
+    background: rgba(124,252,0,0.12);
+    border-color: rgba(124,252,0,0.75);
+    box-shadow: 0 0 20px rgba(124,252,0,0.25), 0 6px 18px rgba(0,0,0,0.25);
+  }
+}
+/* Press feedback (funciona en móvil también) */
+.bft-hero-btn:active {
+  transform: scale(0.97) translateY(0) !important;
+  filter: brightness(0.92) !important;
+  transition-duration: 0.08s !important;
+}
+
+/* ═══════════════════════════════════════════════
    LOGO GLOW
 ═══════════════════════════════════════════════ */
 .logo-img {
