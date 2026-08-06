@@ -178,16 +178,16 @@
 </header>
 
 <div class="page-wrap">
-  <h1 class="page-title">✉ Notificaciones</h1>
-  <p class="page-sub">Aquí aparecen tus records moderados por el staff: aceptados o rechazados, con la nota que el moderador haya dejado.</p>
+  <h1 class="page-title" data-i18n="notif_title">✉ Notificaciones</h1>
+  <p class="page-sub" data-i18n="notif_subtitle">Aquí aparecen tus records moderados por el staff.</p>
 
   <div class="tabs" id="tabs">
-    <div class="tab active" data-filter="all">Todas</div>
-    <div class="tab" data-filter="Accepted">Aceptadas</div>
-    <div class="tab" data-filter="Rejected">Rechazadas</div>
+    <div class="tab active" data-filter="all" data-i18n="notif_tab_all">Todas</div>
+    <div class="tab" data-filter="Accepted" data-i18n="notif_tab_accepted">Aceptadas</div>
+    <div class="tab" data-filter="Rejected" data-i18n="notif_tab_rejected">Rechazadas</div>
   </div>
 
-  <div id="stateMsg" class="state-msg">Cargando notificaciones...</div>
+  <div id="stateMsg" class="state-msg" data-i18n="notif_loading">Cargando notificaciones...</div>
   <div id="list"></div>
 </div>
 
@@ -240,7 +240,7 @@
   async function loadNotifications(uid) {
     stateMsg.style.display = "block";
     stateMsg.classList.remove("error");
-    stateMsg.textContent = "Cargando notificaciones...";
+    stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_loading') : "Cargando notificaciones...";
     listEl.innerHTML = "";
 
     try {
@@ -258,7 +258,7 @@
         .filter(r => r.status === "Accepted" || r.status === "Rejected");
 
       if (!allNotifs.length) {
-        stateMsg.textContent = "No tienes notificaciones todavía. Cuando el staff revise un record tuyo aparecerá aquí.";
+        stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_empty') : "No tienes notificaciones todavía.";
         return;
       }
 
@@ -285,7 +285,7 @@
     } catch (err) {
       console.error("[notifications] load error:", err);
       stateMsg.classList.add("error");
-      stateMsg.textContent = "Error al cargar las notificaciones: " + (err.message || "");
+      stateMsg.textContent = (window.BFT_I18N ? window.BFT_I18N.t('notif_error') : "Error al cargar las notificaciones") + ": " + (err.message || "");
     }
   }
 
@@ -299,8 +299,8 @@
       stateMsg.style.display = "block";
       stateMsg.classList.remove("error");
       stateMsg.textContent = activeFilter === "all"
-        ? "No tienes notificaciones todavía."
-        : `No hay notificaciones ${activeFilter === "Accepted" ? "aceptadas" : "rechazadas"}.`;
+        ? (window.BFT_I18N ? window.BFT_I18N.t('notif_empty') : "No tienes notificaciones todavía.")
+        : (window.BFT_I18N ? window.BFT_I18N.t('notif_filter_empty') : `No hay notificaciones ${activeFilter === "Accepted" ? "aceptadas" : "rechazadas"}.`);
       return;
     }
     stateMsg.style.display = "none";
@@ -344,12 +344,12 @@
   let initialized = false;
   onAuthChange((user, data, loading) => {
     if (loading) {
-      stateMsg.textContent = "Cargando sesión...";
+      stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_session') : "Cargando sesión...";
       return;
     }
     if (!user) {
       stateMsg.classList.add("error");
-      stateMsg.textContent = "Inicia sesión para ver tus notificaciones.";
+      stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_login_req') : "Inicia sesión para ver tus notificaciones.";
       listEl.innerHTML = "";
       return;
     }

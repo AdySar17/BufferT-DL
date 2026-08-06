@@ -5,7 +5,6 @@
 /* ── Logo responsive title ── */
 .logo-full { display: inline; }
 .logo-short { display: none; }
-@media (max-width: 500px) {
-  .logo-full { display: none; }
-  .logo-short { display: inline; }
-}
+/* header-compact toggled by JS ResizeObserver */
+.header-compact .logo-full { display: none; }
+.header-compact .logo-short { display: inline; }

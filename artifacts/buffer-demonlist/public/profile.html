@@ -878,7 +878,7 @@
           </a>
           <span id="pRoleBadge" class="role-badge" style="display:none;"></span>
           <span id="pBannedBadge" class="role-badge role-banned" style="display:none;">BANEADO</span>
-          <button id="pRoleEditBtn" class="role-edit-btn" style="display:none;" type="button">Cambiar rol</button>
+          <button id="pRoleEditBtn" class="role-edit-btn" style="display:none;" type="button" data-i18n="profile_change_role">Cambiar rol</button>
         </div>
         <div class="profile-meta">
           <span id="pCountryWrap" class="country" style="display:none;">
@@ -893,50 +893,50 @@
     <div class="profile-stats">
       <div class="stat-box">
         <div id="pPoints" class="stat-value">0</div>
-        <div class="stat-label">Puntos</div>
+        <div class="stat-label" data-i18n="profile_pts">Puntos</div>
       </div>
       <div class="stat-box">
         <div id="pRecords" class="stat-value">0</div>
-        <div class="stat-label">Records</div>
+        <div class="stat-label" data-i18n="profile_records">Records</div>
       </div>
       <div class="stat-box">
         <div id="pRank" class="stat-value">—</div>
-        <div class="stat-label">Ranking</div>
+        <div class="stat-label" data-i18n="profile_ranking">Ranking</div>
       </div>
       <div class="stat-box stat-hardest" title="Nivel más difícil completado al 100%">
         <div id="pHardest" class="stat-value">—</div>
-        <div class="stat-label">Hardest</div>
+        <div class="stat-label" data-i18n="profile_hardest">Hardest</div>
       </div>
     </div>
 
     <!-- BIO -->
     <div class="profile-section">
-      <div class="section-label">Biografía</div>
+      <div class="section-label" data-i18n="profile_bio_label">Biografía</div>
       <div id="pBio" class="profile-bio"></div>
     </div>
 
     <!-- ACCIONES (solo el dueño / Owner puede editar perfil ajeno) -->
     <div id="ownerActions" class="btn-row" style="display:none;">
-      <button id="btnEdit" class="btn btn-primary">Editar perfil</button>
-      <button id="btnCosm" class="btn btn-secondary" style="display:none;">🎨 Cosméticos</button>
+      <button id="btnEdit" class="btn btn-primary" data-i18n="profile_edit_btn">Editar perfil</button>
+      <button id="btnCosm" class="btn btn-secondary" style="display:none;" data-i18n="profile_cosm_btn">🎨 Cosméticos</button>
     </div>
 
     <!-- ACCIONES DE STAFF: ban / unban / eliminar cuenta (Admin+Owner) -->
     <div id="staffActions" class="btn-row" style="display:none; margin-top:8px;">
-      <button id="btnBan"           class="btn-ban"            type="button" style="display:none;">Banear usuario</button>
-      <button id="btnUnban"         class="btn-ban unban"      type="button" style="display:none;">Quitar ban</button>
-      <button id="btnDeleteAccount" class="btn-delete-acc"     type="button" style="display:none;">⚠ Eliminar cuenta</button>
+      <button id="btnBan"           class="btn-ban"            type="button" style="display:none;" data-i18n="profile_ban">Banear usuario</button>
+      <button id="btnUnban"         class="btn-ban unban"      type="button" style="display:none;" data-i18n="profile_unban">Quitar ban</button>
+      <button id="btnDeleteAccount" class="btn-delete-acc"     type="button" style="display:none;" data-i18n="profile_delete">⚠ Eliminar cuenta</button>
     </div>
 
     <!-- FORM EDIT -->
     <div id="editForm" class="edit-form">
       <div>
-        <label for="editName">Nombre</label>
+        <label for="editName" data-i18n="profile_name_label">Nombre</label>
         <input id="editName" class="input" maxlength="40" placeholder="Cómo quieres que te llamen" autocomplete="off">
         <div class="field-help">Máx. 40 caracteres. Aparece en perfiles, records y panel.</div>
       </div>
       <div>
-        <label for="editPhoto">URL de foto de perfil</label>
+        <label for="editPhoto" data-i18n="profile_photo_label">URL de foto de perfil</label>
         <input id="editPhoto" class="input" type="url" placeholder="https://iili.io/...jpg" autocomplete="off">
         <div class="field-help">
           Para cambiar tu foto, sube una imagen en
@@ -946,18 +946,18 @@
         </div>
       </div>
       <div>
-        <label for="editCountry">País</label>
+        <label for="editCountry" data-i18n="profile_country_label">País</label>
         <select id="editCountry" class="input" style="padding-right:8px;cursor:pointer;"></select>
         <div id="countryCooldownMsg" style="display:none;margin-top:6px;padding:8px 12px;background:rgba(255,150,50,0.12);border:1px solid rgba(255,150,50,0.35);border-radius:8px;color:#ffcc80;font-size:.82rem;"></div>
         <div class="field-help">Puedes cambiar tu país una vez cada 30 días. Los administradores pueden cambiarlo en cualquier momento.</div>
       </div>
       <div>
-        <label for="editYoutube">Canal de YouTube (opcional)</label>
+        <label for="editYoutube" data-i18n="profile_youtube_label">Canal de YouTube (opcional)</label>
         <input id="editYoutube" class="input" type="url" maxlength="200" placeholder="https://www.youtube.com/@tu-canal" autocomplete="off">
         <div class="field-help">Si lo rellenas, aparecerá un icono de YouTube al lado de tu nombre. Déjalo vacío para ocultarlo.</div>
       </div>
       <div>
-        <label for="editBio">Biografía</label>
+        <label for="editBio" data-i18n="profile_bio_edit">Biografía</label>
         <textarea id="editBio" class="textarea" maxlength="500" placeholder="Cuenta algo sobre ti..."></textarea>
         <div class="field-help">Máx. 500 caracteres.</div>
       </div>

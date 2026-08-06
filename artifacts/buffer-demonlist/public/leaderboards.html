@@ -392,18 +392,18 @@
   </header>
 
   <div class="page-card">
-    <h1 class="page-title">Leaderboards</h1>
-    <p class="page-sub">Ranking de jugadores por puntos y demons completados.</p>
+    <h1 class="page-title" data-i18n="page_leaderboard">Leaderboards</h1>
+    <p class="page-sub" data-i18n="lb_subtitle">Ranking de jugadores por puntos y demons completados.</p>
 
     <!-- SELECTOR DE CATEGORÍA -->
     <div class="cat-select-wrap">
-      <label class="cat-select-label" for="catSelect">Categoría</label>
+      <label class="cat-select-label" for="catSelect" data-i18n="lb_category">Categoría</label>
       <select id="catSelect" class="cat-select"></select>
     </div>
 
     <!-- BUSCADOR -->
     <div id="searchContainer">
-      <input id="searchBar" type="text" placeholder="Buscar jugador por nombre..." />
+      <input id="searchBar" type="text" placeholder="Buscar jugador por nombre..." data-i18n-placeholder="lb_search_player" />
     </div>
 
     <div id="stateMsg"><div class="bft-loading"><span class="bft-spinner"></span></div></div>
@@ -411,12 +411,12 @@
     <div class="lb-list" id="lbList"></div>
 
     <div class="pager" id="pager" style="display:none;">
-      <button class="pg-btn" id="pgPrev">&lt; Atrás</button>
+      <button class="pg-btn" id="pgPrev" data-i18n="lb_prev">&lt; Atrás</button>
       <span class="pg-jump">
         <input id="pgInput" type="number" min="1" value="1" />
         / <span id="pgTotal">1</span>
       </span>
-      <button class="pg-btn" id="pgNext">Siguiente &gt;</button>
+      <button class="pg-btn" id="pgNext" data-i18n="lb_next">Siguiente &gt;</button>
     </div>
   </div>
 

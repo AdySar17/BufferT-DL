@@ -102,7 +102,7 @@
     page_profile:     { es:'Perfil',                 en:'Profile',              ru:'Профиль',            pt:'Perfil',             fr:'Profil',               vi:'Hồ sơ' },
 
     /* ─ Demon List: interfaz ─ */
-    dl_search:   { es:'Buscar nivel...',     en:'Search level...', ru:'Поиск уровня...', pt:'Buscar nível...', fr:'Rechercher...', vi:'Tìm kiếm...' },
+    dl_search:   { es:'🔍 Buscar nivel...',   en:'🔍 Search level...', ru:'🔍 Поиск уровня...', pt:'🔍 Buscar nível...', fr:'🔍 Rechercher...', vi:'🔍 Tìm kiếm...' },
     dl_pos:      { es:'Posición',            en:'Position',        ru:'Позиция',         pt:'Posição',         fr:'Position',      vi:'Vị trí' },
     dl_pts:      { es:'Puntos',              en:'Points',          ru:'Очки',            pt:'Pontos',          fr:'Points',        vi:'Điểm' },
     dl_by:       { es:'Por',                 en:'By',              ru:'От',              pt:'Por',             fr:'Par',           vi:'Bởi' },
@@ -140,6 +140,82 @@
     by:        { es:'By',        en:'By',      ru:'By',         pt:'By',       fr:'By',         vi:'By' },
     loading2:  { es:'Cargando', en:'Loading', ru:'Загрузка',   pt:'Carregando',fr:'Chargement', vi:'Đang tải' },
     no_data:   { es:'Sin datos', en:'No data', ru:'Нет данных', pt:'Sem dados', fr:'Aucune donnée', vi:'Không có dữ liệu' },
+
+    /* ─ Leaderboards ─ */
+    lb_subtitle:      { es:'Ranking de jugadores por puntos y demons completados.', en:'Player ranking by points and completed demons.', ru:'Рейтинг игроков по очкам и пройденным демонам.', pt:'Ranking de jogadores por pontos e demons completados.', fr:'Classement des joueurs par points et demons complétés.', vi:'Bảng xếp hạng người chơi theo điểm và demon đã hoàn thành.' },
+    lb_category:      { es:'Categoría', en:'Category', ru:'Категория', pt:'Categoria', fr:'Catégorie', vi:'Danh mục' },
+    lb_search_player: { es:'Buscar jugador por nombre...', en:'Search player by name...', ru:'Поиск игрока по имени...', pt:'Buscar jogador por nome...', fr:'Rechercher joueur par nom...', vi:'Tìm người chơi theo tên...' },
+    lb_prev:          { es:'< Atrás', en:'< Back', ru:'< Назад', pt:'< Anterior', fr:'< Précédent', vi:'< Trước' },
+    lb_next:          { es:'Siguiente >', en:'Next >', ru:'Вперёд >', pt:'Próximo >', fr:'Suivant >', vi:'Tiếp >' },
+
+    /* ─ Notificaciones ─ */
+    notif_title:         { es:'✉ Notificaciones', en:'✉ Notifications', ru:'✉ Уведомления', pt:'✉ Notificações', fr:'✉ Notifications', vi:'✉ Thông báo' },
+    notif_subtitle:      { es:'Aquí aparecen tus records moderados por el staff.', en:'Your records moderated by staff appear here.', ru:'Здесь отображаются рекорды, проверенные персоналом.', pt:'Aqui aparecem seus records moderados pelo staff.', fr:'Vos records modérés par le staff apparaissent ici.', vi:'Các records được staff kiểm duyệt của bạn xuất hiện ở đây.' },
+    notif_tab_all:       { es:'Todas', en:'All', ru:'Все', pt:'Todas', fr:'Toutes', vi:'Tất cả' },
+    notif_tab_accepted:  { es:'Aceptadas', en:'Accepted', ru:'Принятые', pt:'Aceitas', fr:'Acceptées', vi:'Đã chấp nhận' },
+    notif_tab_rejected:  { es:'Rechazadas', en:'Rejected', ru:'Отклонённые', pt:'Rejeitadas', fr:'Rejetées', vi:'Bị từ chối' },
+    notif_loading:       { es:'Cargando notificaciones...', en:'Loading notifications...', ru:'Загрузка уведомлений...', pt:'Carregando notificações...', fr:'Chargement des notifications...', vi:'Đang tải thông báo...' },
+    notif_empty:         { es:'No tienes notificaciones todavía. Cuando el staff revise un record tuyo aparecerá aquí.', en:'No notifications yet. Your notifications will appear here when staff reviews your records.', ru:'Уведомлений пока нет.', pt:'Sem notificações ainda.', fr:'Aucune notification pour l\'instant.', vi:'Chưa có thông báo.' },
+    notif_error:         { es:'Error al cargar las notificaciones', en:'Error loading notifications', ru:'Ошибка загрузки уведомлений', pt:'Erro ao carregar notificações', fr:'Erreur chargement notifications', vi:'Lỗi tải thông báo' },
+    notif_filter_empty:  { es:'No hay notificaciones en esta categoría.', en:'No notifications in this category.', ru:'Нет уведомлений в этой категории.', pt:'Sem notificações nesta categoria.', fr:'Aucune notification dans cette catégorie.', vi:'Không có thông báo trong danh mục này.' },
+    notif_login_req:     { es:'Inicia sesión para ver tus notificaciones.', en:'Sign in to see your notifications.', ru:'Войдите, чтобы увидеть уведомления.', pt:'Faça login para ver suas notificações.', fr:'Connectez-vous pour voir vos notifications.', vi:'Đăng nhập để xem thông báo.' },
+    notif_session:       { es:'Cargando sesión...', en:'Loading session...', ru:'Загрузка сессии...', pt:'Carregando sessão...', fr:'Chargement de la session...', vi:'Đang tải phiên...' },
+
+    /* ─ Nivel (level page) ─ */
+    lv_loading_level:    { es:'Cargando nivel...', en:'Loading level...', ru:'Загрузка уровня...', pt:'Carregando nível...', fr:'Chargement du niveau...', vi:'Đang tải màn chơi...' },
+    lv_back:             { es:'← Volver a la lista', en:'← Back to list', ru:'← К списку', pt:'← Voltar à lista', fr:'← Retour à la liste', vi:'← Quay lại danh sách' },
+    lv_tier:             { es:'Tier', en:'Tier', ru:'Тир', pt:'Tier', fr:'Tier', vi:'Tier' },
+    lv_list_pts:         { es:'Puntos de Lista:', en:'List Points:', ru:'Очки списка:', pt:'Pontos de Lista:', fr:'Points de liste:', vi:'Điểm danh sách:' },
+    lv_host_label:       { es:'Host:', en:'Host:', ru:'Хост:', pt:'Host:', fr:'Hôte:', vi:'Host:' },
+    lv_difficulty_label: { es:'Dificultad:', en:'Difficulty:', ru:'Сложность:', pt:'Dificuldade:', fr:'Difficulté:', vi:'Độ khó:' },
+    lv_id_label:         { es:'ID:', en:'ID:', ru:'ID:', pt:'ID:', fr:'ID:', vi:'ID:' },
+    lv_creators_label:   { es:'Creadores', en:'Creators', ru:'Создатели', pt:'Criadores', fr:'Créateurs', vi:'Người tạo' },
+    lv_min_pct:          { es:'Porcentaje mínimo:', en:'Minimum percentage:', ru:'Мин. процент:', pt:'Porcentagem mínima:', fr:'Pourcentage minimum:', vi:'Phần trăm tối thiểu:' },
+    lv_pager_prev:       { es:'Atrás', en:'Back', ru:'Назад', pt:'Anterior', fr:'Précédent', vi:'Trước' },
+    lv_pager_next:       { es:'Siguiente', en:'Next', ru:'Вперёд', pt:'Próximo', fr:'Suivant', vi:'Tiếp' },
+    lv_first_victor_title: { es:'First Victor por País', en:'First Victor by Country', ru:'First Victor по стране', pt:'First Victor por País', fr:'First Victor par Pays', vi:'First Victor theo Quốc gia' },
+    lv_first_victor_sub:   { es:'Primer jugador de cada país en completar este nivel', en:'First player of each country to complete this level', ru:'Первый игрок каждой страны, прошедший уровень', pt:'Primeiro jogador de cada país a completar este nível', fr:'Premier joueur de chaque pays à compléter ce niveau', vi:'Người chơi đầu tiên của mỗi quốc gia hoàn thành màn chơi' },
+    lv_custom_ids_sub:   { es:'IDs alternativas asociadas a este nivel', en:'Alternative IDs associated with this level', ru:'Альтернативные ID этого уровня', pt:'IDs alternativas associadas a este nível', fr:'IDs alternatives associées à ce niveau', vi:'ID thay thế liên quan đến màn chơi này' },
+    lv_history_sub:      { es:'Cambios registrados en este nivel', en:'Recorded changes for this level', ru:'Зафиксированные изменения уровня', pt:'Mudanças registradas neste nível', fr:'Changements enregistrés pour ce niveau', vi:'Các thay đổi được ghi lại cho màn chơi này' },
+    lv_loading_records:  { es:'Cargando records...', en:'Loading records...', ru:'Загрузка рекордов...', pt:'Carregando records...', fr:'Chargement des records...', vi:'Đang tải records...' },
+    lv_loading_hist:     { es:'Cargando historial...', en:'Loading history...', ru:'Загрузка истории...', pt:'Carregando histórico...', fr:'Chargement de l\'historique...', vi:'Đang tải lịch sử...' },
+
+    /* ─ Submit page ─ */
+    sub_subtitle:      { es:'Envía tu récord al equipo BufferTeam para verificación', en:'Submit your record to the BufferTeam for verification', ru:'Отправьте рекорд команде BufferTeam для проверки', pt:'Envie seu record à equipe BufferTeam para verificação', fr:'Soumettez votre record à l\'équipe BufferTeam', vi:'Gửi record cho nhóm BufferTeam để xác minh' },
+    sub_login_banner:  { es:'⚠️ Inicia sesión con Google para enviar récords.', en:'⚠️ Sign in with Google to submit records.', ru:'⚠️ Войдите через Google, чтобы отправить рекорд.', pt:'⚠️ Faça login com Google para enviar records.', fr:'⚠️ Connectez-vous avec Google pour soumettre des records.', vi:'⚠️ Đăng nhập bằng Google để gửi records.' },
+    sub_submitter_label: { es:'Submitter', en:'Submitter', ru:'Отправитель', pt:'Submitter', fr:'Soumetteur', vi:'Người gửi' },
+    sub_change:        { es:'Cambiar', en:'Change', ru:'Изменить', pt:'Mudar', fr:'Changer', vi:'Thay đổi' },
+    sub_data_title:    { es:'Datos del récord', en:'Record data', ru:'Данные рекорда', pt:'Dados do record', fr:'Données du record', vi:'Dữ liệu record' },
+    sub_level_label:   { es:'Nivel', en:'Level', ru:'Уровень', pt:'Nível', fr:'Niveau', vi:'Màn chơi' },
+    sub_percent_label: { es:'Porcentaje', en:'Percentage', ru:'Процент', pt:'Porcentagem', fr:'Pourcentage', vi:'Phần trăm' },
+    sub_video_label:   { es:'Link del vídeo', en:'Video link', ru:'Ссылка на видео', pt:'Link do vídeo', fr:'Lien vidéo', vi:'Link video' },
+    sub_mobile_label:  { es:'Completado en móvil', en:'Completed on mobile', ru:'Пройдено на мобильном', pt:'Completado no celular', fr:'Complété sur mobile', vi:'Hoàn thành trên di động' },
+    sub_2p_label:      { es:'Es un nivel 2P (segundo jugador)', en:'Is a 2P level (second player)', ru:'Уровень 2P (второй игрок)', pt:'É um nível 2P (segundo jogador)', fr:'Est un niveau 2P (deuxième joueur)', vi:'Là màn 2 người (người chơi thứ 2)' },
+    sub_player2_label: { es:'Segundo jugador', en:'Second player', ru:'Второй игрок', pt:'Segundo jogador', fr:'Deuxième joueur', vi:'Người chơi thứ 2' },
+    sub_mode2p_label:  { es:'Modo 2P', en:'2P Mode', ru:'Режим 2P', pt:'Modo 2P', fr:'Mode 2P', vi:'Chế độ 2P' },
+    sub_mobile2p_label:{ es:'El segundo jugador también juega en móvil', en:'The second player also plays on mobile', ru:'Второй игрок тоже играет на мобильном', pt:'O segundo jogador também joga no celular', fr:'Le deuxième joueur joue aussi sur mobile', vi:'Người chơi thứ 2 cũng dùng di động' },
+    sub_video2_label:  { es:'Link del vídeo del 2.º jugador', en:'Second player video link', ru:'Ссылка на видео 2-го игрока', pt:'Link do vídeo do 2.º jogador', fr:'Lien vidéo du 2e joueur', vi:'Link video người chơi thứ 2' },
+    sub_raw_label:     { es:'Raw footage', en:'Raw footage', ru:'Raw footage', pt:'Raw footage', fr:'Raw footage', vi:'Raw footage' },
+    sub_notes_label:   { es:'Notas adicionales', en:'Additional notes', ru:'Доп. заметки', pt:'Notas adicionais', fr:'Notes supplémentaires', vi:'Ghi chú thêm' },
+
+    /* ─ Profile page ─ */
+    profile_loading:      { es:'Cargando perfil...', en:'Loading profile...', ru:'Загрузка профиля...', pt:'Carregando perfil...', fr:'Chargement du profil...', vi:'Đang tải hồ sơ...' },
+    profile_pts:          { es:'Puntos', en:'Points', ru:'Очки', pt:'Pontos', fr:'Points', vi:'Điểm' },
+    profile_records:      { es:'Records', en:'Records', ru:'Рекорды', pt:'Records', fr:'Records', vi:'Records' },
+    profile_ranking:      { es:'Ranking', en:'Ranking', ru:'Рейтинг', pt:'Ranking', fr:'Classement', vi:'Xếp hạng' },
+    profile_hardest:      { es:'Hardest', en:'Hardest', ru:'Сложнейший', pt:'Hardest', fr:'Hardest', vi:'Khó nhất' },
+    profile_bio_label:    { es:'Biografía', en:'Biography', ru:'Биография', pt:'Biografia', fr:'Biographie', vi:'Tiểu sử' },
+    profile_edit_btn:     { es:'Editar perfil', en:'Edit profile', ru:'Редактировать', pt:'Editar perfil', fr:'Modifier le profil', vi:'Chỉnh sửa hồ sơ' },
+    profile_change_role:  { es:'Cambiar rol', en:'Change role', ru:'Изменить роль', pt:'Mudar papel', fr:'Changer le rôle', vi:'Thay đổi vai trò' },
+    profile_ban:          { es:'Banear usuario', en:'Ban user', ru:'Заблокировать', pt:'Banir usuário', fr:'Bannir', vi:'Cấm người dùng' },
+    profile_unban:        { es:'Quitar ban', en:'Remove ban', ru:'Разблокировать', pt:'Remover ban', fr:'Lever le ban', vi:'Bỏ cấm' },
+    profile_delete:       { es:'⚠ Eliminar cuenta', en:'⚠ Delete account', ru:'⚠ Удалить аккаунт', pt:'⚠ Excluir conta', fr:'⚠ Supprimer le compte', vi:'⚠ Xóa tài khoản' },
+    profile_name_label:   { es:'Nombre', en:'Name', ru:'Имя', pt:'Nome', fr:'Nom', vi:'Tên' },
+    profile_photo_label:  { es:'URL de foto de perfil', en:'Profile photo URL', ru:'URL фото профиля', pt:'URL da foto de perfil', fr:'URL de la photo de profil', vi:'URL ảnh hồ sơ' },
+    profile_country_label:{ es:'País', en:'Country', ru:'Страна', pt:'País', fr:'Pays', vi:'Quốc gia' },
+    profile_youtube_label:{ es:'Canal de YouTube (opcional)', en:'YouTube channel (optional)', ru:'Канал YouTube (необязательно)', pt:'Canal do YouTube (opcional)', fr:'Chaîne YouTube (optionnel)', vi:'Kênh YouTube (tuỳ chọn)' },
+    profile_bio_edit:     { es:'Biografía', en:'Biography', ru:'Биография', pt:'Biografia', fr:'Biographie', vi:'Tiểu sử' },
+    profile_cosm_btn:     { es:'🎨 Cosméticos', en:'🎨 Cosmetics', ru:'🎨 Косметика', pt:'🎨 Cosméticos', fr:'🎨 Cosmétiques', vi:'🎨 Trang trí' },
   };
 
   /* ── Mapa href → clave de traducción (para nav automático) ─── */
@@ -260,10 +336,11 @@
         '}',
         '.bft-lang-btn:hover{background:rgba(124,252,0,0.12);color:#fff;}',
         '.bft-lang-btn.active{color:#c7ff3b;font-weight:700;}',
-        /* Responsive logo title */
+        /* Responsive logo title — controlled by JS ResizeObserver (.header-compact class) */
         '.logo-full{display:inline;}',
         '.logo-short{display:none;}',
-        '@media(max-width:500px){.logo-full{display:none;}.logo-short{display:inline;}}',
+        '.header-compact .logo-full{display:none;}',
+        '.header-compact .logo-short{display:inline;}',
       ].join('');
       document.head.appendChild(style);
     },
@@ -319,18 +396,40 @@
       wrapper.appendChild(dropdown);
       container.appendChild(wrapper);
     },
+
+    /** Watches the header for overflow and toggles .header-compact to abbreviate the title. */
+    _watchHeader: function() {
+      var header = document.querySelector('.top-header');
+      if (!header) return;
+      var check = function() {
+        var leftEl  = header.querySelector('.left');
+        var rightEl = leftEl && leftEl.nextElementSibling;
+        if (!leftEl || !rightEl) return;
+        /* Compare combined scrollWidth of both sides vs available width */
+        var available = header.clientWidth - 30;
+        var used      = leftEl.scrollWidth + rightEl.scrollWidth + 14;
+        header.classList.toggle('header-compact', used > available * 0.95);
+      };
+      check();
+      if (window.ResizeObserver) {
+        var ro = new ResizeObserver(check);
+        ro.observe(header);
+      }
+      window.addEventListener('resize', check);
+    },
   };
 
   window.BFT_I18N = i18n;
 
   /* ── Auto-apply cuando el DOM esté listo ──────────────── */
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      i18n._injectCSS();
-      i18n.apply();
-    });
-  } else {
+  function _onReady() {
     i18n._injectCSS();
     i18n.apply();
+    i18n._watchHeader();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _onReady);
+  } else {
+    _onReady();
   }
 })();

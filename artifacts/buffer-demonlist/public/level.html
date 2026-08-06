@@ -366,12 +366,12 @@
 </script>
 
 <!-- ESTADO -->
-<div id="stateMsg">Cargando nivel...</div>
+<div id="stateMsg" data-i18n="lv_loading_level">Cargando nivel...</div>
 
 <!-- CONTENIDO PRINCIPAL -->
 <div class="page-wrap" id="pageWrap">
 
-  <a href="/demonlist.html" class="back-btn">&#8592; Volver a la lista</a>
+  <a href="/demonlist.html" class="back-btn" data-i18n="lv_back">← Volver a la lista</a>
 
   <div class="grid">
 
@@ -414,14 +414,14 @@
                El valor real se configurará por nivel más adelante; por ahora
                siempre muestra "—". -->
           <div class="stat-tier-box" title="Tier del nivel">
-            <div class="stat-tier-label">Tier</div>
+            <div class="stat-tier-label" data-i18n="lv_tier">Tier</div>
             <div class="stat-tier-value" id="lvlTier">—</div>
           </div>
           <div class="stat-list">
-            <div class="stat-item">Puntos de Lista: <span class="stat-val" id="lvlPoints">—</span></div>
-            <div class="stat-item">Host: <span class="stat-val" id="lvlAuthor">—</span></div>
-            <div class="stat-item">Dificultad: <span class="stat-val" id="lvlDifficulty">Extreme Demon</span></div>
-            <div class="stat-item">ID: <span class="stat-val" id="lvlGdId">—</span></div>
+            <div class="stat-item"><span data-i18n="lv_list_pts">Puntos de Lista:</span> <span class="stat-val" id="lvlPoints">—</span></div>
+            <div class="stat-item"><span data-i18n="lv_host_label">Host:</span> <span class="stat-val" id="lvlAuthor">—</span></div>
+            <div class="stat-item"><span data-i18n="lv_difficulty_label">Dificultad:</span> <span class="stat-val" id="lvlDifficulty">Extreme Demon</span></div>
+            <div class="stat-item"><span data-i18n="lv_id_label">ID:</span> <span class="stat-val" id="lvlGdId">—</span></div>
           </div>
         </div>
       </div>
@@ -429,7 +429,7 @@
       <!-- Creadores -->
       <div class="card meta-section" id="lvlCreatorsCard" style="display:none;">
         <div class="meta-block">
-          <div class="meta-label">Creadores</div>
+          <div class="meta-label" data-i18n="lv_creators_label">Creadores</div>
           <div class="meta-name" id="lvlCreators">—</div>
         </div>
       </div>
@@ -441,17 +441,17 @@
             <div class="records-title" id="recTitle">RECORDS (0)</div>
             <div class="records-min" id="recMinPct">Porcentaje mínimo: 100%</div>
           </div>
-          <input class="rec-search" id="recSearch" placeholder="Buscar jugador...">
+          <input class="rec-search" id="recSearch" placeholder="Buscar jugador..." data-i18n-placeholder="lv_search_rec">
         </div>
 
         <div id="recordsList">
-          <div class="rec-loading">Cargando records...</div>
+          <div class="rec-loading" data-i18n="lv_loading_records">Cargando records...</div>
         </div>
 
         <div class="pager">
-          <button class="pager-btn" id="prevBtn" disabled>Atrás</button>
+          <button class="pager-btn" id="prevBtn" disabled data-i18n="lv_pager_prev">Atrás</button>
           <div class="pager-info" id="pageInfo">1 / 1</div>
-          <button class="pager-btn" id="nextBtn" disabled>Siguiente</button>
+          <button class="pager-btn" id="nextBtn" disabled data-i18n="lv_pager_next">Siguiente</button>
         </div>
       </div>
 
@@ -459,8 +459,8 @@
       <div class="card" id="fvnCard" style="display:none;">
         <div class="records-head hist-toggle" id="fvnToggle" role="button" tabindex="0" aria-expanded="false">
           <div>
-            <div class="records-title" id="fvnTitle">First Victor por País</div>
-            <div class="records-min">Primer jugador de cada país en completar este nivel</div>
+            <div class="records-title" id="fvnTitle" data-i18n="lv_first_victor_title">First Victor por País</div>
+            <div class="records-min" data-i18n="lv_first_victor_sub">Primer jugador de cada país en completar este nivel</div>
           </div>
           <span class="hist-arrow" id="fvnArrow">▼</span>
         </div>
@@ -471,8 +471,8 @@
       <div class="card" id="customIdsCard" style="display:none;">
         <div class="records-head hist-toggle" id="customIdsToggle" role="button" tabindex="0" aria-expanded="false">
           <div>
-            <div class="records-title">IDs CUSTOM</div>
-            <div class="records-min">IDs alternativas asociadas a este nivel</div>
+            <div class="records-title" data-i18n="lv_custom_ids">IDs CUSTOM</div>
+            <div class="records-min" data-i18n="lv_custom_ids_sub">IDs alternativas asociadas a este nivel</div>
           </div>
           <span class="hist-arrow" id="customIdsArrow">▼</span>
         </div>
@@ -485,13 +485,13 @@
       <div class="card">
         <div class="records-head hist-toggle" id="histToggle" role="button" tabindex="0" aria-expanded="false">
           <div>
-            <div class="records-title">HISTORIAL DE POSICIONES</div>
-            <div class="records-min">Cambios registrados en este nivel</div>
+            <div class="records-title" data-i18n="lv_history">HISTORIAL DE POSICIONES</div>
+            <div class="records-min" data-i18n="lv_history_sub">Cambios registrados en este nivel</div>
           </div>
           <span class="hist-arrow" id="histArrow">▼</span>
         </div>
         <div id="historyList" class="hist-body hist-collapsed">
-          <div class="rec-loading">Cargando historial...</div>
+          <div class="rec-loading" data-i18n="lv_loading_hist">Cargando historial...</div>
         </div>
       </div>
 
@@ -687,7 +687,7 @@
     const minPctEl = document.getElementById("recMinPct");
     if (minPctEl) {
       const mp = Number.isFinite(Number(nivel.minPercent)) ? Number(nivel.minPercent) : 100;
-      minPctEl.textContent = `Porcentaje mínimo: ${mp}%`;
+      minPctEl.textContent = (window.BFT_I18N ? window.BFT_I18N.t('lv_min_pct') : 'Porcentaje mínimo:') + ` ${mp}%`;
     }
     /* Guardar el nivel para usarlo más tarde (validar updates, etc.) */
     window.__currentLevel = nivel;
@@ -1038,7 +1038,7 @@
       filtered = [...allRecords];
 
       document.getElementById("recTitle").textContent =
-        `RECORDS (${allRecords.length})`;
+        (window.BFT_I18N ? window.BFT_I18N.t('lv_records') : 'RECORDS') + ` (${allRecords.length})`;
       renderPage();
       renderFirstVictors(allRecords);
     } catch (err) {

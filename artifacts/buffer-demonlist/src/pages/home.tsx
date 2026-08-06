@@ -428,6 +428,8 @@ export default function Home() {
       .top-header .nav-links a { color:white; text-decoration:none; font-size:0.95rem; font-family:'Montserrat',sans-serif; transition:color 0.18s; }
       .top-header .nav-links a:hover { color:#7cfc00; }
       .top-header .menu-toggle { display:none; font-size:28px; color:white; width:40px; height:40px; align-items:center; justify-content:center; cursor:pointer; user-select:none; }
+      .top-header.header-compact .logo-full { display:none; }
+      .top-header.header-compact .logo-short { display:inline; }
       .home-top-card,.home-top-card * { font-family:'Montserrat',sans-serif; }
       .staff-only { display:none!important; } body.is-staff .staff-only, body.is-admin .staff-only, body.is-owner .staff-only { display:revert!important; }
       .owner-only { display:none!important; } body.is-owner .owner-only { display:revert!important; }
@@ -459,6 +461,22 @@ export default function Home() {
     }
 
     (window as any).toggleMenu = () => { const el = document.getElementById("navLinks"); if (el) el.classList.toggle("active"); };
+
+    /* Responsive logo: toggle .header-compact when header content overflows */
+    const header = document.querySelector(".top-header") as HTMLElement | null;
+    if (header) {
+      const check = () => {
+        const leftEl  = header.querySelector(".left") as HTMLElement | null;
+        const rightEl = leftEl?.nextElementSibling as HTMLElement | null;
+        if (!leftEl || !rightEl) return;
+        const used = leftEl.scrollWidth + rightEl.scrollWidth + 14;
+        header.classList.toggle("header-compact", used > header.clientWidth * 0.95);
+      };
+      check();
+      const ro = window.ResizeObserver ? new ResizeObserver(check) : null;
+      ro?.observe(header);
+      window.addEventListener("resize", check);
+    }
   }, []);
 
   return (
