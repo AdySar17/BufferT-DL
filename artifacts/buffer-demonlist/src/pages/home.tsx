@@ -30,7 +30,7 @@ const LANG_FLAGS: Record<string, string> = {
 const TR: Record<string, Record<string, string>> = {
   nav_home:          { es:"Home",               en:"Home",           ru:"Главная",               pt:"Início",          fr:"Accueil",           vi:"Trang chủ" },
   nav_demonlist:     { es:"Demon List",          en:"Demon List",     ru:"Список демонов",        pt:"Demon List",      fr:"Demon List",        vi:"Demon List" },
-  nav_pemonlist:     { es:"PemonList",           en:"PemonList",      ru:"PemonList",             pt:"PemonList",       fr:"PemonList",        vi:"PemonList" },
+  nav_pemonlist:     { es:"Pemon List",           en:"Pemon List",      ru:"Pemon List",             pt:"Pemon List",       fr:"Pemon List",        vi:"Pemon List" },
   nav_leaderboards:  { es:"Leaderboards",        en:"Leaderboards",   ru:"Таблица лидеров",       pt:"Rankings",        fr:"Classements",       vi:"Bảng xếp hạng" },
   nav_notifications: { es:"✉ Notificaciones",    en:"✉ Notifications",ru:"✉ Уведомления",        pt:"✉ Notificações",  fr:"✉ Notifications",   vi:"✉ Thông báo" },
   nav_submit:        { es:"Enviar Record",       en:"Submit Record",  ru:"Отправить рекорд",      pt:"Enviar Record",   fr:"Soumettre un record",vi:"Gửi Record" },
@@ -561,7 +561,10 @@ export default function Home() {
             <a href="/demonlist.html">{t("nav_demonlist")}</a>
             <a href="/pemonlist.html">{t("nav_pemonlist")}</a>
             <a href="/leaderboards.html">{t("nav_leaderboards")}</a>
-            <a href="/notifications.html">{t("nav_notifications")}</a>
+            <a href="/notifications.html" className="bft-notifications-link">
+              <span className="notification-label">{t("nav_notifications")}</span>
+              <span className="notification-badge" id="notificationBadge" hidden aria-label="Notificaciones nuevas">0</span>
+            </a>
             <a href="/submit.html">{t("nav_submit")}</a>
             <a href="/guidelines.html">{t("nav_guidelines")}</a>
             <a href="/panel.html" className="staff-only">{t("nav_panel")}</a>

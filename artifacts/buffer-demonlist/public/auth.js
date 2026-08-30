@@ -14,7 +14,8 @@ import {
   onAuthStateChanged, setPersistence, browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp
+  getFirestore, collection, query, where, getDocs,
+  doc, getDoc, setDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* ── Config ─────────────────────────────────────────────────── */
@@ -386,11 +387,242 @@ function escapeHtml(s) {
 }
 
 /* ============================================================
+ *  Header compartido
+ *  Todas las páginas estáticas pasan por aquí para evitar que
+ *  una copia antigua del header vuelva a desalinearse.
+ * ============================================================ */
+function isPemonHeaderRoute() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const file = path.split("/").pop().toLowerCase();
+  return file === "pemonlist.html"
+    || file === "pemon-level.html"
+    || (file === "submit.html"
+      && new URLSearchParams(window.location.search).get("list") === "pemon");
+}
+
+function isNotificationsRoute() {
+  return window.location.pathname.replace(/\/+$/, "").split("/").pop().toLowerCase()
+    === "notifications.html";
+}
+
+function sharedHeaderMarkup(isPemon) {
+  const submitHref = isPemon ? "/submit.html?list=pemon" : "/submit.html";
+  const submitKey = isPemon ? "nav_submit_pemon" : "nav_submit";
+  const brandFull = isPemon ? "BFT Pemon List" : "BFT Demon List";
+  const brandShort = isPemon ? "BFT PL" : "BFT DL";
+  return `
+    <div class="bft-header-left">
+      <a class="bft-brand" href="/" aria-label="${brandFull}">
+        <img src="/logo.png" class="logo-img" alt="Logo">
+        <span class="logo-text bft-logo-text">
+          <span class="logo-full">${brandFull}</span>
+          <span class="logo-short">${brandShort}</span>
+        </span>
+      </a>
+    </div>
+    <div class="bft-header-actions">
+      <nav class="nav-links bft-header-nav" id="navLinks">
+        <a href="/" data-i18n="nav_home">Home</a>
+        <a href="/demonlist.html" data-i18n="nav_demonlist">Demon List</a>
+        <a href="/pemonlist.html" data-i18n="nav_pemonlist">Pemon List</a>
+        <a href="/leaderboards.html" data-i18n="nav_leaderboards">Leaderboards</a>
+        <a href="/notifications.html" class="bft-notifications-link">
+          <span class="notification-label" data-i18n="nav_notifications">✉ Notificaciones</span>
+          <span class="notification-badge" id="notificationBadge" hidden aria-label="Notificaciones nuevas">0</span>
+        </a>
+        <a href="${submitHref}" data-i18n="${submitKey}">${isPemon ? "Enviar Record Pemon" : "Enviar Record"}</a>
+        <a href="/guidelines.html" data-i18n="nav_guidelines">Guidelines</a>
+        <a href="/panel.html" class="staff-only" data-i18n="nav_panel">Panel de Records</a>
+        <a href="/staff-control.html" class="owner-only" data-i18n="nav_staff_control">Control Staff</a>
+        <a href="/admin-dev.html" class="admin-only" data-i18n="nav_admin_dev">Admin Dev</a>
+      </nav>
+      <div id="langSlot"></div>
+      <div class="auth-slot" id="authSlot"></div>
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menú">☰</button>
+    </div>`;
+}
+
+function mountSharedHeader() {
+  const header = document.querySelector("header.top-header");
+  if (!header) return;
+
+  const isHome = !!document.querySelector(".home-page");
+  const isPemon = isPemonHeaderRoute();
+  header.classList.add("bft-site-header");
+
+  /*
+   * Home está renderizado por React: conserva su árbol para que los
+   * cambios de idioma no sean pisados, pero comparte las mismas clases.
+   * Las páginas estáticas sí se reemplazan completamente por el template
+   * común para eliminar diferencias históricas entre archivos.
+   */
+  if (!isHome) {
+    header.innerHTML = sharedHeaderMarkup(isPemon);
+  }
+
+  const nav = header.querySelector("#navLinks");
+  const menu = header.querySelector("#menuToggle, .menu-toggle");
+  const toggle = () => nav?.classList.toggle("active");
+  window.toggleMenu = toggle;
+
+  /* pemon-level.html ya registra su listener por compatibilidad. */
+  if (!isHome && menu && menu.id !== "menuToggle") {
+    menu.onclick = toggle;
+  }
+
+  const notificationsLink = header.querySelector(".bft-notifications-link")
+    || header.querySelector('a[href="/notifications.html"]');
+  notificationsLink?.addEventListener("click", () => markNotificationsSeen());
+
+  if (isNotificationsRoute()) markNotificationsSeen();
+}
+
+/* ============================================================
+ *  Badge de notificaciones nuevas
+ *  Se basa en records aceptados desde la última visita a
+ *  Notificaciones. El estado de "revisado" es local al navegador,
+ *  apropiado para este indicador decorativo.
+ * ============================================================ */
+const NOTIFICATIONS_SEEN_KEY = "bft_notifications_seen_at";
+let notificationRequestId = 0;
+
+function notificationTimestamp(record) {
+  const value = record?.acceptedAt || record?.moderatedAt || record?.updatedAt || record?.createdAt;
+  if (!value) return 0;
+  try {
+    return value.toMillis ? value.toMillis() : new Date(value).getTime();
+  } catch (_) {
+    return 0;
+  }
+}
+
+function notificationSeenAt() {
+  try {
+    const value = Number(localStorage.getItem(NOTIFICATIONS_SEEN_KEY));
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function renderNotificationBadge(count) {
+  const safeCount = Math.max(0, Math.floor(Number(count) || 0));
+  document.querySelectorAll(".notification-badge").forEach(badge => {
+    badge.textContent = safeCount > 99 ? "99+" : String(safeCount);
+    badge.hidden = safeCount === 0;
+    badge.setAttribute("aria-label", `${safeCount} notificaciones nuevas`);
+  });
+}
+
+export function markNotificationsSeen() {
+  try { localStorage.setItem(NOTIFICATIONS_SEEN_KEY, String(Date.now())); }
+  catch (_) {}
+  renderNotificationBadge(0);
+}
+
+async function refreshNotificationBadge(user) {
+  const requestId = ++notificationRequestId;
+  try {
+    const [snap1, snap2] = await Promise.all([
+      getDocs(query(collection(db, "records"), where("userId", "==", user.uid))),
+      getDocs(query(collection(db, "records"), where("player2Id", "==", user.uid)))
+    ]);
+    if (requestId !== notificationRequestId) return;
+
+    const records = new Map();
+    snap1.forEach(snapshot => records.set(snapshot.id, snapshot.data()));
+    snap2.forEach(snapshot => records.set(snapshot.id, snapshot.data()));
+
+    const seenAt = notificationSeenAt();
+    const unread = [...records.values()].filter(record =>
+      record.status === "Accepted"
+      && (!seenAt || notificationTimestamp(record) > seenAt)
+    ).length;
+    renderNotificationBadge(unread);
+  } catch (err) {
+    if (requestId === notificationRequestId) {
+      console.warn("[auth] No se pudo cargar el badge de notificaciones:", err);
+      renderNotificationBadge(0);
+    }
+  }
+}
+
+/* ============================================================
  *  CSS del widget (inyectado una sola vez)
  * ============================================================ */
 (function injectAuthCss() {
   if (document.getElementById("auth-css")) return;
   const css = `
+    /* Header compartido */
+    .bft-site-header {
+      position:fixed !important; top:0 !important; left:0 !important;
+      width:100% !important; height:60px !important;
+      display:flex !important; align-items:center !important;
+      justify-content:space-between !important;
+      padding:0 15px !important; z-index:9999 !important;
+      background:rgba(0,0,0,0.55) !important;
+      backdrop-filter:blur(10px) !important;
+      font-family:'Montserrat',sans-serif !important;
+    }
+    .bft-site-header .bft-header-left,
+    .bft-site-header .bft-brand {
+      display:flex; align-items:center; gap:10px; min-width:0;
+    }
+    .bft-site-header .bft-brand {
+      color:inherit; text-decoration:none;
+    }
+    .bft-site-header .logo-img {
+      width:38px !important; height:38px !important; flex:0 0 38px;
+    }
+    .bft-site-header .bft-logo-text {
+      color:#fff !important; font-weight:700 !important;
+      font-size:1.1rem !important; white-space:nowrap;
+    }
+    .bft-site-header .logo-short { display:none; }
+    .bft-site-header .bft-header-actions {
+      display:flex; align-items:center; gap:10px; min-width:0;
+    }
+    .bft-site-header .bft-header-nav {
+      display:flex; align-items:center; gap:15px;
+    }
+    .bft-site-header .bft-header-nav a {
+      position:relative; color:#fff; text-decoration:none;
+      font-size:.95rem; white-space:nowrap;
+    }
+    .bft-site-header .bft-header-nav a:hover { color:#c7ff3b; }
+    .bft-site-header .bft-notifications-link {
+      display:inline-flex; align-items:center; gap:4px;
+    }
+    .notification-badge {
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width:17px; height:17px; padding:0 4px;
+      border-radius:999px; background:#e53935; color:#fff;
+      font:700 .62rem/1 'Montserrat',sans-serif;
+      box-shadow:0 0 0 2px rgba(0,0,0,.65);
+      transform:translateY(-7px);
+    }
+    .bft-site-header .menu-toggle {
+      display:none; align-items:center; justify-content:center;
+      width:40px; height:40px; padding:0; border:0;
+      background:none; color:#fff; font-size:28px;
+      cursor:pointer; user-select:none;
+    }
+    @media (max-width:768px) {
+      .bft-site-header .logo-full { display:none !important; }
+      .bft-site-header .logo-short { display:inline !important; }
+      .bft-site-header .menu-toggle { display:flex !important; }
+      .bft-site-header .bft-header-nav {
+        display:none; flex-direction:column; align-items:stretch;
+        position:absolute; top:60px; right:10px; gap:8px;
+        min-width:190px; max-width:calc(100vw - 20px);
+        padding:10px; border-radius:10px;
+        background:rgba(0,0,0,.94);
+        box-shadow:0 12px 28px rgba(0,0,0,.45);
+      }
+      .bft-site-header .bft-header-nav.active { display:flex; }
+      .bft-site-header .bft-header-nav a { padding:4px 6px; }
+    }
+
     .auth-slot { display:flex; align-items:center; }
 
     /* Cargando sesión */
@@ -573,3 +805,14 @@ function escapeHtml(s) {
   style.textContent = css;
   document.head.appendChild(style);
 })();
+
+mountSharedHeader();
+
+onAuthChange((user, data, loading) => {
+  if (loading || !user) {
+    ++notificationRequestId;
+    renderNotificationBadge(0);
+    return;
+  }
+  refreshNotificationBadge(user);
+});
