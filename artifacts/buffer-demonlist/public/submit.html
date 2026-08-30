@@ -549,6 +549,16 @@
         <input type="text" id="newLevelId" maxlength="20" inputmode="numeric"
                placeholder="Ej: 70682040">
 
+        <label for="newLevelType" data-i18n="sub_new_type_label">Tipo</label>
+        <select id="newLevelType">
+          <option value="classic" data-i18n="sub_new_type_classic">Clásico</option>
+          <option value="platformer" data-i18n="sub_new_type_platformer">Plataforma</option>
+          <option value="2p" data-i18n="sub_new_type_2p">2 Players</option>
+          <option value="solo" data-i18n="sub_new_type_solo">2 Players (Solo)</option>
+        </select>
+        <div class="nl-sub" data-i18n="sub_new_type_hint">Elige cómo se clasificará cuando el staff lo acepte.</div>
+        <div id="newLevelTypeInfo" class="nl-sub" style="color:#c7ff3b;margin-top:-4px;"></div>
+
         <label for="newLevelDifficulty">Dificultad del nivel <span class="opt">(elige una)</span></label>
         <select id="newLevelDifficulty">
           <option value="Extreme Demon">Extreme Demon</option>
@@ -649,7 +659,11 @@
     import { mountAuthUI, onAuthChange, getCurrentUser,
              getCurrentProfileData, isOwner, db }
       from "/auth.js?v=8";
-    import { getListType, PEMON_LIST_TYPE, DEMON_LIST_TYPE } from "/list-utils.js";
+    import {
+      getListType, PEMON_LIST_TYPE, DEMON_LIST_TYPE,
+      NEW_LEVEL_TYPE_CLASSIC, NEW_LEVEL_TYPE_PLATFORMER,
+      NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO
+    } from "/list-utils.js";
     import {
       collection, getDocs, getDoc, doc, addDoc, query, where, limit,
       orderBy, serverTimestamp
@@ -727,6 +741,37 @@
     const requestedListType = new URLSearchParams(location.search).get("list") === PEMON_LIST_TYPE
       ? PEMON_LIST_TYPE
       : DEMON_LIST_TYPE;
+    function getSelectedNewLevelType() {
+      const value = $("newLevelType")?.value;
+      return [NEW_LEVEL_TYPE_CLASSIC, NEW_LEVEL_TYPE_PLATFORMER, NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO]
+        .includes(value) ? value : NEW_LEVEL_TYPE_CLASSIC;
+    }
+    function syncNewLevelDifficulty() {
+      const type = getSelectedNewLevelType();
+      const select = $("newLevelDifficulty");
+      if (!select) return;
+      const options = type === NEW_LEVEL_TYPE_PLATFORMER
+        ? ["Platformer", "Hard Platformer", "Extreme Platformer"]
+        : ["Extreme Demon", "Insane Demon", "Hard Demon", "Medium Demon", "Easy Demon"];
+      const previous = select.value;
+      select.innerHTML = options.map(value => `<option value="${value}">${value}</option>`).join("");
+      select.value = options.includes(previous)
+        ? previous
+        : (type === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
+      const infoKey = {
+        [NEW_LEVEL_TYPE_CLASSIC]: "sub_new_type_classic_desc",
+        [NEW_LEVEL_TYPE_PLATFORMER]: "sub_new_type_platformer_desc",
+        [NEW_LEVEL_TYPE_2P]: "sub_new_type_2p_desc",
+        [NEW_LEVEL_TYPE_SOLO]: "sub_new_type_solo_desc"
+      }[type];
+      $("newLevelTypeInfo").textContent = window.BFT_I18N?.t(infoKey) || "";
+    }
+    $("newLevelType").value = requestedListType === PEMON_LIST_TYPE
+      ? NEW_LEVEL_TYPE_PLATFORMER
+      : NEW_LEVEL_TYPE_CLASSIC;
+    $("newLevelType").addEventListener("change", syncNewLevelDifficulty);
+    window.addEventListener("bft-lang-change", syncNewLevelDifficulty);
+    syncNewLevelDifficulty();
     function showMsg(text, type) {
       const el = $("msg");
       el.textContent = text;
@@ -1042,11 +1087,16 @@
 
       /* === Datos del nuevo nivel reclamado === */
       let claimedLevelName = "", claimedLevelId = "", claimedLevelDifficulty = "";
+      const claimedLevelType = isNewClaim
+        ? getSelectedNewLevelType()
+        : requestedListType === PEMON_LIST_TYPE
+          ? NEW_LEVEL_TYPE_PLATFORMER
+          : NEW_LEVEL_TYPE_CLASSIC;
       if (isNewClaim) {
         claimedLevelName       = $("newLevelName").value.trim();
         claimedLevelId         = $("newLevelId").value.trim();
         claimedLevelDifficulty = $("newLevelDifficulty").value ||
-          (requestedListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon");
+          (claimedLevelType === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
         if (!claimedLevelName || !claimedLevelId) {
           showMsg("Para un nivel nuevo debes indicar nombre e ID.", "err"); return;
         }
@@ -1108,7 +1158,14 @@
          *     que está en la Lista. Esto evita que el usuario reclame
          *     un nivel ya existente "como nuevo". Comparamos el campo
          *     `gdLevelId` que el staff asigna al añadir/editar niveles. */
-        const yaEnLista = levelsCache.find(l =>
+        let allLevelsForCollision = levelsCache;
+        try {
+          const allLevelsSnap = await getDocs(collection(db, "levels"));
+          allLevelsForCollision = allLevelsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (err) {
+          console.warn("[submit] all-level collision check fallback:", err);
+        }
+        const yaEnLista = allLevelsForCollision.find(l =>
           String(l.gdLevelId || "").trim() === claimedLevelId
         );
         if (yaEnLista) {
@@ -1216,7 +1273,10 @@
           claimedLevelName:       isNewClaim ? claimedLevelName       : "",
           claimedLevelId:         isNewClaim ? claimedLevelId         : "",
           claimedLevelDifficulty: isNewClaim ? claimedLevelDifficulty : "",
-          listType: requestedListType
+          claimedLevelType:      isNewClaim ? claimedLevelType       : "",
+          listType: isNewClaim
+            ? (claimedLevelType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE)
+            : requestedListType
         };
         const ref = await addDoc(collection(db, "records"), payload);
         console.log("[submit] OK record id =", ref.id, "newClaim=", isNewClaim);
@@ -1231,7 +1291,9 @@
         clearLevel();
         $("newLevelName").value       = "";
         $("newLevelId").value         = "";
-        $("newLevelDifficulty").value = requestedListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon";
+        $("newLevelType").value = requestedListType === PEMON_LIST_TYPE
+          ? NEW_LEVEL_TYPE_PLATFORMER : NEW_LEVEL_TYPE_CLASSIC;
+        syncNewLevelDifficulty();
         $("percent").value = "";
         $("video").value = "";
         $("video2").value = "";

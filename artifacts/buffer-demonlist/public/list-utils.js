@@ -1,5 +1,9 @@
 export const DEMON_LIST_TYPE = "demon";
 export const PEMON_LIST_TYPE = "pemon";
+export const NEW_LEVEL_TYPE_CLASSIC = "classic";
+export const NEW_LEVEL_TYPE_PLATFORMER = "platformer";
+export const NEW_LEVEL_TYPE_2P = "2p";
+export const NEW_LEVEL_TYPE_SOLO = "solo";
 
 /* Legacy levels without listType are part of the original Demon List. */
 export function getListType(value) {
@@ -14,6 +18,24 @@ export function isPemon(value) {
 
 export function isDemon(value) {
   return getListType(value) === DEMON_LIST_TYPE;
+}
+
+export function getNewLevelType(record) {
+  if (record?.claimedLevelType === NEW_LEVEL_TYPE_PLATFORMER ||
+      record?.claimedLevelType === NEW_LEVEL_TYPE_2P ||
+      record?.claimedLevelType === NEW_LEVEL_TYPE_SOLO ||
+      record?.claimedLevelType === NEW_LEVEL_TYPE_CLASSIC) {
+    return record.claimedLevelType;
+  }
+  return record?.listType === PEMON_LIST_TYPE
+    ? NEW_LEVEL_TYPE_PLATFORMER
+    : NEW_LEVEL_TYPE_CLASSIC;
+}
+
+export function getNewLevelSuffix(type) {
+  if (type === NEW_LEVEL_TYPE_2P) return " (2P)";
+  if (type === NEW_LEVEL_TYPE_SOLO) return " (Solo)";
+  return "";
 }
 
 /* PemonList currently follows the same position curve as Demon List.

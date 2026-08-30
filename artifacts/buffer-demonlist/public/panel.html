@@ -417,8 +417,8 @@
     </div>
   </div>
 
-  <!-- Sólo Owner: recalcular los puntos de TODOS los niveles con la
-       fórmula actual de points.js. Se inyecta dinámicamente. -->
+  <!-- Sólo Owner: recalcular los valores de TODOS los niveles usando
+       computePoints para Demon List y computeLunas para PemonList. -->
   <div id="ownerToolsBox" style="display:none; margin: 18px 0 22px;">
     <div class="card" style="padding:16px 18px; border:1px solid rgba(199,255,59,0.30);">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -427,14 +427,13 @@
             🛠 Herramientas de Owner
           </div>
           <div style="font-size:.86rem; color:rgba(230,230,230,0.7); line-height:1.4;">
-            Recalcula el campo <code>value</code> (puntos) de cada nivel de la
-            lista usando la fórmula actual <code>computePoints(position)</code>.
-            Útil cuando cambias la curva de puntos.
+            Recalcula el campo <code>value</code> de cada nivel usando Puntos
+            para Demon List y Lunas para PemonList.
           </div>
         </div>
         <button id="btnRecalcPoints" class="btn"
                 style="background:linear-gradient(90deg,#7fff3b,#ffd700); color:#0a1a00; font-weight:700;">
-          Recalcular puntos de toda la lista
+          Recalcular valores de toda la lista
         </button>
       </div>
       <div id="recalcStatus" style="margin-top:10px; font-size:.85rem; color:rgba(230,230,230,0.75);"></div>
@@ -654,7 +653,11 @@
     writeBatch, serverTimestamp, deleteField, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { computePoints } from "/points.js";
-  import { computeLunas, getListType, PEMON_LIST_TYPE, DEMON_LIST_TYPE } from "/list-utils.js";
+  import {
+    computeLunas, getListType, getNewLevelType, getNewLevelSuffix,
+    PEMON_LIST_TYPE, DEMON_LIST_TYPE, NEW_LEVEL_TYPE_PLATFORMER,
+    NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO
+  } from "/list-utils.js";
 
   const $ = (id) => document.getElementById(id);
   const stateBox = $("stateBox");
@@ -1089,11 +1092,15 @@
       return;
     }
     alContext = { rec, wrap };
-    const targetListType = rec.listType === PEMON_LIST_TYPE ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
+    const claimType = getNewLevelType(rec);
+    const targetListType = claimType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
     $("alDifficulty").innerHTML = targetListType === PEMON_LIST_TYPE
       ? '<option value="Platformer">Platformer</option><option value="Hard Platformer">Hard Platformer</option><option value="Extreme Platformer">Extreme Platformer</option>'
       : '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>';
-    $("alName").value       = rec.claimedLevelName || "";
+    const suffix = getNewLevelSuffix(claimType);
+    const claimedName = rec.claimedLevelName || "";
+    $("alName").value       = suffix && !claimedName.endsWith(suffix)
+      ? `${claimedName}${suffix}` : claimedName;
     $("alAuthor").value     = "";
     /* Banner con la info que envió el usuario: ID del nivel en GD */
     if (rec.claimedLevelId) {
@@ -1183,7 +1190,10 @@
     if (!alContext) return;
     const { rec, wrap } = alContext;
 
-    const name      = $("alName").value.trim();
+    const claimType = getNewLevelType(rec);
+    const suffix    = getNewLevelSuffix(claimType);
+    const rawName   = $("alName").value.trim();
+    const name      = suffix && !rawName.endsWith(suffix) ? `${rawName}${suffix}` : rawName;
     const author    = $("alAuthor").value.trim();
     const creators  = $("alCreators").value.split(",").map(s => s.trim()).filter(Boolean);
     const reqPos    = Math.max(1, Math.floor(Number($("alPosition").value) || 0));
@@ -1192,7 +1202,8 @@
     const background  = $("alBackground").value.trim()
                      || gdBgUrl(($("alGdLevelId").value || "").trim());
     const video     = $("alVideo").value.trim();
-    const difficulty= $("alDifficulty").value || "Extreme Demon";
+    const difficulty= $("alDifficulty").value ||
+      (claimType === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
     const minRaw    = parseInt($("alMinPercent").value, 10);
     /* Solo Top 50 puede tener minPercent < 100 */
     const minPercent= (reqPos <= 50 && Number.isFinite(minRaw)) ? Math.min(100, Math.max(1, minRaw)) : 100;
@@ -1219,7 +1230,7 @@
     try {
       /* 1) Cargar todos los niveles para reordenar tras la inserción */
       const lvlSnap = await getDocs(collection(db, "levels"));
-      const targetListType = rec.listType === PEMON_LIST_TYPE ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
+      const targetListType = claimType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
       const all = [];
       lvlSnap.forEach(d => {
         const level = { id: d.id, ...d.data() };
@@ -1242,8 +1253,10 @@
         name, author, creators,
         position: newPos, value: newValue,
         listType: targetListType,
+        levelType: claimType,
         thumbnail, background, video,
-        glow, is2P: false,
+        glow,
+        is2P: claimType === NEW_LEVEL_TYPE_2P || claimType === NEW_LEVEL_TYPE_SOLO,
         description, difficulty, minPercent,
         tags,
         customIds
@@ -1831,10 +1844,10 @@
   }
 
   /* ============================================================
-   *  HERRAMIENTA OWNER: recalcular puntos de toda la lista
+  *  HERRAMIENTA OWNER: recalcular valores de toda la lista
    *  ----------------------------------------------------------
    *  Para cada doc de /levels: lee `position`, calcula
-   *  `computePoints(position)` y, si difiere del `value` actual,
+   *  `computePoints(position)` o `computeLunas(position)` y, si difiere del `value` actual,
    *  lo actualiza. Se hace en lotes de 400 con writeBatch para
    *  no romper el límite de 500 ops por batch de Firestore.
    *  Sólo el rol Owner puede usarlo (UI oculta + chequeo en JS;
@@ -1848,7 +1861,7 @@
     const btn    = $("btnRecalcPoints");
     const status = $("recalcStatus");
     const ok = confirm(
-      "¿Recalcular los puntos (campo \"value\") de TODOS los niveles "
+      "¿Recalcular los valores (campo \"value\") de TODOS los niveles "
       + "usando la fórmula actual?\n\nEsta acción afecta a todos los "
       + "niveles de la lista. No se puede deshacer automáticamente."
     );
@@ -1870,16 +1883,21 @@
       for (const lvl of all) {
         const pos = Number(lvl.position);
         if (!Number.isFinite(pos) || pos < 1) continue; /* sin posición válida */
-        const newVal = computePoints(pos);
+        const newVal = getListType(lvl) === PEMON_LIST_TYPE
+          ? computeLunas(pos)
+          : computePoints(pos);
         const oldVal = Number(lvl.value);
         if (!Number.isFinite(oldVal) || oldVal !== newVal) {
-          changes.push({ id: lvl.id, newVal, oldVal, pos, name: lvl.name });
+          changes.push({
+            id: lvl.id, newVal, oldVal, pos, name: lvl.name,
+            listType: getListType(lvl)
+          });
         }
       }
 
       if (!changes.length) {
         status.style.color = "#7fff3b";
-        status.textContent = `✔ Nada que actualizar: los ${total} niveles ya tienen los puntos correctos.`;
+        status.textContent = `✔ Nada que actualizar: los ${total} niveles ya tienen los valores correctos.`;
         return;
       }
 
@@ -1891,7 +1909,10 @@
       for (let i = 0; i < changes.length; i += CHUNK) {
         const slice = changes.slice(i, i + CHUNK);
         const batch = writeBatch(db);
-        slice.forEach(c => batch.update(doc(db, "levels", c.id), { value: c.newVal }));
+        slice.forEach(c => batch.update(doc(db, "levels", c.id), {
+          value: c.newVal,
+          listType: c.listType || DEMON_LIST_TYPE
+        }));
         await batch.commit();
         written += slice.length;
         status.textContent = `Actualizados ${written}/${changes.length}…`;
@@ -1908,7 +1929,7 @@
       showToast("Error al recalcular: " + (err.message || err.code || "desconocido"), true);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Recalcular puntos de toda la lista";
+      btn.textContent = "Recalcular valores de toda la lista";
     }
   }
   $("btnRecalcPoints").addEventListener("click", recalcAllPoints);
