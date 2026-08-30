@@ -1110,6 +1110,31 @@
   }
   let _alPrevGdId = "";
 
+  function normalizeNewLevelName(value, type) {
+    const baseName = String(value || "")
+      .replace(/\s+\((?:2P|Solo)\)\s*$/i, "")
+      .trim();
+    return `${baseName}${getNewLevelSuffix(type)}`;
+  }
+
+  function levelVariantType(level) {
+    const explicitType = level?.levelType;
+    if ([NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO].includes(explicitType)) {
+      return explicitType;
+    }
+    return level?.is2P ? NEW_LEVEL_TYPE_2P : "classic";
+  }
+
+  function canShareGeometryDashId(existing, requestedType) {
+    const existingType = existing?.claimedLevelType
+      ? getNewLevelType(existing)
+      : levelVariantType(existing);
+    const twoPlayerTypes = [NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO];
+    return twoPlayerTypes.includes(requestedType) &&
+      twoPlayerTypes.includes(existingType) &&
+      requestedType !== existingType;
+  }
+
   function openAddLevelModal(rec, wrap) {
     /* V15: cualquier staff (Mod/Admin/Owner) puede aceptar el reclamo y
        crear el nivel. Los Mods quedarán bloqueados por reglas de
@@ -1124,10 +1149,8 @@
     $("alDifficulty").innerHTML = targetListType === PEMON_LIST_TYPE
       ? '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>'
       : '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>';
-    const suffix = getNewLevelSuffix(claimType);
     const claimedName = rec.claimedLevelName || "";
-    $("alName").value       = suffix && !claimedName.endsWith(suffix)
-      ? `${claimedName}${suffix}` : claimedName;
+    $("alName").value       = normalizeNewLevelName(claimedName, claimType);
     $("alAuthor").value     = "";
     /* Banner con la info que envió el usuario: ID del nivel en GD */
     if (rec.claimedLevelId) {
@@ -1239,9 +1262,9 @@
     const { rec, wrap } = alContext;
 
     const claimType = getNewLevelType(rec);
-    const suffix    = getNewLevelSuffix(claimType);
     const rawName   = $("alName").value.trim();
-    const name      = suffix && !rawName.endsWith(suffix) ? `${rawName}${suffix}` : rawName;
+    const name      = normalizeNewLevelName(rawName, claimType);
+    const baseName  = rawName.replace(/\s+\((?:2P|Solo)\)\s*$/i, "").trim();
     const author    = $("alAuthor").value.trim();
     const creators  = $("alCreators").value.split(",").map(s => s.trim()).filter(Boolean);
     const reqPos    = Math.max(1, Math.floor(Number($("alPosition").value) || 0));
@@ -1273,7 +1296,7 @@
     function showErr(t) { $("alErr").textContent = t; $("alErr").style.display = "block"; }
     $("alErr").style.display = "none";
 
-    if (!name || !author) { showErr("Nombre y autor son obligatorios."); return; }
+    if (!baseName || !author) { showErr("Nombre y autor son obligatorios."); return; }
     if (!reqPos)          { showErr("Indica la posición del nivel (≥ 1)."); return; }
 
     $("alConfirm").disabled = true;
@@ -1288,6 +1311,20 @@
         const level = { id: d.id, ...d.data() };
         if (getListType(level) === targetListType) all.push(level);
       });
+      const finalGdId = ($("alGdLevelId").value || "").trim();
+      if (finalGdId) {
+        const conflictingLevel = all.find(level =>
+          String(level.gdLevelId || "").trim() === finalGdId &&
+          !canShareGeometryDashId(level, claimType)
+        );
+        if (conflictingLevel) {
+          showErr(
+            `La ID de Geometry Dash ya pertenece a "${conflictingLevel.name}". ` +
+            `Sólo puede repetirse entre un nivel 2P y uno 2P (Solo).`
+          );
+          return;
+        }
+      }
       const ordered = [...all].sort((a, b) => {
         const pa = Number(a.position) || Infinity;
         const pb = Number(b.position) || Infinity;
@@ -1316,7 +1353,6 @@
       if (!isPemonLevel) levelDoc.minPercent = minPercent;
       /* gdLevelId final: lo que el staff dejó en el input del modal
          (prellenado con rec.claimedLevelId, pero editable). */
-      const finalGdId = ($("alGdLevelId").value || "").trim();
       if (finalGdId) levelDoc.gdLevelId = String(finalGdId);
       const newRef = await addDoc(collection(db, "levels"), levelDoc);
       placeholder.id = newRef.id;

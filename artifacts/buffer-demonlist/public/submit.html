@@ -733,7 +733,8 @@
     import {
       getListType, PEMON_LIST_TYPE, DEMON_LIST_TYPE,
       NEW_LEVEL_TYPE_CLASSIC, NEW_LEVEL_TYPE_PLATFORMER,
-      NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO
+      NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO, getNewLevelSuffix,
+      getNewLevelType
     } from "/list-utils.js";
     import {
       collection, getDocs, getDoc, doc, addDoc, query, where, limit,
@@ -826,6 +827,56 @@
         : (isPemonMode() ? NEW_LEVEL_TYPE_PLATFORMER : NEW_LEVEL_TYPE_CLASSIC);
     }
 
+    function stripNewLevelVariantSuffix(value) {
+      return String(value || "").replace(/\s+\((?:2P|Solo)\)\s*$/i, "").trim();
+    }
+
+    function withNewLevelVariantSuffix(value, type) {
+      const baseName = stripNewLevelVariantSuffix(value);
+      return `${baseName}${getNewLevelSuffix(type)}`;
+    }
+
+    function levelVariantType(level) {
+      const explicitType = level?.levelType;
+      if ([NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO, NEW_LEVEL_TYPE_CLASSIC, NEW_LEVEL_TYPE_PLATFORMER]
+        .includes(explicitType)) {
+        return explicitType;
+      }
+      /* Niveles antiguos con is2P sólo pueden identificarse como 2P. */
+      return level?.is2P ? NEW_LEVEL_TYPE_2P : NEW_LEVEL_TYPE_CLASSIC;
+    }
+
+    function canShareGeometryDashId(existing, requestedType) {
+      const existingType = existing?.claimedLevelType
+        ? getNewLevelType(existing)
+        : levelVariantType(existing);
+      const twoPlayerTypes = [NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO];
+      return twoPlayerTypes.includes(requestedType) &&
+        twoPlayerTypes.includes(existingType) &&
+        requestedType !== existingType;
+    }
+
+    function syncNewLevelNameForType() {
+      const input = $("newLevelName");
+      if (!input) return;
+      input.value = withNewLevelVariantSuffix(input.value, getSelectedNewLevelType());
+    }
+
+    function syncNewLevel2PForType(resetNon2P = false) {
+      const type = getSelectedNewLevelType();
+      const checkbox = $("tg2P");
+      if (!checkbox) return;
+
+      if (type === NEW_LEVEL_TYPE_2P) {
+        checkbox.checked = true;
+      } else if (type === NEW_LEVEL_TYPE_SOLO || resetNon2P) {
+        checkbox.checked = false;
+      }
+
+      $("block2P").classList.toggle("open", checkbox.checked);
+      if (checkbox.checked && profilesCache.length === 0) loadProfiles();
+    }
+
     function syncNewLevelTypeOptions(forceDefault = false) {
       const select = $("newLevelType");
       if (!select) return;
@@ -844,6 +895,8 @@
         `<option value="${value}">${escapeHtml(window.BFT_I18N?.t(labels[value]) || value)}</option>`
       ).join("");
       select.value = type;
+      syncNewLevelNameForType();
+      syncNewLevel2PForType(forceDefault || type !== current);
     }
 
     function syncNewLevelDifficulty() {
@@ -886,7 +939,11 @@
       syncRecordInputMode();
     }
 
-    $("newLevelType").addEventListener("change", syncNewLevelDifficulty);
+    $("newLevelType").addEventListener("change", () => {
+      syncNewLevelNameForType();
+      syncNewLevel2PForType(true);
+      syncNewLevelDifficulty();
+    });
     window.addEventListener("bft-lang-change", () => {
       syncNewLevelTypeOptions();
       syncNewLevelDifficulty();
@@ -975,7 +1032,7 @@
           <button type="button" class="list-mode-button pemon" data-list-type="${PEMON_LIST_TYPE}">
             <svg class="gd-icon gd-moon-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="#58b8ff" d="M20.2 15.1A8.8 8.8 0 0 1 8.9 3.8a9.2 9.2 0 1 0 11.3 11.3Z"/>
-            </svg><span data-i18n="sub_list_lunas">Lunas</span>
+            </svg><span data-i18n="sub_list_platform">Plataforma</span>
           </button>
         </div>`;
     }
@@ -1278,7 +1335,11 @@
           ? NEW_LEVEL_TYPE_PLATFORMER
           : NEW_LEVEL_TYPE_CLASSIC;
       if (isNewClaim) {
-        claimedLevelName       = $("newLevelName").value.trim();
+        claimedLevelName       = withNewLevelVariantSuffix(
+          $("newLevelName").value,
+          claimedLevelType
+        );
+        $("newLevelName").value = claimedLevelName;
         claimedLevelId         = $("newLevelId").value.trim();
         claimedLevelDifficulty = $("newLevelDifficulty").value ||
           (claimedLevelType === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
@@ -1348,7 +1409,8 @@
         /* (A) Bloqueo si el ID de Geometry Dash YA pertenece a un nivel
          *     que está en la Lista. Esto evita que el usuario reclame
          *     un nivel ya existente "como nuevo". Comparamos el campo
-         *     `gdLevelId` que el staff asigna al añadir/editar niveles. */
+         *     `gdLevelId` que el staff asigna al añadir/editar niveles.
+         *     Sólo se permite compartirlo entre las variantes 2P y Solo. */
         let allLevelsForCollision = levelsCache;
         try {
           const allLevelsSnap = await getDocs(collection(db, "levels"));
@@ -1357,7 +1419,8 @@
           console.warn("[submit] all-level collision check fallback:", err);
         }
         const yaEnLista = allLevelsForCollision.find(l =>
-          String(l.gdLevelId || "").trim() === claimedLevelId
+          String(l.gdLevelId || "").trim() === claimedLevelId &&
+          !canShareGeometryDashId(l, claimedLevelType)
         );
         if (yaEnLista) {
           showMsg(
@@ -1369,16 +1432,14 @@
         }
 
         /* (B) Para "Nuevo nivel": revisar si OTRO usuario ya reclamó este ID de
-         *   nivel (status Pending). El ID del nivel en Geometry Dash es único
-         *   así que evita que cambien solo el nombre y se cuelen.
-         *   También bloquea reclamos duplicados del propio usuario. */
+         *   nivel (status Pending). El mismo ID sólo puede coexistir si una
+         *   solicitud es 2P y la otra es 2P (Solo). */
         try {
           const claimSnap = await getDocs(query(
             collection(db, "records"),
             where("isNewLevelClaim", "==", true),
             where("status", "==", "Pending"),
-            where("claimedLevelId", "==", claimedLevelId),
-            limit(5)
+            where("claimedLevelId", "==", claimedLevelId)
           ));
           if (!claimSnap.empty) {
             showMsg(
@@ -1397,10 +1458,11 @@
               collection(db, "records"),
               where("isNewLevelClaim", "==", true),
               where("status", "==", "Pending"),
-              limit(100)
+              limit(1000)
             ));
             const colision = claimSnap.docs.find(d =>
-              String((d.data().claimedLevelId || "")).trim() === claimedLevelId
+              String((d.data().claimedLevelId || "")).trim() === claimedLevelId &&
+              !canShareGeometryDashId(d.data(), claimedLevelType)
             );
             if (colision) {
               showMsg(
