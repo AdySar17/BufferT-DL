@@ -1462,8 +1462,8 @@
         const easierNeighbor = ordered[insertAt];     // pos newPos+1 (más abajo en la lista)
         const isFirst = newPos === 1;
         const isLast  = !easierNeighbor;
-        const platformLabel = isPemonLevel ? " de la Plataforma" : "";
-        const hardestLabel = isPemonLevel ? "Hardest Plataforma del servidor" : "Hardest del Servidor";
+        const platformLabel = isPemonLevel ? " de la Pemon List" : "";
+        const hardestLabel = isPemonLevel ? "Hardest de la Pemon List" : "Hardest del Servidor";
         let msg;
         if (isFirst) {
           msg = `**${name}** ha sido posicionado como Top **#1**${platformLabel}, siendo el nuevo ${hardestLabel}.`;
@@ -1584,7 +1584,8 @@
 
     const accepted = action === "accept";
     const lvl      = rec._level || {};
-    const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE;
+    const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE
+      || lvl.listType === PEMON_LIST_TYPE;
     const lvlName  = lvl.name || rec.claimedLevelName || "Nivel desconocido";
     const lvlPos   = lvl.position ? `Top #${lvl.position}` : (rec.isNewLevelClaim ? "Nuevo nivel" : "Top —");
 
@@ -1599,7 +1600,10 @@
       : dev1;
 
     const notes = (staffnotes && staffnotes.trim()) || "—";
-    const diffImg = DIFFICULTY_IMAGES[lvl.difficulty] || DIFFICULTY_IMAGES["Extreme Demon"];
+    const difficultyKey = lvl.difficulty
+      || (rec.isNewLevelClaim ? rec.claimedLevelDifficulty : "")
+      || "Extreme Demon";
+    const diffImg = DIFFICULTY_IMAGES[difficultyKey] || DIFFICULTY_IMAGES["Extreme Demon"];
 
     /* Resultado enviado: porcentaje clásico o tiempo Pemon. */
     const pctNum = Math.max(1, Math.min(100, Math.round(Number(rec.percent) || 0)));
@@ -1608,11 +1612,14 @@
       ? { name: "Tiempo", value: formatTimeMs(rec.timeMs), inline: false }
       : { name: "Porcentaje", value: pctStr, inline: false };
 
-    /* Aceptado → "Record Aceptado" en LIMA (verde lima).
+    /* Aceptado → "Record Aceptado" en LIMA (verde lima) para clásico
+       y con círculo azul para Pemon.
        Rechazado → "Record Rechazado" en ROJO. La carita de
        dificultad va como thumbnail (esquina superior derecha). */
     const embed = {
-      title: accepted ? "🟢 Record Aceptado" : "🔴 Record Rechazado",
+      title: accepted
+        ? (isPemonRecord ? "🔵 Record Aceptado" : "🟢 Record Aceptado")
+        : "🔴 Record Rechazado",
       description: `**${lvlPos} - ${lvlName}**`,
       color: accepted
         ? (isPemonRecord ? 0x65D9FF /* azul plataforma */ : 0x7CFC00 /* lima */)
