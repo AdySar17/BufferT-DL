@@ -465,9 +465,9 @@ function mountSharedHeader() {
   const toggle = () => nav?.classList.toggle("active");
   window.toggleMenu = toggle;
 
-  /* pemon-level.html ya registra su listener por compatibilidad. */
-  if (!isHome && menu && menu.id !== "menuToggle") {
-    menu.onclick = toggle;
+  if (!isHome && menu && menu.dataset.bftMenuBound !== "1") {
+    menu.addEventListener("click", toggle);
+    menu.dataset.bftMenuBound = "1";
   }
 
   const notificationsLink = header.querySelector(".bft-notifications-link")

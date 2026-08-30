@@ -332,7 +332,10 @@
     const profileCache = new Map();
 
     mountAuthUI("authSlot");
-    $("menuToggle").addEventListener("click", () => $("navLinks").classList.toggle("active"));
+    const menuToggle = $("menuToggle");
+    if (menuToggle && menuToggle.dataset.bftMenuBound !== "1") {
+      menuToggle.addEventListener("click", () => $("navLinks").classList.toggle("active"));
+    }
     document.addEventListener("DOMContentLoaded", () => window.BFT_I18N?.renderSelector("langSlot"));
 
     const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
