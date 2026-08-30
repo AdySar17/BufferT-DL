@@ -216,7 +216,18 @@ function LanguageSelector({ lang, setLang }: { lang: string; setLang: (c: string
 
 /* ─── Tipos para datos en vivo ─── */
 type LiveLevel  = { id: string; name: string; author: string; position: number; value: number; thumbnail?: string; background?: string; glow?: string; video?: string; };
-type LiveRecord = { id: string; playerName: string; playerPhoto?: string; levelName: string; levelId: string; percent: number; acceptedAt?: any; };
+type LiveRecord = {
+  id: string;
+  playerName: string;
+  playerPhoto?: string;
+  levelName: string;
+  levelId: string;
+  percent: number;
+  timeMs?: number;
+  acceptedAt?: any;
+  isPemon?: boolean;
+  levelDifficulty?: string;
+};
 type LiveStats  = { records: number; players: number; levels: number; recent: number; };
 
 const CACHE_TTL_MS       = 5 * 60 * 1000;
@@ -253,7 +264,7 @@ function useLiveData() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const cached = readCache<{ stats: LiveStats; top10: LiveLevel[]; records: LiveRecord[] }>("home_livedata_v2");
+      const cached = readCache<{ stats: LiveStats; top10: LiveLevel[]; records: LiveRecord[] }>("home_livedata_v3");
       if (cached) { setStats(cached.stats); setTop10(cached.top10); setRecords(cached.records); setLoading(false); return; }
       try {
         const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
@@ -269,32 +280,6 @@ function useLiveData() {
           if (level.listType !== "pemon") lvls.push({ id: d.id, ...level });
         });
 
-        const recSnap = await getDocs(query(collection(db, "records"), orderBy("acceptedAt", "desc"), limit(5)));
-        const rawRecs: any[] = [];
-        recSnap.forEach((d: any) => rawRecs.push({ id: d.id, ...d.data() }));
-
-        const recsResolved = (await Promise.all(
-          rawRecs.map(async (r: any) => {
-            let playerName = "Jugador"; let playerPhoto: string | undefined; let levelName = "Nivel";
-            try {
-              if (r.userId) {
-                const p = await getDoc(doc(db, "profiles", r.userId));
-                if (p.exists()) { const pd = p.data(); playerName = pd.displayName || pd.name || playerName; playerPhoto = pd.photoURL; }
-                else { const u = await getDoc(doc(db, "users", r.userId)); if (u.exists()) { const ud = u.data(); playerName = ud.displayName || ud.name || playerName; playerPhoto = ud.photoURL; } }
-              }
-              if (r.levelId) {
-                const lv = await getDoc(doc(db, "levels", r.levelId));
-                if (lv.exists()) {
-                  const level = lv.data();
-                  if (level.listType === "pemon") return null;
-                  levelName = level.name || levelName;
-                }
-              }
-            } catch {}
-            return { id: r.id, playerName, playerPhoto, levelName, levelId: r.levelId, percent: r.percent || 100, acceptedAt: r.acceptedAt };
-          })
-        )).filter(Boolean) as LiveRecord[];
-
         async function countCol(colRef: any, label: string): Promise<number> {
           if (typeof getCountFromServer === "function") { try { const snap = await getCountFromServer(colRef); const n = snap.data().count; if (typeof n === "number") return n; } catch (e) { console.warn(`[home] count (${label}):`, e); } }
           try { const snap = await getDocs(query(colRef, limit(1000))); return snap.size; } catch { return 0; }
@@ -304,6 +289,41 @@ function useLiveData() {
           getDocs(collection(db, "levels")),
           countCol(collection(db, "profiles"), "profiles"),
         ]);
+        const levelById = new Map<string, any>();
+        allLevelsSnap.forEach((d: any) => levelById.set(d.id, { id: d.id, ...d.data() }));
+        const toMillis = (value: any) => {
+          if (!value) return 0;
+          if (typeof value.toDate === "function") return value.toDate().getTime();
+          if (typeof value === "object" && typeof value.seconds === "number") return value.seconds * 1000;
+          const millis = new Date(value).getTime();
+          return Number.isFinite(millis) ? millis : 0;
+        };
+        const rawRecs: any[] = allRecordsSnap.docs
+          .map((d: any) => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => toMillis(b.acceptedAt) - toMillis(a.acceptedAt))
+          .slice(0, 5);
+
+        const recsResolved = (await Promise.all(
+          rawRecs.map(async (r: any) => {
+            let playerName = "Jugador"; let playerPhoto: string | undefined; let levelName = "Nivel";
+            const level = r.levelId ? levelById.get(r.levelId) : null;
+            const isPemon = level?.listType === "pemon" || r.listType === "pemon";
+            try {
+              if (r.userId) {
+                const p = await getDoc(doc(db, "profiles", r.userId));
+                if (p.exists()) { const pd = p.data(); playerName = pd.displayName || pd.name || playerName; playerPhoto = pd.photoURL; }
+                else { const u = await getDoc(doc(db, "users", r.userId)); if (u.exists()) { const ud = u.data(); playerName = ud.displayName || ud.name || playerName; playerPhoto = ud.photoURL; } }
+              }
+              levelName = level?.name || levelName;
+            } catch {}
+            return {
+              id: r.id, playerName, playerPhoto, levelName, levelId: r.levelId,
+              percent: r.percent || 100, timeMs: r.timeMs, acceptedAt: r.acceptedAt,
+              isPemon, levelDifficulty: level?.difficulty,
+            };
+          })
+        )).filter(Boolean) as LiveRecord[];
+
         const demonLevelIds = new Set<string>();
         allLevelsSnap.forEach((d: any) => {
           if (d.data()?.listType !== "pemon") demonLevelIds.add(d.id);
@@ -315,7 +335,7 @@ function useLiveData() {
 
         if (cancelled) return;
         const newStats = { records: recordsCount, players: playersCount, levels: levelsCount, recent: recsResolved.length };
-        writeCache("home_livedata_v2", { stats: newStats, top10: lvls, records: recsResolved });
+        writeCache("home_livedata_v3", { stats: newStats, top10: lvls, records: recsResolved });
         setTop10(lvls); setRecords(recsResolved); setStats(newStats); setLoading(false);
       } catch (err) { console.error("[home] error cargando datos:", err); if (!cancelled) setLoading(false); }
     })();
@@ -360,7 +380,7 @@ function useStaffMembers() {
 }
 
 /* ─── Tipo Changelog ─── */
-type ChangelogEntry = { id: string; type: "NEW" | "MOVED"; levelId: string; levelName: string; newPosition: number; oldPosition: number | null; createdAt?: any; };
+type ChangelogEntry = { id: string; type: "NEW" | "MOVED"; levelId: string; levelName: string; listType?: string; newPosition: number; oldPosition: number | null; createdAt?: any; };
 
 function useChangelog() {
   const [entries,   setEntries]   = useState<ChangelogEntry[]>([]);
@@ -374,10 +394,24 @@ function useChangelog() {
         const auth = await dynImport("/auth.js");
         const fs   = await dynImport("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
         const { db } = auth as any;
-        const { collection, query, orderBy, limit, onSnapshot } = fs as any;
+        const { collection, query, orderBy, limit, onSnapshot, doc, getDoc } = fs as any;
         unsub = onSnapshot(
           query(collection(db, "changelog"), orderBy("createdAt", "desc"), limit(5)),
-          (snap: any) => { const rows: ChangelogEntry[] = []; snap.forEach((d: any) => rows.push({ id: d.id, ...d.data() })); setEntries(rows); setLoadingCl(false); },
+          async (snap: any) => {
+            const rows: ChangelogEntry[] = [];
+            snap.forEach((d: any) => rows.push({ id: d.id, ...d.data() }));
+            const hydrated = await Promise.all(rows.map(async (row) => {
+              if (row.listType) return row;
+              try {
+                const levelSnap = await getDoc(doc(db, "levels", row.levelId));
+                return levelSnap.exists()
+                  ? { ...row, listType: levelSnap.data()?.listType }
+                  : row;
+              } catch { return row; }
+            }));
+            setEntries(hydrated);
+            setLoadingCl(false);
+          },
           (e: any) => { console.warn("[home] changelog:", e); setLoadingCl(false); }
         );
       } catch (e) { console.warn("[home] changelog setup:", e); setLoadingCl(false); }
@@ -402,6 +436,17 @@ function timeAgo(ts: any, t: (key: string, vars?: Record<string, string | number
   if (diff < 86400)  return t("time_h",   { n: Math.floor(diff / 3600) });
   if (diff < 604800) return t("time_d",   { n: Math.floor(diff / 86400) });
   return d.toLocaleDateString();
+}
+
+function formatTimeMs(value: any): string {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const millis = Math.floor(ms % 1000);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
 }
 
 /* ─── Estilos ─── */
@@ -561,14 +606,19 @@ export default function Home() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {changelogEntries.map((entry) => {
             const isNew = entry.type === "NEW";
+            const isPemon = entry.listType === "pemon";
+            const href = isPemon
+              ? `/pemon-level.html?id=${entry.levelId}`
+              : `/level.html?id=${entry.levelId}`;
+            const accent = isPemon ? "#65d9ff" : isNew ? "#7cfc00" : "#c7ff3b";
             return (
-              <a key={entry.id} href={`/level.html?id=${entry.levelId}`}
-                style={{ display:"flex", alignItems:"center", gap:14, background:"rgba(15,25,15,0.75)", border:`1px solid ${isNew?"rgba(124,252,0,0.22)":"rgba(199,255,59,0.18)"}`, borderRadius:12, padding:"12px 16px", textDecoration:"none", color:"inherit", transition:"border-color 0.2s, box-shadow 0.2s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = isNew?"rgba(124,252,0,0.5)":"rgba(199,255,59,0.45)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow="0 0 14px rgba(124,252,0,0.18)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = isNew?"rgba(124,252,0,0.22)":"rgba(199,255,59,0.18)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow=""; }}
+              <a key={entry.id} href={href}
+                style={{ display:"flex", alignItems:"center", gap:14, background:"rgba(15,25,25,0.75)", border:`1px solid ${isPemon?"rgba(101,217,255,0.24)":isNew?"rgba(124,252,0,0.22)":"rgba(199,255,59,0.18)"}`, borderRadius:12, padding:"12px 16px", textDecoration:"none", color:"inherit", transition:"border-color 0.2s, box-shadow 0.2s" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = isPemon?"rgba(101,217,255,0.58)":isNew?"rgba(124,252,0,0.5)":"rgba(199,255,59,0.45)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow=`0 0 14px ${isPemon?"rgba(101,217,255,0.2)":"rgba(124,252,0,0.18)"}`; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = isPemon?"rgba(101,217,255,0.24)":isNew?"rgba(124,252,0,0.22)":"rgba(199,255,59,0.18)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow=""; }}
               >
-                <div style={{ width:36, height:36, borderRadius:10, background:isNew?"linear-gradient(135deg,#1a4d1a,#7cfc00)":"linear-gradient(135deg,#2a2a00,#c7ff3b)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem", flexShrink:0 }}>
-                  {isNew ? "★" : "↕"}
+                <div style={{ width:36, height:36, borderRadius:10, background:isPemon?"linear-gradient(135deg,#103b54,#65d9ff)":isNew?"linear-gradient(135deg,#1a4d1a,#7cfc00)":"linear-gradient(135deg,#2a2a00,#c7ff3b)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem", flexShrink:0 }}>
+                  {isPemon ? <span style={{ color:"#b9efff", fontSize:"1.35rem", lineHeight:1 }}>☾</span> : isNew ? "★" : "↕"}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontWeight:700, fontSize:"0.95rem", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{entry.levelName}</div>
@@ -579,7 +629,7 @@ export default function Home() {
                     {" · "}{timeAgo(entry.createdAt, t)}
                   </div>
                 </div>
-                <div style={{ fontSize:"0.72rem", fontWeight:700, textTransform:"uppercase", letterSpacing:1, color:isNew?"#7cfc00":"#c7ff3b", flexShrink:0 }}>
+                <div style={{ fontSize:"0.72rem", fontWeight:700, textTransform:"uppercase", letterSpacing:1, color:accent, flexShrink:0 }}>
                   {isNew ? t("cl_new") : t("cl_moved")}
                 </div>
               </a>
@@ -682,24 +732,28 @@ export default function Home() {
         )}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:14 }}>
           {records.map((r) => (
-            <a key={r.id} href={`/level.html?id=${r.levelId}`}
-              style={{ textDecoration:"none", color:"inherit", background:"rgba(15,25,15,0.75)", border:"1px solid rgba(124,252,0,0.18)", borderRadius:14, padding:14, display:"flex", alignItems:"center", gap:12, transition:"border-color 0.2s, box-shadow 0.2s" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor="rgba(124,252,0,0.55)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow="0 0 18px rgba(124,252,0,0.25)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor="rgba(124,252,0,0.18)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow=""; }}
+            <a key={r.id} href={`${r.isPemon ? "/pemon-level.html" : "/level.html"}?id=${r.levelId}`}
+              style={{ textDecoration:"none", color:"inherit", background:"rgba(15,25,25,0.75)", border:`1px solid ${r.isPemon?"rgba(101,217,255,0.24)":"rgba(124,252,0,0.18)"}`, borderRadius:14, padding:14, display:"flex", alignItems:"center", gap:12, transition:"border-color 0.2s, box-shadow 0.2s" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor=r.isPemon?"rgba(101,217,255,0.58)":"rgba(124,252,0,0.55)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow=r.isPemon?"0 0 18px rgba(101,217,255,0.22)":"0 0 18px rgba(124,252,0,0.25)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor=r.isPemon?"rgba(101,217,255,0.24)":"rgba(124,252,0,0.18)"; (e.currentTarget as HTMLAnchorElement).style.boxShadow=""; }}
             >
               {r.playerPhoto
-                ? <img src={r.playerPhoto} alt={r.playerName} style={{ width:42, height:42, borderRadius:"50%", objectFit:"cover", border:"1px solid rgba(124,252,0,0.4)" }} />
-                : <div style={{ width:42, height:42, borderRadius:"50%", background:"linear-gradient(135deg,#1a4d1a,#7cfc00)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, color:"#fff" }}>{r.playerName.charAt(0).toUpperCase()}</div>
+                ? <img src={r.playerPhoto} alt={r.playerName} style={{ width:42, height:42, borderRadius:"50%", objectFit:"cover", border:`1px solid ${r.isPemon?"rgba(101,217,255,0.5)":"rgba(124,252,0,0.4)"}` }} />
+                : <div style={{ width:42, height:42, borderRadius:"50%", background:r.isPemon?"linear-gradient(135deg,#103b54,#65d9ff)":"linear-gradient(135deg,#1a4d1a,#7cfc00)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, color:"#fff" }}>{r.playerName.charAt(0).toUpperCase()}</div>
               }
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.playerName}</div>
                 <div style={{ fontSize:"0.85rem", color:"rgba(255,255,255,0.7)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                  {Number(r.percent) >= 100
-                    ? <>{t("rec_completed")} <span style={{ color:"#7cfc00" }}>{r.levelName}</span></>
-                    : <>{t("rec_progress")} <span style={{ color:"#c7ff3b", fontWeight:700 }}>{r.percent}%</span> {t("rec_in")} <span style={{ color:"#7cfc00" }}>{r.levelName}</span></>
+                  {r.isPemon
+                    ? <><span style={{ color:"#65d9ff", fontWeight:800 }}>☾</span> {t("rec_completed")} <span style={{ color:"#65d9ff" }}>{r.levelName}</span></>
+                    : Number(r.percent) >= 100
+                      ? <>{t("rec_completed")} <span style={{ color:"#7cfc00" }}>{r.levelName}</span></>
+                      : <>{t("rec_progress")} <span style={{ color:"#c7ff3b", fontWeight:700 }}>{r.percent}%</span> {t("rec_in")} <span style={{ color:"#7cfc00" }}>{r.levelName}</span></>
                   }
                 </div>
-                <div style={{ fontSize:"0.75rem", color:"rgba(255,255,255,0.45)", marginTop:2 }}>{timeAgo(r.acceptedAt, t)} · {r.percent}%</div>
+                <div style={{ fontSize:"0.75rem", color:"rgba(255,255,255,0.45)", marginTop:2 }}>
+                  {timeAgo(r.acceptedAt, t)} · {r.isPemon ? <span style={{ color:"#65d9ff", fontWeight:700 }}>☾ {formatTimeMs(r.timeMs)}</span> : `${r.percent}%`}
+                </div>
               </div>
             </a>
           ))}

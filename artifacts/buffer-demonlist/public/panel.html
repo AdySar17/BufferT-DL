@@ -1121,7 +1121,7 @@
     const claimType = getNewLevelType(rec);
     const targetListType = claimType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
     $("alDifficulty").innerHTML = targetListType === PEMON_LIST_TYPE
-      ? '<option value="Platformer">Platformer</option><option value="Hard Platformer">Hard Platformer</option><option value="Extreme Platformer">Extreme Platformer</option>'
+      ? '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>'
       : '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>';
     const suffix = getNewLevelSuffix(claimType);
     const claimedName = rec.claimedLevelName || "";
@@ -1151,8 +1151,9 @@
     $("alVideo").value      = rec.video || "";
     /* Si el usuario eligió una dificultad en el reclamo, la usamos como
        valor por defecto del select; si no, dejamos Extreme Demon. */
-    $("alDifficulty").value = rec.claimedLevelDifficulty ||
-      (targetListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon");
+    $("alDifficulty").value = targetListType === PEMON_LIST_TYPE
+      ? normalizePemonDifficulty(rec.claimedLevelDifficulty)
+      : (rec.claimedLevelDifficulty || "Extreme Demon");
     $("alMinPercent").value = "";
     const isPemonLevel = targetListType === PEMON_LIST_TYPE;
     $("alMinPercentWrap").style.display = isPemonLevel ? "none" : "";
@@ -1164,6 +1165,18 @@
     _alCustomIds.length = 0;
     renderAlCustomIds();
     $("alBackdrop").style.display = "flex";
+  }
+  function normalizePemonDifficulty(value) {
+    const legacy = {
+      Platformer: "Easy Demon",
+      "Hard Platformer": "Medium Demon",
+      "Extreme Platformer": "Hard Demon",
+    };
+    const normalized = legacy[value] || value;
+    return ["Extreme Demon", "Insane Demon", "Hard Demon", "Medium Demon", "Easy Demon"]
+      .includes(normalized)
+      ? normalized
+      : "Extreme Demon";
   }
   function closeAddLevelModal() { $("alBackdrop").style.display = "none"; alContext = null; }
   $("alCancel").onclick = closeAddLevelModal;
@@ -1236,10 +1249,11 @@
     const background  = $("alBackground").value.trim()
                      || gdBgUrl(($("alGdLevelId").value || "").trim());
     const video     = $("alVideo").value.trim();
-    const difficulty= $("alDifficulty").value ||
-      (claimType === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
     const targetListType = claimType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
     const isPemonLevel = targetListType === PEMON_LIST_TYPE;
+    const difficulty= isPemonLevel
+      ? normalizePemonDifficulty($("alDifficulty").value)
+      : ($("alDifficulty").value || "Extreme Demon");
     const minRaw    = parseInt($("alMinPercent").value, 10);
     /* Solo Demon List usa minPercent; PemonList ordena récords por tiempo. */
     const minPercent = (!isPemonLevel && reqPos <= 50 && Number.isFinite(minRaw))
@@ -1395,6 +1409,7 @@
           type:        "NEW",
           levelId:     newRef.id,
           levelName:   name,
+          listType:    targetListType,
           newPosition: newPos,
           oldPosition: null,
           createdAt:   serverTimestamp()

@@ -818,11 +818,12 @@
       <input id="inp-background" placeholder="URL Fondo de la card">
       <input id="inp-video"      placeholder="URL Video">
       <select id="inp-difficulty">
-        <option value="Platformer">Platformer</option>
-        <option value="Hard Platformer">Hard Platformer</option>
-        <option value="Extreme Platformer">Extreme Platformer</option>
+        <option value="Extreme Demon">Extreme Demon</option>
+        <option value="Insane Demon">Insane Demon</option>
+        <option value="Hard Demon">Hard Demon</option>
+        <option value="Medium Demon">Medium Demon</option>
+        <option value="Easy Demon">Easy Demon</option>
       </select>
-      <input id="inp-min-percent" type="number" min="1" max="100" placeholder="% mínimo requerido (1–100, default 100)">
       <select id="inp-glow">
         <option value="">Sin glow</option>
         <optgroup label="— Originales —">
@@ -935,11 +936,12 @@
       <input id="edit-background" placeholder="URL Fondo de la card">
       <input id="edit-video"      placeholder="URL Video">
       <select id="edit-difficulty">
-        <option value="Platformer">Platformer</option>
-        <option value="Hard Platformer">Hard Platformer</option>
-        <option value="Extreme Platformer">Extreme Platformer</option>
+        <option value="Extreme Demon">Extreme Demon</option>
+        <option value="Insane Demon">Insane Demon</option>
+        <option value="Hard Demon">Hard Demon</option>
+        <option value="Medium Demon">Medium Demon</option>
+        <option value="Easy Demon">Easy Demon</option>
       </select>
-      <input id="edit-min-percent" type="number" min="1" max="100" placeholder="% mínimo requerido (1–100, default 100)">
       <select id="edit-glow">
         <option value="">Sin glow</option>
         <optgroup label="— Originales —">
@@ -1095,7 +1097,7 @@
     import { difficultyImage } from "/difficulty.js";
     import {
       collection, getDocs, addDoc, deleteDoc, doc, updateDoc,
-      writeBatch, serverTimestamp, query, orderBy, limit, startAfter
+      deleteField, writeBatch, serverTimestamp, query, orderBy, limit, startAfter
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     /* ── PAGINACIÓN ─────────────────────────────────────────────── */
@@ -1480,6 +1482,7 @@
           type,
           levelId,
           levelName,
+          listType: PEMON_LIST_TYPE,
           newPosition,
           oldPosition: oldPosition ?? null,
           createdAt: serverTimestamp()
@@ -1506,42 +1509,18 @@
     bindPointsPreview("inp-position",  "inp-points-preview");
     bindPointsPreview("edit-position", "edit-points-preview");
 
-    /* ── MIN % SOLO PARA TOP 50 ──────────────────────────────────
-       Si la posición es > 50, el campo minPercent se bloquea a 100
-       porque solo los niveles del Main List pueden tener % mínimo. */
-    function syncMinPercentLock(posId, minId, hintId) {
-      const posInp = document.getElementById(posId);
-      const minInp = document.getElementById(minId);
-      let hintEl   = document.getElementById(hintId);
-      if (!posInp || !minInp) return;
-      /* Crear el hint si no existe */
-      if (!hintEl) {
-        hintEl = document.createElement("div");
-        hintEl.id = hintId;
-        hintEl.style.cssText = "font-size:.78rem;color:#ff9a9a;margin:-4px 0 6px 2px;display:none;";
-        minInp.insertAdjacentElement("afterend", hintEl);
-      }
-      function update() {
-        const p = Number(posInp.value);
-        const locked = p > 50;
-        minInp.disabled = locked;
-        minInp.style.opacity = locked ? "0.45" : "";
-        minInp.title = locked ? "Solo Top 50 puede tener % mínimo < 100" : "";
-        if (locked) {
-          minInp.value = "";
-          minInp.placeholder = "100 (bloqueado — solo Top 50)";
-          hintEl.textContent = "% mínimo solo disponible para niveles Top 50.";
-          hintEl.style.display = "block";
-        } else {
-          minInp.placeholder = "% mínimo requerido (1–100, default 100)";
-          hintEl.style.display = "none";
-        }
-      }
-      posInp.addEventListener("input", update);
-      posInp.addEventListener("change", update);
+    function normalizePemonDifficulty(value) {
+      const legacy = {
+        Platformer: "Easy Demon",
+        "Hard Platformer": "Medium Demon",
+        "Extreme Platformer": "Hard Demon",
+      };
+      const normalized = legacy[value] || value;
+      return ["Extreme Demon", "Insane Demon", "Hard Demon", "Medium Demon", "Easy Demon"]
+        .includes(normalized)
+        ? normalized
+        : "Extreme Demon";
     }
-    syncMinPercentLock("inp-position",  "inp-min-percent",  "inp-min-percent-hint");
-    syncMinPercentLock("edit-position", "edit-min-percent", "edit-min-percent-hint");
 
     /* ========== AÑADIR ========== */
     window.agregarNivel = async function () {
@@ -1564,12 +1543,7 @@
       const glow       = document.getElementById("inp-glow").value.trim();
       const is2P       = document.getElementById("inp-is2P").checked;
       const description = document.getElementById("inp-description").value.trim();
-      const difficulty = document.getElementById("inp-difficulty").value || "Platformer";
-      const minPercentRaw = parseInt(document.getElementById("inp-min-percent").value, 10);
-      /* Solo Top 50 puede tener minPercent < 100 */
-      const minPercent = (reqPos <= 50 && Number.isFinite(minPercentRaw))
-        ? Math.min(100, Math.max(1, minPercentRaw))
-        : 100;
+      const difficulty = normalizePemonDifficulty(document.getElementById("inp-difficulty").value);
       const tags = getTags("inp");
 
       if (!name || !author) { alert("Nombre y host son obligatorios."); return; }
@@ -1592,7 +1566,7 @@
           name, author, creators, position: newPos, value: newValue,
           listType: PEMON_LIST_TYPE,
           thumbnail, background, video, glow, is2P,
-          description, difficulty, minPercent, tags,
+           description, difficulty, tags,
           rewards: _inpSelectedRewards,
           customIds: _inpCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
         };
@@ -1784,9 +1758,7 @@
         (nivel.background || "").trim() || gdBgUrl(_editPrevGdId);
       document.getElementById("edit-video").value      = nivel.video      || "";
       document.getElementById("edit-glow").value       = nivel.glow       || "";
-      document.getElementById("edit-difficulty").value = nivel.difficulty || "Platformer";
-      document.getElementById("edit-min-percent").value = Number.isFinite(Number(nivel.minPercent))
-        ? Number(nivel.minPercent) : "";
+       document.getElementById("edit-difficulty").value = normalizePemonDifficulty(nivel.difficulty);
       document.getElementById("edit-is2P").checked     = !!nivel.is2P;
       document.getElementById("edit-description").value = nivel.description || "";
 
@@ -1855,12 +1827,7 @@
       const glow       = document.getElementById("edit-glow").value.trim();
       const is2P       = document.getElementById("edit-is2P").checked;
       const description = document.getElementById("edit-description").value.trim();
-      const difficulty = document.getElementById("edit-difficulty").value || "Platformer";
-      const minPercentRaw = parseInt(document.getElementById("edit-min-percent").value, 10);
-      /* Solo Top 50 puede tener minPercent < 100 */
-      const minPercent = (reqPos <= 50 && Number.isFinite(minPercentRaw))
-        ? Math.min(100, Math.max(1, minPercentRaw))
-        : 100;
+       const difficulty = normalizePemonDifficulty(document.getElementById("edit-difficulty").value);
       const tags = getTags("edit");
 
       if (!name || !author) { alert("Nombre y host son obligatorios."); return; }
@@ -1879,7 +1846,8 @@
           const _editPayload = {
             name, author, creators, thumbnail, background, video, glow, is2P,
             listType: PEMON_LIST_TYPE,
-            description, difficulty, minPercent, tags,
+             description, difficulty, tags,
+             minPercent: deleteField(),
             gdLevelId: gdLevelId ? String(gdLevelId) : "",
             rewards: _editSelectedRewards,
             customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
@@ -1902,7 +1870,8 @@
         await updateDoc(doc(db, "levels", id), {
           name, author, creators, thumbnail, background, video, glow, is2P,
           listType: PEMON_LIST_TYPE,
-          description, difficulty, minPercent, tags,
+           description, difficulty, tags,
+           minPercent: deleteField(),
           gdLevelId: gdLevelId ? String(gdLevelId) : "",
           rewards: _editSelectedRewards,
           customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status })),
