@@ -617,13 +617,12 @@
   import { isDemon } from "/list-utils.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { countryName as lvlCname, flagUrl as lvlFlagUrl } from "/country-utils.js";
+  import { countryName, flagUrl } from "/country-utils.js";
 
   /* ── Constantes ─────────────────────────────────────── */
   const PER_PAGE      = 15;
   const MOBILE_ICON   = "https://iili.io/fuI3XBR.png";
   const PLAY_ICON     = "https://iili.io/fuzpjRf.png";
-  const FLAG_BASE     = "https://flagcdn.com/w40/";
 
   /* ── Estado records ─────────────────────────────────── */
   let allRecords  = [];
@@ -642,11 +641,6 @@
     const long  = url.match(/[?&]v=([^&\s]+)/);
     if (long)  return `https://www.youtube.com/embed/${long[1]}`;
     return url;
-  }
-
-  function flagUrl(country) {
-    if (!country) return "";
-    return FLAG_BASE + country.toLowerCase() + ".png";
   }
 
   /* ── Render nivel ───────────────────────────────────── */
@@ -1177,7 +1171,7 @@
 
       const flag = document.createElement("img");
       flag.className = "fvn-flag";
-      flag.src = lvlFlagUrl(e.country);
+      flag.src = flagUrl(e.country);
       flag.alt = e.country.toUpperCase();
       flag.onerror = () => { flag.style.display = "none"; };
 

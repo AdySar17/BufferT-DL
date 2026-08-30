@@ -1107,7 +1107,9 @@
     let hasMore         = true; // ¿quedan más niveles en Firestore?
     let loadingMore     = false;
     let allLevelsCache  = null; // caché completa (carga perezosa, para búsqueda)
+    let allLevelsPromise = null;
     let searchMode      = false;
+    let searchRequest   = 0;
 
     /* ========== HELPERS DE REORGANIZACIÓN ========== */
 
@@ -1330,7 +1332,9 @@
       lastDoc         = null;
       hasMore         = true;
       allLevelsCache  = null;
+      allLevelsPromise = null;
       searchMode      = false;
+      searchRequest++;
 
       try {
         const q = query(
@@ -1360,7 +1364,8 @@
 
         niveles.forEach(nivel => container.appendChild(crearCard(nivel)));
         setupObserver();
-        aplicarBuscador();
+        const bar = document.getElementById("searchBar");
+        if (bar.value.trim()) bar._searchHandler?.();
       } catch (err) {
         loadingMsg.textContent = "Error al cargar: " + err.message;
         loadingMsg.style.display = "block";
@@ -1406,12 +1411,43 @@
     }
 
     /* ── BUSCADOR ─────────────────────────────────────────────── */
+    function filtrarNiveles(niveles, term) {
+      return niveles.filter(lv => {
+        const t = (lv.name   || "").toLowerCase();
+        const a = (lv.author || "").toLowerCase();
+        return t.includes(term) || a.includes(term);
+      });
+    }
+
+    function renderResultadosBusqueda(niveles, term) {
+      const container = document.getElementById("levelContainer");
+      container.innerHTML = "";
+      filtrarNiveles(niveles, term).forEach(nivel => container.appendChild(crearCard(nivel)));
+    }
+
+    function cargarListaCompletaParaBusqueda() {
+      if (allLevelsCache) return Promise.resolve(allLevelsCache);
+      if (!allLevelsPromise) {
+        allLevelsPromise = fetchAllLevels()
+          .then(niveles => {
+            allLevelsCache = niveles;
+            return niveles;
+          })
+          .catch(error => {
+            console.error("[search] fetchAllLevels error:", error);
+            return null;
+          });
+      }
+      return allLevelsPromise;
+    }
+
     function aplicarBuscador() {
       const bar = document.getElementById("searchBar");
       if (bar._searchHandler) bar.removeEventListener("input", bar._searchHandler);
 
-      bar._searchHandler = async () => {
+      bar._searchHandler = () => {
         const term = bar.value.toLowerCase().trim();
+        const request = ++searchRequest;
 
         if (!term) {
           searchMode = false;
@@ -1426,27 +1462,21 @@
         searchMode = true;
         if (_observer) _observer.disconnect();
 
-        if (!allLevelsCache) {
-          const prev = bar.placeholder;
-          bar.placeholder = "Cargando lista completa…";
-          try {
-            allLevelsCache = await fetchAllLevels();
-          } catch (e) {
-            console.error("[search] fetchAllLevels error:", e);
-            allLevelsCache = [...nivelesActuales];
-          }
-          bar.placeholder = prev;
+        /* Mostrar inmediatamente coincidencias de la página ya cargada.
+           La búsqueda completa continúa en segundo plano. */
+        renderResultadosBusqueda(nivelesActuales, term);
+        if (allLevelsCache) {
+          renderResultadosBusqueda(allLevelsCache, term);
+          return;
         }
 
-        const filtrados = allLevelsCache.filter(lv => {
-          const t = (lv.name   || "").toLowerCase();
-          const a = (lv.author || "").toLowerCase();
-          return t.includes(term) || a.includes(term);
+        const prev = bar.placeholder;
+        bar.placeholder = "Cargando lista completa…";
+        cargarListaCompletaParaBusqueda().then(niveles => {
+          bar.placeholder = prev;
+          if (!niveles || request !== searchRequest || bar.value.toLowerCase().trim() !== term) return;
+          renderResultadosBusqueda(niveles, term);
         });
-
-        const container = document.getElementById("levelContainer");
-        container.innerHTML = "";
-        filtrados.forEach(nivel => container.appendChild(crearCard(nivel)));
       };
 
       bar.addEventListener("input", bar._searchHandler);
@@ -2041,6 +2071,7 @@
       document.getElementById("listView").style.display = "block";
     };
 
+    aplicarBuscador();
     cargarNiveles();
   </script>
 
