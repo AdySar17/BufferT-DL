@@ -7,4 +7,4 @@ Firebase Auth must be initialized through one canonical module URL across every 
 
 **Why:** Query-string variants of the auth module create separate browser module instances, and resolving the Header before Firebase finishes restoration produces a false sign-in state during navigation.
 
-**How to apply:** Let the Header render a loading state until Firebase emits its first real state; once a user exists, render that identity immediately from Auth while Firestore role/profile hydration happens separately. Use Firestore only for app metadata and authorization roles, not to decide whether Firebase Auth is signed in.
+**How to apply:** Let the Header render a skeleton until Firebase emits its first real state and the associated users/profile documents finish loading; render the authenticated identity only from the confirmed Firestore data. Use Firestore only for app metadata and authorization roles, not to decide whether Firebase Auth is signed in.

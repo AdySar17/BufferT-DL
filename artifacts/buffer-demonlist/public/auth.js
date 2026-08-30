@@ -279,12 +279,16 @@ export function mountAuthUI(slotId = "authSlot") {
   slot.dataset.bftAuthMounted = "1";
 
   function render(user, data, loading, profile) {
-    /* 1) Sólo mostramos loading mientras Auth aún no confirmó identidad. */
-    if (loading && !user) {
+    /*
+     * No mostramos datos de Firebase Auth mientras users/{uid} y
+     * profiles/{uid} todavía se están hidratando. El primer render
+     * autenticado debe ser ya el perfil definitivo de Firestore.
+     */
+    if (loading) {
       slot.innerHTML = `
-        <div class="auth-loading">
-          <div class="auth-spinner"></div>
-          <span>Cargando sesión...</span>
+        <div class="auth-loading auth-skeleton" aria-busy="true" aria-label="Cargando perfil">
+          <span class="auth-skeleton-avatar"></span>
+          <span class="auth-skeleton-line"></span>
         </div>`;
       return;
     }
@@ -317,10 +321,14 @@ export function mountAuthUI(slotId = "authSlot") {
 
     /* 3) Usuario logueado → avatar + menú
        (preferimos profile.name / profile.photoURL si el usuario los personalizó) */
-    const role  = (data && data.role)   || "Default";
-    const name  = (profile && profile.name)     || user.displayName || "Sin nombre";
+    const role  = (data && data.role) || "Default";
+    /*
+     * El nombre y la foto visibles son exclusivamente los datos de
+     * profiles/{uid}; no usamos displayName/photoURL como fallback visual.
+     */
+    const name  = (profile && profile.name) || "Usuario";
     const email = user.email             || "";
-    const photo = (profile && profile.photoURL) || user.photoURL    || "";
+    const photo = (profile && profile.photoURL) || "";
     const initials = (name || "?").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
     const showStaffLink = ["Mod","Admin","Owner"].includes(role);
 
@@ -395,6 +403,31 @@ function escapeHtml(s) {
       color: rgba(230,230,230,0.7);
       font-family:'Montserrat',sans-serif;
       font-size:.82rem; font-weight:600;
+    }
+    .auth-skeleton {
+      width:132px; height:36px; padding:0;
+      border:0; background:transparent;
+      overflow:hidden;
+    }
+    .auth-skeleton-avatar,
+    .auth-skeleton-line {
+      display:block;
+      background:linear-gradient(90deg,
+        rgba(255,255,255,.08) 25%,
+        rgba(255,255,255,.18) 50%,
+        rgba(255,255,255,.08) 75%);
+      background-size:200% 100%;
+      animation:auth-skeleton-shimmer 1.2s ease-in-out infinite;
+    }
+    .auth-skeleton-avatar {
+      width:36px; height:36px; border-radius:50%; flex-shrink:0;
+    }
+    .auth-skeleton-line {
+      width:78px; height:12px; border-radius:999px;
+    }
+    @keyframes auth-skeleton-shimmer {
+      from { background-position:200% 0; }
+      to { background-position:-200% 0; }
     }
     .auth-spinner {
       width:14px; height:14px; border-radius:50%;

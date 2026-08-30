@@ -273,13 +273,6 @@ function useLiveData() {
         const { db } = auth as any;
         const { collection, query, orderBy, limit, where, getDocs, getCountFromServer, doc, getDoc } = fs as any;
 
-        const lvlSnap = await getDocs(query(collection(db, "levels"), orderBy("position", "asc"), limit(10)));
-        const lvls: LiveLevel[] = [];
-        lvlSnap.forEach((d: any) => {
-          const level = d.data() as any;
-          if (level.listType !== "pemon") lvls.push({ id: d.id, ...level });
-        });
-
         async function countCol(colRef: any, label: string): Promise<number> {
           if (typeof getCountFromServer === "function") { try { const snap = await getCountFromServer(colRef); const n = snap.data().count; if (typeof n === "number") return n; } catch (e) { console.warn(`[home] count (${label}):`, e); } }
           try { const snap = await getDocs(query(colRef, limit(1000))); return snap.size; } catch { return 0; }
@@ -289,6 +282,16 @@ function useLiveData() {
           getDocs(collection(db, "levels")),
           countCol(collection(db, "profiles"), "profiles"),
         ]);
+        /*
+         * Filtrar Pemon antes de cortar el resultado. El antiguo limit(10)
+         * se aplicaba a la colección mezclada y podía dejar sólo 8 demons
+         * cuando había niveles Pemon entre las primeras posiciones.
+         */
+        const lvls: LiveLevel[] = allLevelsSnap.docs
+          .map((d: any) => ({ id: d.id, ...d.data() } as LiveLevel))
+          .filter((level: LiveLevel) => level.listType !== "pemon")
+          .sort((a: LiveLevel, b: LiveLevel) => Number(a.position) - Number(b.position))
+          .slice(0, 10);
         const levelById = new Map<string, any>();
         allLevelsSnap.forEach((d: any) => levelById.set(d.id, { id: d.id, ...d.data() }));
         const toMillis = (value: any) => {
