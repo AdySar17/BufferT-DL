@@ -196,10 +196,43 @@
 
   .profile-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-top: 26px;
   }
+  .stat-box.has-symbol {
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-box.has-symbol::before {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    font-size: 5.8rem;
+    line-height: 1;
+    opacity: .12;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .stat-box.has-symbol > * { position: relative; z-index: 1; }
+  .stat-box.rank-classic {
+    border-color: rgba(255,215,0,.28);
+    box-shadow: inset 0 0 20px rgba(255,215,0,.06);
+  }
+  .stat-box.rank-classic::before {
+    content: "★";
+    color: #ffd700;
+  }
+  .stat-box.rank-plat {
+    border-color: rgba(70,180,255,.35);
+    box-shadow: inset 0 0 20px rgba(70,180,255,.08);
+  }
+  .stat-box.rank-plat::before {
+    content: "☾";
+    color: #43baff;
+    font-size: 6.2rem;
+  }
+  .stat-box.stat-lunas { border-color: rgba(114,230,255,.24); }
   /* Hardest puede tener nombre largo: damos espacio y truncamos con elipsis */
   .stat-hardest .stat-value {
     font-size: 1.05rem;
@@ -453,6 +486,13 @@
     margin-top: 2px;
   }
   .lvl-percent.full { background: rgba(199,255,59,0.2); color: #c7ff3b; }
+  .lvl-time {
+    font-size: .92rem;
+    font-weight: 800;
+    color: #72e6ff;
+    white-space: nowrap;
+    text-shadow: 0 0 10px rgba(114,230,255,.24);
+  }
 
   .lvl-card-footer {
     position: relative; z-index: 1;
@@ -900,13 +940,21 @@
         <div id="pRecords" class="stat-value">0</div>
         <div class="stat-label" data-i18n="profile_records">Records</div>
       </div>
-      <div class="stat-box">
+    <div class="stat-box has-symbol rank-classic">
         <div id="pRank" class="stat-value">—</div>
-        <div class="stat-label" data-i18n="profile_ranking">Ranking</div>
+        <div class="stat-label" data-i18n="profile_ranking_classic">RANKING CLASSIC</div>
       </div>
       <div class="stat-box stat-hardest" title="Nivel más difícil completado al 100%">
         <div id="pHardest" class="stat-value">—</div>
         <div class="stat-label" data-i18n="profile_hardest">Hardest</div>
+      </div>
+      <div class="stat-box has-symbol rank-plat">
+        <div id="pPlatRank" class="stat-value">—</div>
+        <div class="stat-label" data-i18n="profile_ranking_plat">RANKING PLAT</div>
+      </div>
+      <div class="stat-box stat-lunas">
+        <div id="pLunas" class="stat-value">0</div>
+        <div class="stat-label" data-i18n="profile_lunas">Lunas</div>
       </div>
     </div>
 
@@ -990,6 +1038,15 @@
     <div id="recordsState" class="records-empty">Cargando records...</div>
     <div id="recordsList" class="records-grid"></div>
   </div>
+
+  <!-- RECORDS DE PLATFORMER / PEMONLIST -->
+  <div class="profile-card" id="platformRecordsCard" style="display:none; margin-top:18px;">
+    <div class="section-label" style="margin-bottom:14px; color:#72e6ff;">
+      <span data-i18n="profile_platform_records">Records Platformer</span> — <span id="platformRecordsCount" style="color:#72e6ff">0</span>
+    </div>
+    <div id="platformRecordsState" class="records-empty">Cargando records Pemon...</div>
+    <div id="platformRecordsList" class="records-grid"></div>
+  </div>
 </div>
 
 <!-- MODAL: CAMBIAR ROL (Admin / Owner) -->
@@ -1023,6 +1080,10 @@
       <div class="modal-row">
         <label>Porcentaje</label>
         <input type="number" min="1" max="100" class="input" id="updPercent">
+      </div>
+      <div class="modal-row" id="updTimeWrap" style="display:none;">
+        <label>Tiempo <span style="color:rgba(255,255,255,.45);font-weight:400;text-transform:none;letter-spacing:0;">(HH:MM:SS.mmm)</span></label>
+        <input type="text" class="input" id="updTime" placeholder="00:00:00.000" inputmode="decimal">
       </div>
       <div class="modal-row">
         <label>Link del video</label>
@@ -1075,7 +1136,7 @@
 <script type="module">
   import { db, onAuthChange, refreshProfile } from "/auth.js";
   import { DIFFICULTY_IMAGES } from "/difficulty.js";
-  import { isDemon } from "/list-utils.js";
+  import { computeLunas, isDemon, isPemon } from "/list-utils.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
            collection, query, where, getDocs }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1271,17 +1332,17 @@
     recordsLoaded = true;
     loadProfile(uid);
     loadRecords(uid);
-    loadRanking(uid);
+    loadRankings(uid);
   }
   if (targetUid) kickOff(targetUid);
 
-  /* ===== RANKING POR PUNTOS =====
-     Carga todos los records aceptados al 100% + todos los niveles,
-     agrupa puntos por uid (incluye player2Id) y muestra la posición
-     de targetUid. Sólo cuenta el ranking por PUNTOS. */
-  async function loadRanking(uid) {
-    const el = $("pRank");
-    if (!el) return;
+  /* ===== RANKINGS CLASSIC + PLAT =====
+     Una sola lectura de records y niveles calcula ambos rankings:
+     Classic por puntos y Plat por Lunas. */
+  async function loadRankings(uid) {
+    const classicEl = $("pRank");
+    const platEl = $("pPlatRank");
+    if (!classicEl && !platEl) return;
     try {
       const [recsSnap, lvlSnap] = await Promise.all([
         getDocs(collection(db, "records")),
@@ -1290,34 +1351,47 @@
       const lvlMap = new Map();
       lvlSnap.forEach(d => lvlMap.set(d.id, d.data()));
 
-      const points = new Map();   // uid -> total points
+      const points = new Map();   // uid -> total classic points
+      const lunas = new Map();    // uid -> total Pemon Lunas
       recsSnap.forEach(d => {
         const r = d.data();
         if (r.status !== "Accepted") return;
         const lvl = lvlMap.get(r.levelId);
-        if (!lvl || !isDemon(lvl)) return;
+        if (!lvl) return;
+        const players = [r.userId, r.player2Id].filter(Boolean);
+        if (isPemon(lvl)) {
+          const time = Number(r.timeMs);
+          const levelLunas = computeLunas(lvl.position) || Number(lvl.value) || 0;
+          if (!Number.isFinite(time) || time <= 0 || levelLunas <= 0) return;
+          players.forEach(u => lunas.set(u, (lunas.get(u) || 0) + levelLunas));
+          return;
+        }
+        if (!isDemon(lvl)) return;
         const pct = Number(r.percent);
         if (!Number.isFinite(pct) || pct <= 0) return;
         const base = Number(lvl.value || 0);
         const v = pct === 100 ? base : (base / 10);   // <100% otorga 1/10 de los puntos
-        [r.userId, r.player2Id].forEach(u => {
+        players.forEach(u => {
           if (!u) return;
           points.set(u, (points.get(u) || 0) + v);
         });
       });
 
-      const myPts = points.get(uid) || 0;
-      if (myPts <= 0) { el.textContent = "—"; return; }
-
-      const arr = [...points.entries()]
-        .filter(([, v]) => v > 0)
-        .sort((a, b) => b[1] - a[1]);
-      const idx = arr.findIndex(([u]) => u === uid);
-      if (idx < 0) { el.textContent = "—"; return; }
-      el.textContent = `#${idx + 1}`;
+      const rankOf = (map) => {
+        const mine = map.get(uid) || 0;
+        if (mine <= 0) return "—";
+        const ranked = [...map.entries()]
+          .filter(([, v]) => v > 0)
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        const index = ranked.findIndex(([userId]) => userId === uid);
+        return index < 0 ? "—" : `#${index + 1}`;
+      };
+      if (classicEl) classicEl.textContent = rankOf(points);
+      if (platEl) platEl.textContent = rankOf(lunas);
     } catch (e) {
-      console.warn("[profile] loadRanking error:", e);
-      el.textContent = "—";
+      console.warn("[profile] loadRankings error:", e);
+      if (classicEl) classicEl.textContent = "—";
+      if (platEl) platEl.textContent = "—";
     }
   }
 
@@ -1502,6 +1576,27 @@
     return d.toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric" });
   }
 
+  function formatTimeMs(value) {
+    const ms = Number(value);
+    if (!Number.isFinite(ms) || ms < 0) return "—";
+    const total = Math.floor(ms);
+    const hours = Math.floor(total / 3600000);
+    const minutes = Math.floor((total % 3600000) / 60000);
+    const seconds = Math.floor((total % 60000) / 1000);
+    const millis = total % 1000;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+  }
+
+  function parseTimeText(value) {
+    const match = String(value || "").trim().match(/^(?:(\d+):)?([0-5]?\d):([0-5]?\d)\.(\d{1,3})$/);
+    if (!match) return null;
+    const hours = Number(match[1] || 0);
+    const minutes = Number(match[2]);
+    const seconds = Number(match[3]);
+    const millis = Number(match[4].padEnd(3, "0"));
+    return hours * 3600000 + minutes * 60000 + seconds * 1000 + millis;
+  }
+
   async function loadRecords(uid) {
     $("recordsCard").style.display = "block";
     $("recordsState").style.display = "block";
@@ -1530,7 +1625,7 @@
       }));
       myRecords = myRecords.filter(r => {
         const level = levelsCache.get(r.levelId);
-        return level && isDemon(level);
+        return level && (isDemon(level) || isPemon(level));
       });
 
       /* Cargar profiles del compañero (player1 si soy player2, o viceversa) */
@@ -1568,7 +1663,7 @@
   }
 
   function recomputeStats(uid) {
-    let points = 0, count = 0;
+    let points = 0, count = 0, lunas = 0;
     const diffCounts = {
       "Extreme Demon": 0, "Insane Demon": 0, "Hard Demon": 0,
       "Medium Demon": 0, "Easy Demon": 0
@@ -1577,10 +1672,17 @@
     let hardestPos = Infinity;
     myRecords.forEach(r => {
       if (r.status !== "Accepted") return;
-      const pct = Number(r.percent);
-      if (!Number.isFinite(pct) || pct <= 0) return;
       const lvl = levelsCache.get(r.levelId);
       if (!lvl) return;
+      if (isPemon(lvl)) {
+        const time = Number(r.timeMs);
+        const levelLunas = computeLunas(lvl.position) || Number(lvl.value) || 0;
+        if (Number.isFinite(time) && time > 0 && levelLunas > 0) lunas += levelLunas;
+        return;
+      }
+      if (!isDemon(lvl)) return;
+      const pct = Number(r.percent);
+      if (!Number.isFinite(pct) || pct <= 0) return;
       const base = Number(lvl.value || 0);
       points += pct === 100 ? base : (base / 10);   // <100% otorga 1/10
       count++;                                      // cuenta como record igual
@@ -1598,6 +1700,7 @@
     });
     $("pPoints").textContent  = Math.round(points * 100) / 100;
     $("pRecords").textContent = count;
+    $("pLunas").textContent = Math.round(lunas * 100) / 100;
     const hEl = $("pHardest");
     if (hEl) {
       if (hardestLvl) {
@@ -1636,9 +1739,17 @@
        de otros perfiles. Solo Mod/Admin/Owner ven todo en perfiles ajenos.
        En el propio perfil siempre se ve todo. */
     const isViewerStaff = ["Mod", "Admin", "Owner"].includes(currentUserRole);
-    const visibleRecords = (isViewerOwner || isViewerStaff)
+    const allVisibleRecords = (isViewerOwner || isViewerStaff)
       ? myRecords
       : myRecords.filter(r => r.status === "Accepted");
+    renderPlatformRecords(allVisibleRecords.filter(r => {
+      const lvl = levelsCache.get(r.levelId);
+      return lvl && isPemon(lvl);
+    }));
+    const visibleRecords = allVisibleRecords.filter(r => {
+      const lvl = levelsCache.get(r.levelId);
+      return lvl && isDemon(lvl);
+    });
 
     $("recordsCount").textContent = visibleRecords.length;
 
@@ -1885,6 +1996,190 @@
     }
   }
 
+  /* Los records Pemon viven en un bloque separado y se ordenan por tiempo.
+     Se mantiene la visibilidad de estados con la misma regla del bloque Classic. */
+  function renderPlatformRecords(records) {
+    const card = $("platformRecordsCard");
+    const state = $("platformRecordsState");
+    const list = $("platformRecordsList");
+    const count = $("platformRecordsCount");
+    if (!card || !state || !list) return;
+
+    card.style.display = "block";
+    list.innerHTML = "";
+    if (count) count.textContent = records.length;
+    if (!records.length) {
+      state.textContent = "Este usuario aún no tiene records de plataforma.";
+      state.style.display = "block";
+      return;
+    }
+    state.style.display = "none";
+
+    const accepted = records
+      .filter(r => r.status === "Accepted")
+      .sort((a, b) => (Number(a.timeMs) || Infinity) - (Number(b.timeMs) || Infinity));
+    const pending = records.filter(r => r.status === "Pending");
+    const rejected = records.filter(r => r.status === "Rejected");
+
+    accepted.forEach(rec => list.appendChild(buildPlatformCard(rec)));
+    if (pending.length) {
+      const hdr = document.createElement("div");
+      hdr.className = "pending-section-header";
+      hdr.textContent = `Records en espera (${pending.length})`;
+      list.appendChild(hdr);
+      pending.forEach(rec => list.appendChild(buildPlatformCard(rec)));
+    }
+    if (rejected.length) {
+      const hdr = document.createElement("div");
+      hdr.className = "pending-section-header";
+      hdr.style.color = "rgba(255,100,100,0.55)";
+      hdr.style.borderColor = "rgba(255,100,100,0.15)";
+      hdr.textContent = `Records rechazados (${rejected.length})`;
+      list.appendChild(hdr);
+      rejected.forEach(rec => list.appendChild(buildPlatformCard(rec)));
+    }
+  }
+
+  function buildPlatformCard(rec) {
+    const lvl = levelsCache.get(rec.levelId) || {};
+    const card = document.createElement("article");
+    card.className = "lvl-card";
+
+    const bgUrl = lvl.background || lvl.imageURL || lvl.thumbnail || "";
+    if (bgUrl) {
+      const bgEl = document.createElement("div");
+      bgEl.className = "lvl-card-bg";
+      bgEl.style.backgroundImage = `url("${bgUrl}")`;
+      card.appendChild(bgEl);
+    }
+
+    const content = document.createElement("div");
+    content.className = "lvl-card-content";
+    const thumb = document.createElement("div");
+    thumb.className = "lvl-thumb";
+    thumb.textContent = "☾";
+    thumb.title = "Platformer";
+    thumb.style.cssText = "display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#72e6ff;text-shadow:0 0 16px rgba(114,230,255,.7);";
+    content.appendChild(thumb);
+
+    const info = document.createElement("div");
+    info.className = "lvl-info";
+    const titleRow = document.createElement("div");
+    titleRow.className = "lvl-title-row";
+    const nameLink = document.createElement("a");
+    nameLink.className = "lvl-name";
+    nameLink.textContent = lvl.name || rec.claimedLevelName || "(Nivel desconocido)";
+    nameLink.href = lvl.id ? `/pemon-level.html?id=${encodeURIComponent(lvl.id)}` : "#";
+    nameLink.style.textDecoration = "none";
+    titleRow.appendChild(nameLink);
+    if (lvl.position) {
+      const pos = document.createElement("span");
+      pos.className = "lvl-pos-badge";
+      pos.textContent = `#${lvl.position}`;
+      titleRow.appendChild(pos);
+    }
+    if (rec.mode2P || lvl.is2P) {
+      const badge = document.createElement("span");
+      badge.className = "badge-2p";
+      badge.textContent = "2P";
+      titleRow.appendChild(badge);
+    }
+    info.appendChild(titleRow);
+    const author = document.createElement("div");
+    author.className = "lvl-author";
+    author.textContent = lvl.author ? `por ${lvl.author}` : "";
+    info.appendChild(author);
+
+    const partnerId = rec.userId === targetUid ? rec.player2Id
+                     : rec.player2Id === targetUid ? rec.userId : null;
+    if (partnerId) {
+      const partner = profilesCache.get(partnerId);
+      const partnerEl = document.createElement("div");
+      partnerEl.className = "lvl-meta";
+      partnerEl.innerHTML = `Con: <a href="/profile.html?id=${encodeURIComponent(partnerId)}" style="color:#fff;text-decoration:none;font-weight:700;">${escapeHtml(partner?.name || "Jugador")}</a>`;
+      info.appendChild(partnerEl);
+    }
+    if (rec.mobile || rec.mobile2P) {
+      const mobile = document.createElement("div");
+      mobile.className = "lvl-meta";
+      mobile.innerHTML = "📱 <b>Móvil</b>";
+      info.appendChild(mobile);
+    }
+    content.appendChild(info);
+
+    const aside = document.createElement("div");
+    aside.className = "lvl-aside";
+    const time = document.createElement("div");
+    time.className = "lvl-time";
+    time.textContent = formatTimeMs(rec.timeMs);
+    aside.appendChild(time);
+    const timeLabel = document.createElement("div");
+    timeLabel.className = "lvl-points-label";
+    timeLabel.textContent = "tiempo";
+    aside.appendChild(timeLabel);
+    content.appendChild(aside);
+    card.appendChild(content);
+
+    const footer = document.createElement("div");
+    footer.className = "lvl-card-footer";
+    const left = document.createElement("div");
+    left.className = "lvl-actions";
+    const status = (rec.status || "Pending").toLowerCase();
+    const badge = document.createElement("span");
+    badge.className = "status-badge " + status;
+    badge.textContent = ({ pending: "Pendiente", accepted: "Aceptado", rejected: "Rechazado" })[status] || rec.status;
+    left.appendChild(badge);
+    const date = document.createElement("span");
+    date.className = "status-date";
+    date.textContent = rec.status === "Accepted" ? "Aceptado: " + fmtDate(rec.acceptedAt)
+      : rec.status === "Rejected" ? "Rechazado: " + fmtDate(rec.updatedAt || rec.createdAt)
+      : "Enviado: " + fmtDate(rec.createdAt);
+    left.appendChild(date);
+    footer.appendChild(left);
+
+    const right = document.createElement("div");
+    right.className = "lvl-actions";
+    if (rec.video) {
+      const video = document.createElement("a");
+      video.className = "lvl-link";
+      video.href = rec.video;
+      video.target = "_blank";
+      video.rel = "noopener";
+      video.textContent = "Ver video ▶";
+      right.appendChild(video);
+    }
+    const isViewerOwner = !!(currentUser && currentUser.uid === targetUid);
+    const canOwnerEdit = isViewerOwner && rec.userId === currentUser.uid;
+    const canEdit = canOwnerEdit || (currentUserRole === "Owner" && currentUser);
+    if (canEdit) {
+      const update = document.createElement("button");
+      update.className = "btn btn-secondary";
+      update.textContent = "Actualizar";
+      update.onclick = () => openUpdateModal(rec);
+      right.appendChild(update);
+
+      const canDelete = currentUserRole === "Owner" ||
+        (currentUser && rec.userId === currentUser.uid && rec.status !== "Accepted");
+      if (canDelete) {
+        const del = document.createElement("button");
+        del.className = "btn btn-danger";
+        del.textContent = "Eliminar";
+        del.onclick = () => deleteOwnRecord(rec);
+        right.appendChild(del);
+      }
+      if (currentUserRole === "Owner" && rec.status !== "Pending") {
+        const resend = document.createElement("button");
+        resend.className = "btn btn-secondary";
+        resend.textContent = "↩ Mandar a revisión";
+        resend.onclick = () => resendForReview(rec);
+        right.appendChild(resend);
+      }
+    }
+    footer.appendChild(right);
+    card.appendChild(footer);
+    return card;
+  }
+
   /* ====== Re-enviar a revisión (sólo Owner role) ====== *
    *  Pone status="Pending" y limpia acceptedAt para que vuelva a aparecer
    *  en el panel de moderación. No toca el resto de campos del record.   */
@@ -1892,8 +2187,11 @@
     if (currentUserRole !== "Owner") return;
     if (rec.status === "Pending") return;
     const lvl = levelsCache.get(rec.levelId) || {};
+    const resultLabel = isPemon(lvl)
+      ? formatTimeMs(rec.timeMs)
+      : `${Math.round(Number(rec.percent) || 0)}%`;
     const ok = confirm(
-      `¿Mandar este record (${lvl.name || "nivel"} - ${Math.round(Number(rec.percent) || 0)}%) `
+      `¿Mandar este record (${lvl.name || "nivel"} - ${resultLabel}) `
       + `de vuelta a revisión?\nCambiará su estado a "Pendiente".`
     );
     if (!ok) return;
@@ -1960,11 +2258,15 @@
   function openUpdateModal(rec) {
     editingRecord = rec;
     const lvl = levelsCache.get(rec.levelId) || {};
+    const isPemonRecord = isPemon(lvl);
     $("updTitle").textContent = `Actualizar: ${lvl.name || "Record"}`;
     $("updWarn").style.display = (rec.status === "Accepted") ? "block" : "none";
     $("updMsgErr").style.display = "none";
 
     $("updPercent").value = rec.percent ?? "";
+    $("updPercent").parentElement.style.display = isPemonRecord ? "none" : "block";
+    $("updTimeWrap").style.display = isPemonRecord ? "block" : "none";
+    $("updTime").value = isPemonRecord ? formatTimeMs(rec.timeMs) : "";
     $("updVideo").value   = rec.video   || "";
     $("updVideo2").value  = rec.video2  || "";
     $("updRaw").value     = rec.rawFootage || "";
@@ -1995,17 +2297,25 @@
     if (!editingRecord || !currentUser) return;
     const rec = editingRecord;
     const lvl = levelsCache.get(rec.levelId) || {};
+    const isPemonRecord = isPemon(lvl);
     const is2P = !!(rec.mode2P || lvl.is2P);
 
-    const percent = parseInt($("updPercent").value, 10);
-    if (!percent || percent < 1 || percent > 100) {
+    const percent = isPemonRecord ? 100 : parseInt($("updPercent").value, 10);
+    const timeMs = isPemonRecord ? parseTimeText($("updTime").value) : null;
+    if (isPemonRecord && timeMs === null) {
+      $("updMsgErr").textContent = "Tiempo inválido. Usa el formato HH:MM:SS.mmm.";
+      $("updMsgErr").style.display = "block"; return;
+    }
+    if (!isPemonRecord && (!percent || percent < 1 || percent > 100)) {
       $("updMsgErr").textContent = "Porcentaje inválido (1–100).";
       $("updMsgErr").style.display = "block"; return;
     }
-    const minPct = Number.isFinite(Number(lvl.minPercent)) ? Number(lvl.minPercent) : 100;
-    if (percent < minPct) {
-      $("updMsgErr").textContent = `Error, el % mínimo de este nivel es ${minPct}%`;
-      $("updMsgErr").style.display = "block"; return;
+    if (!isPemonRecord) {
+      const minPct = Number.isFinite(Number(lvl.minPercent)) ? Number(lvl.minPercent) : 100;
+      if (percent < minPct) {
+        $("updMsgErr").textContent = `Error, el % mínimo de este nivel es ${minPct}%`;
+        $("updMsgErr").style.display = "block"; return;
+      }
     }
     const video = $("updVideo").value.trim();
     if (!video) {
@@ -2027,6 +2337,7 @@
 
     const payload = {
       percent,
+      ...(isPemonRecord ? { timeMs } : {}),
       video,
       video2,
       mobile:    $("updMobile").checked,

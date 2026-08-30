@@ -424,7 +424,7 @@
   <script type="module">
     import { onAuthChange, db, isStaff, mountAuthUI } from "/auth.js";
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
-    import { isDemon } from "/list-utils.js";
+    import { computeLunas, isDemon, isPemon } from "/list-utils.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
@@ -447,6 +447,7 @@
     /* ===== CATEGORÍAS ===== */
     const CATEGORIES = [
       { key: "points",        label: "Por Puntos",            unit: "Pts" },
+      { key: "lunas",         label: "Lunas",                 unit: "Lunas" },
       { key: "total",         label: "Por Demons completados", unit: "Demons" },
       { key: "Extreme Demon", label: "Por Extreme Demons",    unit: "Demons", diff: "Extreme Demon" },
       { key: "Insane Demon",  label: "Por Insane Demons",     unit: "Demons", diff: "Insane Demon"  },
@@ -496,13 +497,13 @@
         const recsSnap = await getDocs(collection(db, "records"));
         const records = recsSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(r => r.status === "Accepted" && Number(r.percent) > 0);
+          .filter(r => r.status === "Accepted");
 
         /* 2) Levels: traer TODOS de una sola colección (1 sola lectura tipo list) */
         const lvlSnap = await getDocs(collection(db, "levels"));
         lvlSnap.forEach(d => {
           const level = d.data();
-          if (isDemon(level)) levelsCache.set(d.id, level);
+          if (isDemon(level) || isPemon(level)) levelsCache.set(d.id, level);
         });
 
         /* 3) Agregar por usuario */
@@ -512,7 +513,7 @@
           if (!map.has(uid)) {
             map.set(uid, {
               uid,
-              points: 0, total: 0,
+               points: 0, lunas: 0, total: 0,
               "Extreme Demon": 0, "Insane Demon": 0,
               "Hard Demon": 0, "Medium Demon": 0, "Easy Demon": 0
             });
@@ -522,13 +523,26 @@
         records.forEach(r => {
           const lvl = levelsCache.get(r.levelId);
           if (!lvl) return;
+          const players = [r.userId, r.player2Id].filter(Boolean);
+          if (isPemon(lvl)) {
+            const time = Number(r.timeMs);
+            const levelLunas = computeLunas(lvl.position) || Number(lvl.value) || 0;
+            if (!Number.isFinite(time) || time <= 0 || levelLunas <= 0) return;
+            players.forEach(uid => {
+              const u = bump(uid);
+              u.lunas += levelLunas;
+            });
+            return;
+          }
+          if (!isDemon(lvl)) return;
           const pct  = Number(r.percent);
+          if (!Number.isFinite(pct) || pct <= 0) return;
           const base = Number(lvl.value || 0);
           const earned = pct === 100 ? base : (base / 10);   // <100% → 1/10 puntos
           const dkey = (lvl.difficulty && [
             "Extreme Demon","Insane Demon","Hard Demon","Medium Demon","Easy Demon"
           ].includes(lvl.difficulty)) ? lvl.difficulty : "Extreme Demon";
-          [r.userId, r.player2Id].forEach(uid => {
+          players.forEach(uid => {
             if (!uid) return;
             const u = bump(uid);
             u.points += earned;
