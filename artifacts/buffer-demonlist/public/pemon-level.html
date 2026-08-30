@@ -1,55 +1,488 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pemon Level - BufferTeam</title>
-  <link rel="stylesheet" href="/shared.css"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nivel Pemon - BFT PemonList</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
   <script src="/i18n.js"></script>
-  <script>document.addEventListener("DOMContentLoaded",()=>window.BFT_I18N?.renderSelector("langSlot"));</script>
   <style>
-    body { min-height:100vh; background:#070a12; color:#f4f7fb; }
-    #levelBg { position:fixed; inset:0; z-index:-1; background:center/cover no-repeat; filter:brightness(.28) saturate(1.2); }
-    .wrap { width:min(1080px,94vw); margin:auto; padding:92px 0 48px; }
-    .back { color:#72e6ff; text-decoration:none; font-weight:700; }
-    .hero,.card { border:1px solid rgba(114,230,255,.18); border-radius:18px; background:rgba(10,18,31,.88); box-shadow:0 14px 50px rgba(0,0,0,.25); }
-    .hero { display:flex; gap:20px; align-items:center; margin-top:20px; padding:24px; }
-    .diff { width:70px; height:70px; object-fit:contain; }
-    h1 { margin:0 0 8px; font-size:clamp(1.7rem,4vw,3rem); } .sub { color:rgba(235,243,255,.65); margin:0; }
-    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:16px 0; }
-    .stat { padding:18px; text-align:center; } .stat-label { color:rgba(235,243,255,.58); font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; } .stat-value { color:#f4dd8b; font-size:1.35rem; font-weight:800; margin-top:7px; }
-    .card { padding:22px; margin-top:16px; } .card h2 { margin:0 0 16px; }
-    .video { position:relative; aspect-ratio:16/9; overflow:hidden; padding:0; } .video iframe { width:100%; height:100%; border:0; }
-    .record { display:grid; grid-template-columns:1fr auto; gap:10px; padding:13px 0; border-top:1px solid rgba(255,255,255,.1); }
-    .record strong { color:#72e6ff; } .record small { color:rgba(235,243,255,.58); display:block; margin-top:5px; }
-    .empty,#state { color:rgba(235,243,255,.65); text-align:center; padding:24px; }
-    @media(max-width:650px){.hero{padding:18px}.stats{grid-template-columns:1fr 1fr}.diff{width:54px;height:54px}.record{grid-template-columns:1fr}}
+    :root {
+      --accent-start: #72e6ff;
+      --accent-end: #b4f3ff;
+      --glass-bg: rgba(10,10,12,.55);
+      --glass-border: rgba(255,255,255,.06);
+      --text: #eaeaea;
+      --muted: rgba(230,230,230,.65);
+      --radius: 14px;
+    }
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+    html,body {
+      min-height:100%;
+      font-family:'Montserrat',sans-serif;
+      background:#060606;
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+    }
+    #levelBgLayer {
+      position:fixed; inset:0; z-index:0;
+      background:#060606 center/cover no-repeat;
+      pointer-events:none;
+      transition:background-image .4s;
+    }
+    #levelBgLayer::after {
+      content:""; position:absolute; inset:0;
+      background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.9));
+    }
+    body > *:not(#levelBgLayer):not(.top-header) { position:relative; z-index:1; }
+
+    .top-header {
+      position:fixed; top:0; left:0; width:100%; height:60px;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 18px; z-index:9999;
+      background:rgba(0,0,0,.6);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid rgba(255,255,255,.05);
+    }
+    .left { display:flex; align-items:center; gap:10px; }
+    .logo-img { width:36px; height:36px; }
+    .logo-text { color:white; font-weight:700; font-size:1.05rem; }
+    .logo-short { display:none; }
+    .nav-links { display:flex; gap:18px; }
+    .nav-links a {
+      color:rgba(255,255,255,.8); text-decoration:none; font-size:.92rem;
+      transition:color .2s;
+    }
+    .nav-links a:hover { color:var(--accent-start); }
+    .menu-toggle {
+      display:none; font-size:26px; color:white; width:38px; height:38px;
+      align-items:center; justify-content:center; cursor:pointer; user-select:none;
+      background:none; border:0;
+    }
+    @media(max-width:680px) {
+      .menu-toggle { display:flex; }
+      .nav-links {
+        display:none; flex-direction:column; position:absolute; top:60px; right:10px;
+        background:rgba(0,0,0,.92); padding:10px; border-radius:10px; gap:8px;
+      }
+      .nav-links.active { display:flex; }
+      .logo-full { display:none; }
+      .logo-short { display:inline; }
+    }
+
+    #stateMsg {
+      text-align:center; padding:120px 20px 40px; color:var(--muted); font-size:1rem;
+    }
+    .page-wrap {
+      max-width:1200px; margin:80px auto 50px; padding:0 24px;
+      display:none; overflow-x:hidden;
+    }
+    .back-btn {
+      display:inline-flex; align-items:center; gap:7px; margin-bottom:20px;
+      padding:7px 16px; border-radius:10px;
+      border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04);
+      color:var(--muted); font-size:.88rem; font-weight:600;
+      cursor:pointer; text-decoration:none; transition:background .2s,color .2s;
+    }
+    .back-btn:hover { background:rgba(255,255,255,.09); color:var(--text); }
+    .grid { display:grid; grid-template-columns:1fr 360px; gap:20px; align-items:start; }
+    .left-col,.right-col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+    .left-col { overflow:hidden; }
+    .card {
+      background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(0,0,0,.38));
+      border:1px solid var(--glass-border); border-radius:var(--radius);
+      padding:18px; box-shadow:0 6px 28px rgba(0,0,0,.55);
+    }
+    .level-header { display:flex; gap:16px; align-items:center; }
+    .level-header > div { min-width:0; overflow:hidden; }
+    .diff-img {
+      width:90px; height:90px; border-radius:12px; object-fit:cover;
+      border:2px solid rgba(114,230,255,.28); flex:0 0 90px;
+    }
+    .level-title {
+      font-size:1.55rem; font-weight:700; margin-bottom:5px; line-height:1.2;
+      word-break:break-word; overflow-wrap:break-word;
+    }
+    .level-sub { color:var(--muted); font-size:.92rem; }
+    .pemon-badge {
+      display:inline-flex; align-items:center; gap:6px; margin-bottom:9px;
+      padding:4px 9px; border-radius:7px; color:#061016;
+      background:linear-gradient(90deg,#72e6ff,#b4f3ff);
+      font-size:.68rem; font-weight:800; letter-spacing:.7px; text-transform:uppercase;
+    }
+    .lvl-tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .lvl-tags:empty { display:none; }
+    .lvl-tag {
+      display:inline-flex; align-items:center; padding:5px 14px; border-radius:8px;
+      color:#fff; background:linear-gradient(135deg,#123c4b,#2186a3,#72e6ff);
+      font-size:.82rem; font-weight:600; letter-spacing:.3px; text-transform:uppercase;
+      box-shadow:0 2px 8px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.18);
+    }
+    .lvl-desc {
+      margin-top:14px; padding:12px 14px; background:rgba(255,255,255,.04);
+      border-left:3px solid #72e6ff; border-radius:6px; color:#d8d8d8;
+      font-size:.94rem; line-height:1.5; white-space:pre-wrap;
+    }
+    .video-frame {
+      width:100%; aspect-ratio:16/9; border-radius:12px; overflow:hidden;
+      border:1px solid var(--glass-border); background:#000; padding:0;
+    }
+    .video-frame iframe { width:100%; height:100%; border:0; display:block; }
+    .stats { display:flex; gap:14px; align-items:center; }
+    .stat-tier-box {
+      width:72px; min-height:72px; flex:0 0 72px; border-radius:10px;
+      border:1.5px solid rgba(114,230,255,.45);
+      background:linear-gradient(135deg,rgba(10,48,62,.85),rgba(0,0,0,.55));
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:3px; padding:6px 5px; box-shadow:inset 0 0 14px rgba(114,230,255,.12);
+    }
+    .stat-tier-label {
+      font-size:.58rem; letter-spacing:1px; text-transform:uppercase;
+      color:rgba(114,230,255,.9); font-weight:800; white-space:nowrap;
+    }
+    .stat-tier-value { font-size:.64rem; line-height:1.25; font-weight:800; color:#fff; text-align:center; }
+    .stat-list { display:flex; flex-direction:column; gap:6px; flex:1; min-width:0; }
+    .stat-item { font-weight:600; font-size:.92rem; display:flex; align-items:baseline; gap:6px; }
+    .stat-val { color:var(--muted); font-weight:500; word-break:break-word; }
+    .meta-section { display:flex; flex-direction:column; gap:10px; }
+    .meta-label { font-size:.78rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .meta-name { font-weight:600; font-size:.97rem; }
+    .records-head {
+      display:flex; justify-content:space-between; align-items:flex-start;
+      gap:12px; flex-wrap:wrap; margin-bottom:12px;
+    }
+    .records-title { font-weight:700; font-size:.97rem; }
+    .records-sub { font-size:.78rem; color:var(--muted); margin-top:4px; }
+    .rec-search {
+      flex:1; min-width:160px; max-width:220px; padding:8px 11px;
+      border-radius:10px; border:1px solid rgba(255,255,255,.07);
+      background:rgba(255,255,255,.04); color:var(--text);
+      font-family:'Montserrat',sans-serif; font-size:.85rem; outline:none;
+    }
+    .rec-search:focus { border-color:rgba(114,230,255,.45); }
+    .rec-search::placeholder { color:rgba(255,255,255,.3); }
+    #recordsList { min-height:40px; }
+    .record {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:10px 12px; border-radius:10px; background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.04); margin-bottom:7px;
+      transition:background .15s; overflow:hidden; min-width:0;
+    }
+    .record:hover { background:rgba(114,230,255,.07); }
+    .rec-left { display:flex; align-items:center; gap:9px; overflow:hidden; min-width:0; flex:1; }
+    .rec-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .rec-flag { width:34px; height:22px; object-fit:cover; border-radius:3px; flex-shrink:0; }
+    .rec-name { font-weight:600; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .rec-mobile { width:18px; height:18px; object-fit:contain; opacity:.85; }
+    .rec-time { font-size:.88rem; color:var(--accent-start); font-weight:700; white-space:nowrap; }
+    .rec-play { width:30px; height:30px; object-fit:contain; opacity:.85; }
+    .rec-empty,.rec-loading { text-align:center; padding:24px 0; color:var(--muted); font-size:.9rem; }
+    .pager { display:flex; gap:8px; justify-content:center; align-items:center; margin-top:12px; }
+    .pager-btn {
+      padding:7px 16px; border-radius:10px; background:rgba(0,0,0,.45);
+      border:1px solid rgba(255,255,255,.06); color:var(--accent-start);
+      font-family:'Montserrat',sans-serif; font-weight:700; font-size:.88rem;
+      cursor:pointer; transition:background .2s;
+    }
+    .pager-btn:hover:not(:disabled) { background:rgba(255,255,255,.07); }
+    .pager-btn:disabled { opacity:.35; cursor:not-allowed; }
+    .pager-info { font-size:.83rem; color:var(--muted); padding:0 6px; }
+    .hist-toggle { cursor:pointer; user-select:none; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .hist-arrow { color:rgba(114,230,255,.8); transition:transform .25s; }
+    .hist-arrow.open { transform:rotate(180deg); }
+    .hist-body { overflow:hidden; transition:max-height .35s ease,opacity .25s ease; }
+    .hist-collapsed { max-height:0!important; opacity:0; }
+    .ph-row {
+      display:grid; grid-template-columns:1.2fr .6fr .6fr 2fr; gap:10px; align-items:center;
+      padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.05); font-size:.85rem;
+    }
+    .ph-head { color:rgba(114,230,255,.8); text-transform:uppercase; font-weight:700; font-size:.72rem; letter-spacing:.5px; }
+    .ph-up { background:rgba(114,230,255,.06); }
+    .ph-down { background:rgba(255,90,90,.06); }
+    .ph-change { font-weight:700; color:rgba(230,230,230,.6); }
+    .ph-newpos { color:#fff; font-weight:700; }
+    .ph-reason { color:rgba(230,230,230,.78); font-size:.83rem; }
+    .ph-date { color:rgba(230,230,230,.6); font-size:.78rem; }
+    .ph-empty { padding:14px; color:var(--muted); font-size:.85rem; text-align:center; }
+    .cid-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    .cid-table th { text-align:left; padding:7px 12px; color:rgba(114,230,255,.7); font-size:.72rem; text-transform:uppercase; letter-spacing:.6px; }
+    .cid-table td { padding:8px 12px; border-top:1px solid rgba(255,255,255,.04); }
+    .cid-id-mono { font-family:monospace; color:var(--accent-start); font-weight:700; }
+    .cid-ok { color:#9bdc4d; font-weight:700; }
+    .cid-no { color:#ff9a9a; font-weight:700; }
+    .cid-empty { color:var(--muted); text-align:center; padding:14px; font-size:.84rem; }
+    .banner-list { display:flex; flex-wrap:wrap; gap:16px; }
+    .banner-item { display:flex; flex-direction:column; align-items:center; gap:7px; width:100px; }
+    .banner-frame { width:90px; height:90px; border-radius:10px; background-size:cover; background-position:center; }
+    .banner-name { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-size:.75rem; color:rgba(255,255,255,.75); font-weight:600; }
+    @keyframes pemonBannerChroma { from { background-position:0% 50%,0% 50%; } to { background-position:200% 50%,200% 50%; } }
+    @media(max-width:960px) { .grid { grid-template-columns:1fr; } }
+    @media(max-width:560px) {
+      .page-wrap { padding:0 12px; }
+      .level-header { align-items:flex-start; }
+      .diff-img { width:70px; height:70px; flex-basis:70px; }
+      .ph-row { grid-template-columns:1fr 1fr; }
+      .ph-row .ph-newpos,.ph-row .ph-reason { grid-column:span 2; }
+    }
   </style>
 </head>
-<body><div id="levelBg"></div>
-  <header class="top-header"><div class="left"><img src="/logo.png" class="logo-img" alt="Logo"><div class="logo-text"><span class="logo-full">BFT PemonList</span><span class="logo-short">BFT PL</span></div></div>
-    <div style="display:flex;align-items:center;gap:14px"><nav class="nav-links" id="navLinks">
-      <a href="/" data-i18n="nav_home">Home</a><a href="/demonlist.html" data-i18n="nav_demonlist">Demon List</a><a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a><a href="/leaderboards.html" data-i18n="nav_leaderboards">Leaderboards</a><a href="/submit.html?list=pemon" data-i18n="nav_submit_pemon">Enviar Record Pemon</a><a href="/guidelines.html" data-i18n="nav_guidelines">Guidelines</a>
-    </nav><div id="langSlot"></div><div class="auth-slot" id="authSlot"></div><button class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')" aria-label="Menu">☰</button></div>
+<body>
+  <div id="levelBgLayer"></div>
+  <header class="top-header">
+    <div class="left">
+      <img src="/logo.png" class="logo-img" alt="Logo">
+      <div class="logo-text"><span class="logo-full">BFT PemonList</span><span class="logo-short">BFT PL</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <nav class="nav-links" id="navLinks">
+        <a href="/" data-i18n="nav_home">Home</a>
+        <a href="/demonlist.html" data-i18n="nav_demonlist">Demon List</a>
+        <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
+        <a href="/leaderboards.html" data-i18n="nav_leaderboards">Leaderboards</a>
+        <a href="/submit.html?list=pemon" data-i18n="nav_submit_pemon">Enviar Record Pemon</a>
+        <a href="/guidelines.html" data-i18n="nav_guidelines">Guidelines</a>
+      </nav>
+      <div id="langSlot"></div>
+      <div class="auth-slot" id="authSlot"></div>
+      <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú">☰</button>
+    </div>
   </header>
-  <main class="wrap"><div id="state" data-i18n="lv_loading_level">Cargando nivel...</div><div id="content" style="display:none">
-    <a class="back" href="/pemonlist.html" data-i18n="pemon_back">← Volver a PemonList</a>
-    <section class="hero"><img id="diff" class="diff" alt="Platformer"><div><h1 id="name">—</h1><p id="sub" class="sub">—</p></div></section>
-    <div class="stats"><div class="card stat"><div class="stat-label" data-i18n="pemon_lunas">Lunas</div><div id="lunas" class="stat-value">—</div></div><div class="card stat"><div class="stat-label" data-i18n="lv_position">Posición</div><div id="position" class="stat-value">—</div></div><div class="card stat"><div class="stat-label" data-i18n="lv_difficulty">Dificultad</div><div id="difficulty" class="stat-value">—</div></div></div>
-    <div id="videoWrap" class="card video" style="display:none"><iframe id="video" allowfullscreen></iframe></div>
-    <section class="card"><h2 data-i18n="lv_records">Records</h2><div id="records"></div></section>
-  </div></main>
+
+  <div id="stateMsg"><span class="bft-loading"><span class="bft-spinner"></span></span></div>
+  <main class="page-wrap" id="pageWrap">
+    <a href="/pemonlist.html" class="back-btn" data-i18n="pemon_back">← Volver a PemonList</a>
+    <div class="grid">
+      <div class="left-col">
+        <section class="card">
+          <div class="pemon-badge">◈ PemonList · récord por tiempo</div>
+          <div class="level-header">
+            <img class="diff-img" id="lvlDiff" src="" alt="Platformer">
+            <div><h1 class="level-title" id="lvlName">—</h1><p class="level-sub" id="lvlSub">—</p></div>
+          </div>
+          <div class="lvl-tags" id="lvlTags"></div>
+          <p class="lvl-desc" id="lvlDesc" style="display:none;"></p>
+        </section>
+        <div class="video-frame card" id="videoWrap">
+          <iframe id="lvlIframe" src="" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+        </div>
+      </div>
+      <aside class="right-col">
+        <section class="card">
+          <div class="stats">
+            <div class="stat-tier-box"><div class="stat-tier-label">Lista</div><div class="stat-tier-value">Pemon</div></div>
+            <div class="stat-list">
+              <div class="stat-item"><span>Lunas:</span> <span class="stat-val" id="lvlLunas">—</span></div>
+              <div class="stat-item"><span>Host:</span> <span class="stat-val" id="lvlAuthor">—</span></div>
+              <div class="stat-item"><span>Dificultad:</span> <span class="stat-val" id="lvlDifficulty">Platformer</span></div>
+              <div class="stat-item"><span>ID:</span> <span class="stat-val" id="lvlGdId">—</span></div>
+            </div>
+          </div>
+        </section>
+        <section class="card meta-section" id="lvlCreatorsCard" style="display:none;">
+          <div class="meta-block"><div class="meta-label">Creadores</div><div class="meta-name" id="lvlCreators">—</div></div>
+        </section>
+        <section class="card">
+          <div class="records-head">
+            <div><div class="records-title" id="recTitle">RECORDS (0)</div><div class="records-sub">Ordenados por mejor tiempo</div></div>
+            <input class="rec-search" id="recSearch" placeholder="Buscar jugador...">
+          </div>
+          <div id="recordsList"><div class="rec-loading"><span class="bft-spinner bft-spinner--sm"></span></div></div>
+          <div class="pager">
+            <button class="pager-btn" id="prevBtn" disabled>Anterior</button>
+            <div class="pager-info" id="pageInfo">1 / 1</div>
+            <button class="pager-btn" id="nextBtn" disabled>Siguiente</button>
+          </div>
+        </section>
+        <section class="card" id="customIdsCard" style="display:none;">
+          <div class="hist-toggle" id="customIdsToggle" role="button" tabindex="0" aria-expanded="false"><div><div class="records-title">IDs CUSTOM</div><div class="records-sub">IDs alternativas asociadas a este nivel</div></div><span class="hist-arrow" id="customIdsArrow">▼</span></div>
+          <div id="customIdsBody" class="hist-body hist-collapsed"><div id="customIdsContent"></div></div>
+        </section>
+        <section class="card">
+          <div class="hist-toggle" id="histToggle" role="button" tabindex="0" aria-expanded="false"><div><div class="records-title">HISTORIAL DE POSICIONES</div><div class="records-sub">Cambios registrados en este nivel</div></div><span class="hist-arrow" id="histArrow">▼</span></div>
+          <div id="historyList" class="hist-body hist-collapsed"><div class="rec-loading"><span class="bft-spinner bft-spinner--sm"></span></div></div>
+        </section>
+      </aside>
+    </div>
+    <section id="levelBannersWrap" style="display:none;margin-top:18px;">
+      <div class="card"><div style="font-weight:700;font-size:.92rem;color:white;margin-bottom:14px;letter-spacing:.6px;text-transform:uppercase;">Banners del Nivel</div><div id="levelBannersList" class="banner-list"></div></div>
+    </section>
+  </main>
+
   <script type="module">
-    import { db, mountAuthUI } from "/auth.js"; import { computeLunas, PEMON_LIST_TYPE } from "/list-utils.js"; import { difficultyImage } from "/difficulty.js";
-    import { doc,getDoc,collection,query,where,getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    mountAuthUI("authSlot"); const $=id=>document.getElementById(id); const id=new URLSearchParams(location.search).get("id");
-    const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    const embed=url=>{if(!url)return ""; const m=url.match(/(?:youtu\.be\/|[?&]v=)([^?&\s]+)/); return m?`https://www.youtube.com/embed/${m[1]}`:url;};
-    function formatTimeMs(value){const total=Number(value);if(!Number.isFinite(total)||total<0)return "—";const ms=Math.floor(total%1000),seconds=Math.floor(total/1000),s=seconds%60,minutes=Math.floor(seconds/60),m=minutes%60,h=Math.floor(minutes/60);return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(ms).padStart(3,"0")}`;}
-    async function init(){try{if(!id)throw Error(window.BFT_I18N?.t("pemon_missing")||"Nivel no especificado."); const snap=await getDoc(doc(db,"levels",id)); if(!snap.exists()||snap.data().listType!==PEMON_LIST_TYPE) throw Error(window.BFT_I18N?.t("pemon_not_found")||"Este nivel no pertenece a PemonList."); const l={id:snap.id,...snap.data()};
-      document.title=`${l.name} - PemonList`; $("levelBg").style.backgroundImage=l.background?`url("${l.background}")`:"none"; $("diff").src=difficultyImage(l.difficulty); $("name").textContent=`#${l.position||"—"} - ${l.name||"—"}`; $("sub").textContent=`By ${l.author||"—"}${l.creators?.length?` · ${l.creators.join(", ")}`:""}`; $("lunas").textContent=`${computeLunas(l.position)} ${window.BFT_I18N?.t("pemon_lunas")||"Lunas"}`; $("position").textContent=`#${l.position||"—"}`; $("difficulty").textContent=l.difficulty||"Platformer";
-      if(l.video){$("video").src=embed(l.video);$("videoWrap").style.display="block";}
-      const rs=await getDocs(query(collection(db,"records"),where("levelId","==",id))); const records=rs.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(!r.status||r.status==="Accepted")&&(Number(r.timeMs)>0||Number(r.percent)>0)).sort((a,b)=>{const at=Number(a.timeMs),bt=Number(b.timeMs);if(at>0&&bt>0)return at-bt;if(at>0)return -1;if(bt>0)return 1;return Number(b.percent)-Number(a.percent);}); const uids=[...new Set(records.flatMap(r=>[r.userId,r.player2Id].filter(Boolean)))]; const names=new Map(); await Promise.all(uids.map(async uid=>{const p=await getDoc(doc(db,"profiles",uid));names.set(uid,p.exists()?p.data().name||"Sin nombre":"Jugador");})); $("records").innerHTML=records.length?records.map(r=>{const result=Number(r.timeMs)>0?formatTimeMs(r.timeMs):`${Number(r.percent)||0}%`;return `<div class="record"><div><strong>${esc(names.get(r.userId)||"Jugador")}</strong>${r.player2Id?` + ${esc(names.get(r.player2Id)||"Jugador")}`:""}<small>${esc(r.mobile?"Mobile":"Platformer record")}</small></div><strong>${result}</strong></div>`;}).join(""):`<div class="empty">${esc(window.BFT_I18N?.t("lv_no_recs")||"No records yet.")}</div>`;
-      $("state").style.display="none"; $("content").style.display="block";
-    }catch(e){$("state").textContent=e.message;}} init();
+    import { db, mountAuthUI } from "/auth.js";
+    import { computeLunas, PEMON_LIST_TYPE, isPemon } from "/list-utils.js";
+    import { difficultyImage, difficultyName } from "/difficulty.js";
+    import { countryName, flagUrl } from "/country-utils.js";
+    import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const $ = id => document.getElementById(id);
+    const levelId = new URLSearchParams(location.search).get("id");
+    const PER_PAGE = 15;
+    const MOBILE_ICON = "https://iili.io/fuI3XBR.png";
+    const PLAY_ICON = "https://iili.io/fuzpjRf.png";
+    let allRecords = [], filtered = [], currentPage = 1;
+    const profileCache = new Map();
+
+    mountAuthUI("authSlot");
+    $("menuToggle").addEventListener("click", () => $("navLinks").classList.toggle("active"));
+    document.addEventListener("DOMContentLoaded", () => window.BFT_I18N?.renderSelector("langSlot"));
+
+    const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    const toEmbedUrl = url => {
+      if (!url) return "";
+      const short = url.match(/youtu\.be\/([^?&\s]+)/);
+      const long = url.match(/[?&]v=([^&\s]+)/);
+      return short ? `https://www.youtube.com/embed/${short[1]}` : long ? `https://www.youtube.com/embed/${long[1]}` : url;
+    };
+    function formatTimeMs(value) {
+      const total = Number(value);
+      if (!Number.isFinite(total) || total < 1) return "—";
+      const ms = Math.floor(total % 1000), seconds = Math.floor(total / 1000);
+      const s = seconds % 60, minutes = Math.floor(seconds / 60), m = minutes % 60, h = Math.floor(minutes / 60);
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${String(ms).padStart(3,"0")}`;
+    }
+    function tsValue(record) {
+      const ts = record.acceptedAt || record.updatedAt || record.createdAt;
+      return ts?.toMillis ? ts.toMillis() : 0;
+    }
+    function renderLevel(level) {
+      document.title = `${level.name || "Nivel"} - BFT PemonList`;
+      $("lvlName").textContent = `${level.position ? `#${level.position} - ` : ""}${level.name || "Sin nombre"}`;
+      $("lvlSub").textContent = `By ${level.author || "Desconocido"}`;
+      $("lvlLunas").textContent = `${computeLunas(level.position)} Lunas`;
+      $("lvlAuthor").textContent = level.author || "—";
+      $("lvlDifficulty").textContent = difficultyName(level.difficulty);
+      $("lvlDiff").src = difficultyImage(level.difficulty);
+      $("lvlDiff").alt = difficultyName(level.difficulty);
+      $("lvlGdId").textContent = String(level.gdLevelId || "—");
+      const bgUrl = String(level.background || "").trim() || (level.gdLevelId ? `https://levelthumbs.prevter.me/thumbnail/${level.gdLevelId}` : "");
+      if (bgUrl) $("levelBgLayer").style.backgroundImage = `url("${bgUrl}")`;
+      let creators = level.creators;
+      if (typeof creators === "string") creators = creators.split(",").map(v => v.trim()).filter(Boolean);
+      if (Array.isArray(creators) && creators.length) {
+        $("lvlCreators").textContent = creators.join(", ");
+        $("lvlCreatorsCard").style.display = "block";
+      }
+      let tags = level.tags;
+      if (typeof tags === "string") tags = tags.split(",").map(v => v.trim()).filter(Boolean);
+      (Array.isArray(tags) ? tags : []).forEach(tag => {
+        const el = document.createElement("span"); el.className = "lvl-tag"; el.textContent = tag; $("lvlTags").appendChild(el);
+      });
+      const description = String(level.description || "").trim();
+      if (description) { $("lvlDesc").textContent = description; $("lvlDesc").style.display = "block"; }
+      const embed = toEmbedUrl(level.video);
+      if (embed) $("lvlIframe").src = embed; else $("videoWrap").style.display = "none";
+      renderBanners(level);
+      renderCustomIds(level.customIds);
+    }
+    async function renderBanners(level) {
+      const rewards = Array.isArray(level.rewards) ? level.rewards : [];
+      if (!rewards.length) return;
+      const list = $("levelBannersList");
+      for (const bannerId of rewards) {
+        try {
+          const snap = await getDoc(doc(db, "banners", bannerId));
+          if (!snap.exists()) continue;
+          const banner = snap.data(), item = document.createElement("div"), frame = document.createElement("div"), name = document.createElement("div");
+          item.className = "banner-item"; frame.className = "banner-frame"; name.className = "banner-name";
+          if (banner.imageUrl) frame.style.backgroundImage = `url("${String(banner.imageUrl).replace(/"/g, "%22")}")`;
+          if (banner.frameType === "solid") frame.style.boxShadow = `inset 0 0 0 4px ${banner.frameColor || "#72e6ff"}, 0 0 14px ${banner.frameColor || "#72e6ff"}55`;
+          if (banner.frameType === "chroma") { frame.style.border = "4px solid transparent"; frame.style.animation = "pemonBannerChroma 3s linear infinite"; }
+          name.textContent = banner.name || "—";
+          item.append(frame, name); list.appendChild(item);
+        } catch (error) { console.warn("[pemon-level] banner load failed:", error); }
+      }
+      if (list.children.length) $("levelBannersWrap").style.display = "block";
+    }
+    function renderCustomIds(customIds) {
+      const ids = Array.isArray(customIds) ? customIds.filter(item => item && item.id) : [];
+      $("customIdsContent").innerHTML = ids.length ? `<table class="cid-table"><thead><tr><th>ID</th><th>Por</th><th>Status</th></tr></thead><tbody>${ids.map(item => `<tr><td class="cid-id-mono">${esc(item.id)}</td><td>${esc(item.por || "—")}</td><td class="${item.status === "Aceptada" ? "cid-ok" : "cid-no"}">${esc(item.status || "—")}</td></tr>`).join("")}</tbody></table>` : `<div class="cid-empty">Este nivel no tiene IDs Custom registradas.</div>`;
+      if (ids.length) $("customIdsCard").style.display = "block";
+    }
+    async function fetchProfile(uid) {
+      if (!uid) return null;
+      if (profileCache.has(uid)) return profileCache.get(uid);
+      try {
+        const snap = await getDoc(doc(db, "profiles", uid));
+        const profile = snap.exists() ? snap.data() : null;
+        profileCache.set(uid, profile); return profile;
+      } catch { profileCache.set(uid, null); return null; }
+    }
+    async function attachProfiles(records) {
+      const ids = new Set(records.flatMap(record => [record.userId, record.player2Id].filter(Boolean)));
+      await Promise.all([...ids].map(fetchProfile));
+      records.forEach(record => {
+        record._profile = profileCache.get(record.userId) || { name: "Jugador" };
+        record._profile2 = record.player2Id ? profileCache.get(record.player2Id) || { name: "Jugador" } : null;
+      });
+    }
+    function buildRecordRow(record) {
+      const row = document.createElement("div"); row.className = "record";
+      const left = document.createElement("div"); left.className = "rec-left";
+      const p1 = record._profile || {};
+      if (p1.country) { const flag = document.createElement("img"); flag.className = "rec-flag"; flag.src = flagUrl(p1.country); flag.alt = countryName(p1.country); flag.onerror = () => { flag.style.display = "none"; }; left.appendChild(flag); }
+      const name = document.createElement("a"); name.className = "rec-name"; name.href = `/profile.html?id=${encodeURIComponent(record.userId || "")}`; name.textContent = p1.name || "Jugador"; name.style.cssText = "color:inherit;text-decoration:none;";
+      left.appendChild(name);
+      if (record.player2Id && record._profile2) {
+        const separator = document.createElement("span"); separator.textContent = " + "; separator.style.color = "rgba(114,230,255,.8)"; left.appendChild(separator);
+        const second = document.createElement("a"); second.className = "rec-name"; second.href = `/profile.html?id=${encodeURIComponent(record.player2Id)}`; second.textContent = record._profile2.name || "Jugador"; second.style.cssText = "color:inherit;text-decoration:none;opacity:.85;"; left.appendChild(second);
+      }
+      const right = document.createElement("div"); right.className = "rec-right";
+      if (record.mobile) { const mobile = document.createElement("img"); mobile.className = "rec-mobile"; mobile.src = MOBILE_ICON; mobile.alt = "Mobile"; right.appendChild(mobile); }
+      const time = document.createElement("span"); time.className = "rec-time"; time.textContent = formatTimeMs(record.timeMs); right.appendChild(time);
+      if (record.video) { const link = document.createElement("a"); link.href = record.video; link.target = "_blank"; link.rel = "noopener"; const play = document.createElement("img"); play.className = "rec-play"; play.src = PLAY_ICON; play.alt = "Ver video"; link.appendChild(play); right.appendChild(link); }
+      row.append(left, right); return row;
+    }
+    function renderPage() {
+      const list = $("recordsList"); list.innerHTML = "";
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE)); currentPage = Math.min(currentPage, totalPages);
+      filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE).forEach(record => list.appendChild(buildRecordRow(record)));
+      if (!filtered.length) list.innerHTML = '<div class="rec-empty">No se encontraron records con tiempo registrado.</div>';
+      $("pageInfo").textContent = `${currentPage} / ${totalPages}`;
+      $("prevBtn").disabled = currentPage === 1; $("nextBtn").disabled = currentPage === totalPages;
+    }
+    function toggleSection(toggleId, bodyId, arrowId) {
+      const toggle = $(toggleId), body = $(bodyId), arrow = $(arrowId);
+      toggle.addEventListener("click", () => {
+        const open = !body.classList.contains("hist-collapsed");
+        if (open) { body.style.maxHeight = body.scrollHeight + "px"; requestAnimationFrame(() => { body.classList.add("hist-collapsed"); body.style.maxHeight = ""; }); arrow.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); }
+        else { body.classList.remove("hist-collapsed"); body.style.maxHeight = body.scrollHeight + "px"; arrow.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); setTimeout(() => { body.style.maxHeight = "none"; }, 350); }
+      });
+      toggle.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle.click(); } });
+    }
+    async function loadHistory(id) {
+      try {
+        const snap = await getDocs(query(collection(db, "positionHistory"), where("levelId", "==", id)));
+        const rows = snap.docs.map(item => ({ id: item.id, ...item.data() })).sort((a,b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        $("historyList").innerHTML = rows.length ? `<div class="ph-row ph-head"><div>Fecha</div><div>Cambio</div><div>Nueva pos.</div><div>Razón</div></div>${rows.map(item => `<div class="ph-row ${item.change === "REMOVED" || Number(item.change) < 0 ? "ph-down" : item.change === "NEW" || Number(item.change) > 0 ? "ph-up" : ""}"><div class="ph-date">${item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString("es-ES") : "—"}</div><div class="ph-change">${esc(item.change === "NEW" ? "NEW" : item.change || "—")}</div><div class="ph-newpos">${item.newPosition ? `#${item.newPosition}` : "—"}</div><div class="ph-reason">${esc(item.reason || "")}</div></div>`).join("")}` : '<div class="ph-empty">Sin cambios registrados todavía.</div>';
+      } catch (error) { $("historyList").innerHTML = `<div class="ph-empty">Error al cargar historial: ${esc(error.message)}</div>`; }
+    }
+    $("prevBtn").addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+    $("nextBtn").addEventListener("click", () => { if (currentPage < Math.ceil(filtered.length / PER_PAGE)) { currentPage++; renderPage(); } });
+    $("recSearch").addEventListener("input", event => {
+      const term = event.target.value.toLowerCase().trim();
+      filtered = allRecords.filter(record => [record._profile?.name, record._profile2?.name].filter(Boolean).some(name => name.toLowerCase().includes(term)));
+      currentPage = 1; renderPage();
+    });
+    toggleSection("customIdsToggle", "customIdsBody", "customIdsArrow");
+    toggleSection("histToggle", "historyList", "histArrow");
+
+    async function init() {
+      try {
+        if (!levelId) throw new Error("No se especificó ningún nivel.");
+        const levelSnap = await getDoc(doc(db, "levels", levelId));
+        if (!levelSnap.exists() || !isPemon(levelSnap.data())) throw new Error("Este nivel no pertenece a PemonList.");
+        const level = { id: levelSnap.id, ...levelSnap.data() };
+        renderLevel(level); $("stateMsg").style.display = "none"; $("pageWrap").style.display = "block";
+        const recordsSnap = await getDocs(query(collection(db, "records"), where("levelId", "==", levelId)));
+        allRecords = recordsSnap.docs.map(item => ({ id: item.id, ...item.data() })).filter(record => (!record.status || record.status === "Accepted") && Number(record.timeMs) > 0).sort((a,b) => Number(a.timeMs) - Number(b.timeMs) || tsValue(a) - tsValue(b));
+        await attachProfiles(allRecords); filtered = [...allRecords];
+        $("recTitle").textContent = `RECORDS (${allRecords.length})`; renderPage();
+        await loadHistory(levelId);
+      } catch (error) { $("stateMsg").textContent = error.message || "Error al cargar el nivel."; console.error("[pemon-level]", error); }
+    }
+    init();
   </script>
-</body></html>
+</body>
+</html>

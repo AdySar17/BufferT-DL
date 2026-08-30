@@ -498,7 +498,7 @@
           <input id="alPosition" type="number" min="1" class="al-input">
           <div id="alPointsPreview" style="font-size:.78rem; color:#9bdc4d; margin-top:4px;">Puntos automáticos: —</div>
         </div>
-        <div>
+        <div id="alMinPercentWrap">
           <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">% mínimo (default 100)</label>
           <input id="alMinPercent" type="number" min="1" max="100" class="al-input" placeholder="100">
         </div>
@@ -1154,6 +1154,8 @@
     $("alDifficulty").value = rec.claimedLevelDifficulty ||
       (targetListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon");
     $("alMinPercent").value = "";
+    const isPemonLevel = targetListType === PEMON_LIST_TYPE;
+    $("alMinPercentWrap").style.display = isPemonLevel ? "none" : "";
     $("alDescription").value= "";
     $("alStaffNotes").value = "";
     $("alErr").style.display = "none";
@@ -1191,14 +1193,18 @@
     $("alPointsPreview").textContent = (p > 0)
       ? `${pemon ? "Lunas" : "Puntos"} automáticos: ${pemon ? computeLunas(p) : computePoints(p)} (posición #${p})`
       : `${pemon ? "Lunas" : "Puntos"} automáticos: —`;
-    /* Solo Top 50 puede tener minPercent < 100 */
-    const locked = p > 50;
+    const isPemon = alContext?.rec?.listType === PEMON_LIST_TYPE ||
+      getNewLevelType(alContext?.rec) === NEW_LEVEL_TYPE_PLATFORMER;
+    /* PemonList ordena récords por tiempo y no usa porcentaje mínimo. */
+    const locked = isPemon || p > 50;
     $("alMinPercent").disabled = locked;
     $("alMinPercent").style.opacity = locked ? "0.45" : "";
-    $("alMinPercent").title = locked ? "Solo niveles Top 50 pueden tener % mínimo < 100" : "";
+    $("alMinPercent").title = isPemon
+      ? "PemonList no utiliza porcentaje mínimo"
+      : (locked ? "Solo niveles Top 50 pueden tener % mínimo < 100" : "");
     if (locked) {
       $("alMinPercent").value = "";
-      $("alMinPercent").placeholder = "100 (solo Top 50)";
+      $("alMinPercent").placeholder = isPemon ? "No aplica" : "100 (solo Top 50)";
     } else {
       $("alMinPercent").placeholder = "100";
     }
@@ -1209,7 +1215,9 @@
       hintEl.style.cssText = "font-size:.72rem;color:#ff9a9a;margin-top:3px;";
       $("alMinPercent").insertAdjacentElement("afterend", hintEl);
     }
-    hintEl.textContent = locked ? "% mínimo bloqueado para niveles fuera del Top 50." : "";
+    hintEl.textContent = isPemon
+      ? "PemonList ordena los records por tiempo; el porcentaje mínimo no aplica."
+      : (locked ? "% mínimo bloqueado para niveles fuera del Top 50." : "");
   });
 
   $("alConfirm").onclick = async () => {
@@ -1230,9 +1238,13 @@
     const video     = $("alVideo").value.trim();
     const difficulty= $("alDifficulty").value ||
       (claimType === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
+    const targetListType = claimType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
+    const isPemonLevel = targetListType === PEMON_LIST_TYPE;
     const minRaw    = parseInt($("alMinPercent").value, 10);
-    /* Solo Top 50 puede tener minPercent < 100 */
-    const minPercent= (reqPos <= 50 && Number.isFinite(minRaw)) ? Math.min(100, Math.max(1, minRaw)) : 100;
+    /* Solo Demon List usa minPercent; PemonList ordena récords por tiempo. */
+    const minPercent = (!isPemonLevel && reqPos <= 50 && Number.isFinite(minRaw))
+      ? Math.min(100, Math.max(1, minRaw))
+      : 100;
     const description = $("alDescription").value.trim();
     const staffnotes  = $("alStaffNotes").value.trim().slice(0, 500);
     const glow        = $("alGlow").value || "";
@@ -1256,7 +1268,6 @@
     try {
       /* 1) Cargar todos los niveles para reordenar tras la inserción */
       const lvlSnap = await getDocs(collection(db, "levels"));
-      const targetListType = claimType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
       const all = [];
       lvlSnap.forEach(d => {
         const level = { id: d.id, ...d.data() };
@@ -1283,10 +1294,11 @@
         thumbnail, background, video,
         glow,
         is2P: claimType === NEW_LEVEL_TYPE_2P || claimType === NEW_LEVEL_TYPE_SOLO,
-        description, difficulty, minPercent,
+        description, difficulty,
         tags,
         customIds
       };
+      if (!isPemonLevel) levelDoc.minPercent = minPercent;
       /* gdLevelId final: lo que el staff dejó en el input del modal
          (prellenado con rec.claimedLevelId, pero editable). */
       const finalGdId = ($("alGdLevelId").value || "").trim();
