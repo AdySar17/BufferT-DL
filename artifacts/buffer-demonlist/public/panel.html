@@ -385,6 +385,7 @@
     <nav class="nav-links" id="navLinks">
       <a href="/">Home</a>
       <a href="/demonlist.html">Demon List</a>
+      <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
       <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
       <a href="/submit.html">Enviar Record</a>
@@ -653,6 +654,7 @@
     writeBatch, serverTimestamp, deleteField, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { computePoints } from "/points.js";
+  import { computeLunas, getListType, PEMON_LIST_TYPE, DEMON_LIST_TYPE } from "/list-utils.js";
 
   const $ = (id) => document.getElementById(id);
   const stateBox = $("stateBox");
@@ -1087,6 +1089,10 @@
       return;
     }
     alContext = { rec, wrap };
+    const targetListType = rec.listType === PEMON_LIST_TYPE ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
+    $("alDifficulty").innerHTML = targetListType === PEMON_LIST_TYPE
+      ? '<option value="Platformer">Platformer</option><option value="Hard Platformer">Hard Platformer</option><option value="Extreme Platformer">Extreme Platformer</option>'
+      : '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>';
     $("alName").value       = rec.claimedLevelName || "";
     $("alAuthor").value     = "";
     /* Banner con la info que envió el usuario: ID del nivel en GD */
@@ -1112,7 +1118,8 @@
     $("alVideo").value      = rec.video || "";
     /* Si el usuario eligió una dificultad en el reclamo, la usamos como
        valor por defecto del select; si no, dejamos Extreme Demon. */
-    $("alDifficulty").value = rec.claimedLevelDifficulty || "Extreme Demon";
+    $("alDifficulty").value = rec.claimedLevelDifficulty ||
+      (targetListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon");
     $("alMinPercent").value = "";
     $("alDescription").value= "";
     $("alStaffNotes").value = "";
@@ -1147,9 +1154,10 @@
 
   $("alPosition").addEventListener("input", () => {
     const p = Number($("alPosition").value);
+    const pemon = alContext?.rec?.listType === PEMON_LIST_TYPE;
     $("alPointsPreview").textContent = (p > 0)
-      ? `Puntos automáticos: ${computePoints(p)} (posición #${p})`
-      : "Puntos automáticos: —";
+      ? `${pemon ? "Lunas" : "Puntos"} automáticos: ${pemon ? computeLunas(p) : computePoints(p)} (posición #${p})`
+      : `${pemon ? "Lunas" : "Puntos"} automáticos: —`;
     /* Solo Top 50 puede tener minPercent < 100 */
     const locked = p > 50;
     $("alMinPercent").disabled = locked;
@@ -1211,8 +1219,12 @@
     try {
       /* 1) Cargar todos los niveles para reordenar tras la inserción */
       const lvlSnap = await getDocs(collection(db, "levels"));
+      const targetListType = rec.listType === PEMON_LIST_TYPE ? PEMON_LIST_TYPE : DEMON_LIST_TYPE;
       const all = [];
-      lvlSnap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      lvlSnap.forEach(d => {
+        const level = { id: d.id, ...d.data() };
+        if (getListType(level) === targetListType) all.push(level);
+      });
       const ordered = [...all].sort((a, b) => {
         const pa = Number(a.position) || Infinity;
         const pb = Number(b.position) || Infinity;
@@ -1225,10 +1237,11 @@
 
       /* 2) Crear el doc del nivel en su posición pedida */
       const newPos   = insertAt;
-      const newValue = computePoints(newPos);
+      const newValue = targetListType === PEMON_LIST_TYPE ? computeLunas(newPos) : computePoints(newPos);
       const levelDoc = {
         name, author, creators,
         position: newPos, value: newValue,
+        listType: targetListType,
         thumbnail, background, video,
         glow, is2P: false,
         description, difficulty, minPercent,
@@ -1280,10 +1293,10 @@
       ordered.forEach((lvl, i) => {
         if (lvl.id === newRef.id) return;
         const p = i + 1;
-        const v = computePoints(p);
+        const v = targetListType === PEMON_LIST_TYPE ? computeLunas(p) : computePoints(p);
         const orig = originalById.get(lvl.id) || {};
         if (Number(orig.position) !== p || Number(orig.value) !== v) {
-          updates.push({ ref: doc(db, "levels", lvl.id), data: { position: p, value: v } });
+          updates.push({ ref: doc(db, "levels", lvl.id), data: { position: p, value: v, listType: targetListType } });
         }
       });
       const CHUNK = 450;
@@ -1364,6 +1377,7 @@
       const meUid = (window.__currentUser && window.__currentUser.uid) || null;
       await updateDoc(doc(db, "records", rec.id), {
         levelId:         newRef.id,
+        listType:        targetListType,
         isNewLevelClaim: false,
         status:          "Accepted",
         acceptedAt:      serverTimestamp(),

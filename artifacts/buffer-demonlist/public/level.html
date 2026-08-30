@@ -346,6 +346,7 @@
     <nav class="nav-links" id="navLinks">
       <a href="/">Home</a>
       <a href="/demonlist.html">Demon List</a>
+      <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
       <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
       <a href="/submit.html">Enviar Record</a>
@@ -609,6 +610,7 @@
 <script type="module">
   import { db } from "/auth.js";
   import { difficultyImage, difficultyName } from "/difficulty.js";
+  import { isDemon } from "/list-utils.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName as lvlCname, flagUrl as lvlFlagUrl } from "/country-utils.js";
@@ -993,7 +995,12 @@
         stateMsg.textContent = "El nivel no existe en la base de datos.";
         return;
       }
-      renderLevel({ id: levelSnap.id, ...levelSnap.data() });
+      const levelData = { id: levelSnap.id, ...levelSnap.data() };
+      if (!isDemon(levelData)) {
+        stateMsg.textContent = window.BFT_I18N?.t("pemon_not_found") || "Este nivel no pertenece a la Demon List.";
+        return;
+      }
+      renderLevel(levelData);
       stateMsg.style.display = "none";
       pageWrap.style.display = "block";
     } catch (err) {

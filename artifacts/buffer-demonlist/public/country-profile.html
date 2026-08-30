@@ -256,6 +256,7 @@
     <nav class="nav-links" id="navLinks">
       <a href="/">Home</a>
       <a href="/demonlist.html">Demon List</a>
+      <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
       <a href="/leaderboards.html">Leaderboards</a>
       <a href="/notifications.html">✉ Notificaciones</a>
       <a href="/submit.html">Enviar Record</a>
@@ -338,6 +339,7 @@
   import { collection, getDocs }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
+  import { isDemon } from "/list-utils.js";
 
   const code = (new URLSearchParams(location.search).get("code") || "").toLowerCase();
 
@@ -371,7 +373,10 @@
 
       const lvlSnap = await getDocs(collection(db, "levels"));
       const levelsMap = new Map();
-      lvlSnap.forEach(d => levelsMap.set(d.id, { id: d.id, ...d.data() }));
+      lvlSnap.forEach(d => {
+        const level = { id: d.id, ...d.data() };
+        if (isDemon(level)) levelsMap.set(d.id, level);
+      });
 
       const playerStats = new Map();
       countryProfiles.forEach((_, uid) => playerStats.set(uid, { points: 0, records100: 0 }));

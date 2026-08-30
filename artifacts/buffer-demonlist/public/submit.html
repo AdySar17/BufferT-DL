@@ -480,6 +480,7 @@
       <nav class="nav-links" id="navLinks">
         <a href="/">Home</a>
         <a href="/demonlist.html">Demon List</a>
+        <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
         <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
         <a href="/submit.html">Enviar Record</a>
@@ -555,6 +556,9 @@
           <option value="Hard Demon">Hard Demon</option>
           <option value="Medium Demon">Medium Demon</option>
           <option value="Easy Demon">Easy Demon</option>
+          <option value="Platformer">Platformer</option>
+          <option value="Hard Platformer">Hard Platformer</option>
+          <option value="Extreme Platformer">Extreme Platformer</option>
         </select>
       </div>
 
@@ -645,6 +649,7 @@
     import { mountAuthUI, onAuthChange, getCurrentUser,
              getCurrentProfileData, isOwner, db }
       from "/auth.js?v=8";
+    import { getListType, PEMON_LIST_TYPE, DEMON_LIST_TYPE } from "/list-utils.js";
     import {
       collection, getDocs, getDoc, doc, addDoc, query, where, limit,
       orderBy, serverTimestamp
@@ -719,6 +724,9 @@
 
     /* ── Helpers ────────────────────────────────────── */
     const $ = (id) => document.getElementById(id);
+    const requestedListType = new URLSearchParams(location.search).get("list") === PEMON_LIST_TYPE
+      ? PEMON_LIST_TYPE
+      : DEMON_LIST_TYPE;
     function showMsg(text, type) {
       const el = $("msg");
       el.textContent = text;
@@ -738,11 +746,13 @@
           /* fallback si no hay índice o falta campo */
           snap = await getDocs(collection(db, "levels"));
         }
-        levelsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        levelsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(level => getListType(level) === requestedListType);
         levelsCache.sort((a, b) => (a.position ?? 999999) - (b.position ?? 999999));
 
         if (!levelsCache.length) {
-          $("levelSearch").placeholder = "No hay niveles aún";
+          $("levelSearch").placeholder = requestedListType === PEMON_LIST_TYPE
+            ? "No hay niveles Pemon aún" : "No hay niveles aún";
           $("levelSearch").disabled = true;
           return;
         }
@@ -1035,7 +1045,8 @@
       if (isNewClaim) {
         claimedLevelName       = $("newLevelName").value.trim();
         claimedLevelId         = $("newLevelId").value.trim();
-        claimedLevelDifficulty = $("newLevelDifficulty").value || "Extreme Demon";
+        claimedLevelDifficulty = $("newLevelDifficulty").value ||
+          (requestedListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon");
         if (!claimedLevelName || !claimedLevelId) {
           showMsg("Para un nivel nuevo debes indicar nombre e ID.", "err"); return;
         }
@@ -1204,7 +1215,8 @@
           isNewLevelClaim:        isNewClaim,
           claimedLevelName:       isNewClaim ? claimedLevelName       : "",
           claimedLevelId:         isNewClaim ? claimedLevelId         : "",
-          claimedLevelDifficulty: isNewClaim ? claimedLevelDifficulty : ""
+          claimedLevelDifficulty: isNewClaim ? claimedLevelDifficulty : "",
+          listType: requestedListType
         };
         const ref = await addDoc(collection(db, "records"), payload);
         console.log("[submit] OK record id =", ref.id, "newClaim=", isNewClaim);
@@ -1219,7 +1231,7 @@
         clearLevel();
         $("newLevelName").value       = "";
         $("newLevelId").value         = "";
-        $("newLevelDifficulty").value = "Extreme Demon";
+        $("newLevelDifficulty").value = requestedListType === PEMON_LIST_TYPE ? "Platformer" : "Extreme Demon";
         $("percent").value = "";
         $("video").value = "";
         $("video2").value = "";

@@ -838,6 +838,7 @@
     <nav class="nav-links" id="navLinks">
       <a href="/">Home</a>
       <a href="/demonlist.html">Demon List</a>
+      <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
       <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
       <a href="/submit.html">Enviar Record</a>
@@ -1074,6 +1075,7 @@
 <script type="module">
   import { db, onAuthChange, refreshProfile } from "/auth.js";
   import { DIFFICULTY_IMAGES } from "/difficulty.js";
+  import { isDemon } from "/list-utils.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
            collection, query, where, getDocs }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1293,7 +1295,7 @@
         const r = d.data();
         if (r.status !== "Accepted") return;
         const lvl = lvlMap.get(r.levelId);
-        if (!lvl) return;
+        if (!lvl || !isDemon(lvl)) return;
         const pct = Number(r.percent);
         if (!Number.isFinite(pct) || pct <= 0) return;
         const base = Number(lvl.value || 0);
@@ -1526,6 +1528,10 @@
           if (ls.exists()) levelsCache.set(id, { id, ...ls.data() });
         } catch (e) { console.warn("level load fail", id, e); }
       }));
+      myRecords = myRecords.filter(r => {
+        const level = levelsCache.get(r.levelId);
+        return level && isDemon(level);
+      });
 
       /* Cargar profiles del compañero (player1 si soy player2, o viceversa) */
       const otherIds = new Set();

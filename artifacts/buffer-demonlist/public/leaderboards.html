@@ -377,6 +377,7 @@
       <nav class="nav-links" id="navLinks">
         <a href="/">Home</a>
         <a href="/demonlist.html">Demon List</a>
+        <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
         <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
         <a href="/submit.html">Enviar Record</a>
@@ -423,6 +424,7 @@
   <script type="module">
     import { onAuthChange, db, isStaff, mountAuthUI } from "/auth.js";
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
+    import { isDemon } from "/list-utils.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
@@ -498,7 +500,10 @@
 
         /* 2) Levels: traer TODOS de una sola colección (1 sola lectura tipo list) */
         const lvlSnap = await getDocs(collection(db, "levels"));
-        lvlSnap.forEach(d => levelsCache.set(d.id, d.data()));
+        lvlSnap.forEach(d => {
+          const level = d.data();
+          if (isDemon(level)) levelsCache.set(d.id, level);
+        });
 
         /* 3) Agregar por usuario */
         const map = new Map();

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pemon Level - BufferTeam</title>
+  <link rel="stylesheet" href="/shared.css"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="/i18n.js"></script>
+  <script>document.addEventListener("DOMContentLoaded",()=>window.BFT_I18N?.renderSelector("langSlot"));</script>
+  <style>
+    body { min-height:100vh; background:#070a12; color:#f4f7fb; }
+    #levelBg { position:fixed; inset:0; z-index:-1; background:center/cover no-repeat; filter:brightness(.28) saturate(1.2); }
+    .wrap { width:min(1080px,94vw); margin:auto; padding:92px 0 48px; }
+    .back { color:#72e6ff; text-decoration:none; font-weight:700; }
+    .hero,.card { border:1px solid rgba(114,230,255,.18); border-radius:18px; background:rgba(10,18,31,.88); box-shadow:0 14px 50px rgba(0,0,0,.25); }
+    .hero { display:flex; gap:20px; align-items:center; margin-top:20px; padding:24px; }
+    .diff { width:70px; height:70px; object-fit:contain; }
+    h1 { margin:0 0 8px; font-size:clamp(1.7rem,4vw,3rem); } .sub { color:rgba(235,243,255,.65); margin:0; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:16px 0; }
+    .stat { padding:18px; text-align:center; } .stat-label { color:rgba(235,243,255,.58); font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; } .stat-value { color:#f4dd8b; font-size:1.35rem; font-weight:800; margin-top:7px; }
+    .card { padding:22px; margin-top:16px; } .card h2 { margin:0 0 16px; }
+    .video { position:relative; aspect-ratio:16/9; overflow:hidden; padding:0; } .video iframe { width:100%; height:100%; border:0; }
+    .record { display:grid; grid-template-columns:1fr auto; gap:10px; padding:13px 0; border-top:1px solid rgba(255,255,255,.1); }
+    .record strong { color:#72e6ff; } .record small { color:rgba(235,243,255,.58); display:block; margin-top:5px; }
+    .empty,#state { color:rgba(235,243,255,.65); text-align:center; padding:24px; }
+    @media(max-width:650px){.hero{padding:18px}.stats{grid-template-columns:1fr 1fr}.diff{width:54px;height:54px}.record{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><div id="levelBg"></div>
+  <header class="top-header"><div class="left"><img src="/logo.png" class="logo-img" alt="Logo"><div class="logo-text"><span class="logo-full">BFT PemonList</span><span class="logo-short">BFT PL</span></div></div>
+    <div style="display:flex;align-items:center;gap:14px"><nav class="nav-links" id="navLinks">
+      <a href="/" data-i18n="nav_home">Home</a><a href="/demonlist.html" data-i18n="nav_demonlist">Demon List</a><a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a><a href="/leaderboards.html" data-i18n="nav_leaderboards">Leaderboards</a><a href="/submit.html?list=pemon" data-i18n="nav_submit_pemon">Enviar Record Pemon</a><a href="/guidelines.html" data-i18n="nav_guidelines">Guidelines</a>
+    </nav><div id="langSlot"></div><div class="auth-slot" id="authSlot"></div><button class="menu-toggle" onclick="document.getElementById('navLinks').classList.toggle('active')" aria-label="Menu">☰</button></div>
+  </header>
+  <main class="wrap"><div id="state" data-i18n="lv_loading_level">Cargando nivel...</div><div id="content" style="display:none">
+    <a class="back" href="/pemonlist.html" data-i18n="pemon_back">← Volver a PemonList</a>
+    <section class="hero"><img id="diff" class="diff" alt="Platformer"><div><h1 id="name">—</h1><p id="sub" class="sub">—</p></div></section>
+    <div class="stats"><div class="card stat"><div class="stat-label" data-i18n="pemon_lunas">Lunas</div><div id="lunas" class="stat-value">—</div></div><div class="card stat"><div class="stat-label" data-i18n="lv_position">Posición</div><div id="position" class="stat-value">—</div></div><div class="card stat"><div class="stat-label" data-i18n="lv_difficulty">Dificultad</div><div id="difficulty" class="stat-value">—</div></div></div>
+    <div id="videoWrap" class="card video" style="display:none"><iframe id="video" allowfullscreen></iframe></div>
+    <section class="card"><h2 data-i18n="lv_records">Records</h2><div id="records"></div></section>
+  </div></main>
+  <script type="module">
+    import { db, mountAuthUI } from "/auth.js"; import { computeLunas, PEMON_LIST_TYPE } from "/list-utils.js"; import { difficultyImage } from "/difficulty.js";
+    import { doc,getDoc,collection,query,where,getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    mountAuthUI("authSlot"); const $=id=>document.getElementById(id); const id=new URLSearchParams(location.search).get("id");
+    const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const embed=url=>{if(!url)return ""; const m=url.match(/(?:youtu\.be\/|[?&]v=)([^?&\s]+)/); return m?`https://www.youtube.com/embed/${m[1]}`:url;};
+    async function init(){try{if(!id)throw Error(window.BFT_I18N?.t("pemon_missing")||"Nivel no especificado."); const snap=await getDoc(doc(db,"levels",id)); if(!snap.exists()||snap.data().listType!==PEMON_LIST_TYPE) throw Error(window.BFT_I18N?.t("pemon_not_found")||"Este nivel no pertenece a PemonList."); const l={id:snap.id,...snap.data()};
+      document.title=`${l.name} - PemonList`; $("levelBg").style.backgroundImage=l.background?`url("${l.background}")`:"none"; $("diff").src=difficultyImage(l.difficulty); $("name").textContent=`#${l.position||"—"} - ${l.name||"—"}`; $("sub").textContent=`By ${l.author||"—"}${l.creators?.length?` · ${l.creators.join(", ")}`:""}`; $("lunas").textContent=`${computeLunas(l.position)} ${window.BFT_I18N?.t("pemon_lunas")||"Lunas"}`; $("position").textContent=`#${l.position||"—"}`; $("difficulty").textContent=l.difficulty||"Platformer";
+      if(l.video){$("video").src=embed(l.video);$("videoWrap").style.display="block";}
+      const rs=await getDocs(query(collection(db,"records"),where("levelId","==",id))); const records=rs.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(!r.status||r.status==="Accepted")&&Number(r.percent)>0).sort((a,b)=>Number(b.percent)-Number(a.percent)); const uids=[...new Set(records.flatMap(r=>[r.userId,r.player2Id].filter(Boolean)))]; const names=new Map(); await Promise.all(uids.map(async uid=>{const p=await getDoc(doc(db,"profiles",uid));names.set(uid,p.exists()?p.data().name||"Sin nombre":"Jugador");})); $("records").innerHTML=records.length?records.map(r=>`<div class="record"><div><strong>${esc(names.get(r.userId)||"Jugador")}</strong>${r.player2Id?` + ${esc(names.get(r.player2Id)||"Jugador")}`:""}<small>${esc(r.mobile?"Mobile":"Platformer record")}</small></div><strong>${Number(r.percent)||0}%</strong></div>`).join(""):`<div class="empty">${esc(window.BFT_I18N?.t("lv_no_recs")||"No records yet.")}</div>`;
+      $("state").style.display="none"; $("content").style.display="block";
+    }catch(e){$("state").textContent=e.message;}} init();
+  </script>
+</body></html>

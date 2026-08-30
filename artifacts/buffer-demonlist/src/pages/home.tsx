@@ -30,6 +30,7 @@ const LANG_FLAGS: Record<string, string> = {
 const TR: Record<string, Record<string, string>> = {
   nav_home:          { es:"Home",               en:"Home",           ru:"Главная",               pt:"Início",          fr:"Accueil",           vi:"Trang chủ" },
   nav_demonlist:     { es:"Demon List",          en:"Demon List",     ru:"Список демонов",        pt:"Demon List",      fr:"Demon List",        vi:"Demon List" },
+  nav_pemonlist:     { es:"PemonList",           en:"PemonList",      ru:"PemonList",             pt:"PemonList",       fr:"PemonList",        vi:"PemonList" },
   nav_leaderboards:  { es:"Leaderboards",        en:"Leaderboards",   ru:"Таблица лидеров",       pt:"Rankings",        fr:"Classements",       vi:"Bảng xếp hạng" },
   nav_notifications: { es:"✉ Notificaciones",    en:"✉ Notifications",ru:"✉ Уведомления",        pt:"✉ Notificações",  fr:"✉ Notifications",   vi:"✉ Thông báo" },
   nav_submit:        { es:"Enviar Record",       en:"Submit Record",  ru:"Отправить рекорд",      pt:"Enviar Record",   fr:"Soumettre un record",vi:"Gửi Record" },
@@ -252,7 +253,7 @@ function useLiveData() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const cached = readCache<{ stats: LiveStats; top10: LiveLevel[]; records: LiveRecord[] }>("home_livedata");
+      const cached = readCache<{ stats: LiveStats; top10: LiveLevel[]; records: LiveRecord[] }>("home_livedata_v2");
       if (cached) { setStats(cached.stats); setTop10(cached.top10); setRecords(cached.records); setLoading(false); return; }
       try {
         const dynImport: (s: string) => Promise<any> = new Function("u", "return import(u)") as any;
@@ -263,13 +264,16 @@ function useLiveData() {
 
         const lvlSnap = await getDocs(query(collection(db, "levels"), orderBy("position", "asc"), limit(10)));
         const lvls: LiveLevel[] = [];
-        lvlSnap.forEach((d: any) => lvls.push({ id: d.id, ...(d.data() as any) }));
+        lvlSnap.forEach((d: any) => {
+          const level = d.data() as any;
+          if (level.listType !== "pemon") lvls.push({ id: d.id, ...level });
+        });
 
         const recSnap = await getDocs(query(collection(db, "records"), orderBy("acceptedAt", "desc"), limit(5)));
         const rawRecs: any[] = [];
         recSnap.forEach((d: any) => rawRecs.push({ id: d.id, ...d.data() }));
 
-        const recsResolved: LiveRecord[] = await Promise.all(
+        const recsResolved = (await Promise.all(
           rawRecs.map(async (r: any) => {
             let playerName = "Jugador"; let playerPhoto: string | undefined; let levelName = "Nivel";
             try {
@@ -278,25 +282,40 @@ function useLiveData() {
                 if (p.exists()) { const pd = p.data(); playerName = pd.displayName || pd.name || playerName; playerPhoto = pd.photoURL; }
                 else { const u = await getDoc(doc(db, "users", r.userId)); if (u.exists()) { const ud = u.data(); playerName = ud.displayName || ud.name || playerName; playerPhoto = ud.photoURL; } }
               }
-              if (r.levelId) { const lv = await getDoc(doc(db, "levels", r.levelId)); if (lv.exists()) levelName = lv.data().name || levelName; }
+              if (r.levelId) {
+                const lv = await getDoc(doc(db, "levels", r.levelId));
+                if (lv.exists()) {
+                  const level = lv.data();
+                  if (level.listType === "pemon") return null;
+                  levelName = level.name || levelName;
+                }
+              }
             } catch {}
             return { id: r.id, playerName, playerPhoto, levelName, levelId: r.levelId, percent: r.percent || 100, acceptedAt: r.acceptedAt };
           })
-        );
+        )).filter(Boolean) as LiveRecord[];
 
         async function countCol(colRef: any, label: string): Promise<number> {
           if (typeof getCountFromServer === "function") { try { const snap = await getCountFromServer(colRef); const n = snap.data().count; if (typeof n === "number") return n; } catch (e) { console.warn(`[home] count (${label}):`, e); } }
           try { const snap = await getDocs(query(colRef, limit(1000))); return snap.size; } catch { return 0; }
         }
-        const [recordsCount, playersCount, levelsCount] = await Promise.all([
-          countCol(query(collection(db, "records"), where("status", "==", "Accepted")), "records"),
+        const [allRecordsSnap, allLevelsSnap, playersCount] = await Promise.all([
+          getDocs(query(collection(db, "records"), where("status", "==", "Accepted"))),
+          getDocs(collection(db, "levels")),
           countCol(collection(db, "profiles"), "profiles"),
-          countCol(collection(db, "levels"),   "levels"),
         ]);
+        const demonLevelIds = new Set<string>();
+        allLevelsSnap.forEach((d: any) => {
+          if (d.data()?.listType !== "pemon") demonLevelIds.add(d.id);
+        });
+        const recordsCount = allRecordsSnap.docs.filter((d: any) =>
+          demonLevelIds.has(d.data()?.levelId)
+        ).length;
+        const levelsCount = demonLevelIds.size;
 
         if (cancelled) return;
         const newStats = { records: recordsCount, players: playersCount, levels: levelsCount, recent: recsResolved.length };
-        writeCache("home_livedata", { stats: newStats, top10: lvls, records: recsResolved });
+        writeCache("home_livedata_v2", { stats: newStats, top10: lvls, records: recsResolved });
         setTop10(lvls); setRecords(recsResolved); setStats(newStats); setLoading(false);
       } catch (err) { console.error("[home] error cargando datos:", err); if (!cancelled) setLoading(false); }
     })();
@@ -492,6 +511,7 @@ export default function Home() {
           <nav className="nav-links" id="navLinks">
             <a href="/">{t("nav_home")}</a>
             <a href="/demonlist.html">{t("nav_demonlist")}</a>
+            <a href="/pemonlist.html">{t("nav_pemonlist")}</a>
             <a href="/leaderboards.html">{t("nav_leaderboards")}</a>
             <a href="/notifications.html">{t("nav_notifications")}</a>
             <a href="/submit.html">{t("nav_submit")}</a>

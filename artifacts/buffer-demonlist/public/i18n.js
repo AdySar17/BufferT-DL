@@ -27,6 +27,8 @@
     /* ─ Navegación ─ */
     nav_home:          { es:'Home',              en:'Home',          ru:'Главная',                pt:'Início',        fr:'Accueil',        vi:'Trang chủ' },
     nav_demonlist:     { es:'Demon List',        en:'Demon List',    ru:'Список демонов',         pt:'Demon List',    fr:'Demon List',     vi:'Demon List' },
+    nav_pemonlist:     { es:'PemonList',         en:'PemonList',     ru:'PemonList',              pt:'PemonList',     fr:'PemonList',      vi:'PemonList' },
+    nav_submit_pemon:  { es:'Enviar Record Pemon', en:'Submit Pemon Record', ru:'Отправить рекорд Pemon', pt:'Enviar Record Pemon', fr:'Soumettre un record Pemon', vi:'Gửi Record Pemon' },
     nav_leaderboards:  { es:'Leaderboards',      en:'Leaderboards',  ru:'Таблица лидеров',        pt:'Rankings',      fr:'Classements',    vi:'Bảng xếp hạng' },
     nav_notifications: { es:'✉ Notificaciones',  en:'✉ Notifications', ru:'✉ Уведомления',       pt:'✉ Notificações',fr:'✉ Notifications',vi:'✉ Thông báo' },
     nav_submit:        { es:'Enviar Record',     en:'Submit Record', ru:'Отправить рекорд',       pt:'Enviar Record',  fr:'Soumettre un record', vi:'Gửi Record' },
@@ -95,6 +97,20 @@
 
     /* ─ Páginas / Secciones ─ */
     page_demonlist:   { es:'BFT Demon List',        en:'BFT Demon List',       ru:'Список демонов BFT', pt:'BFT Demon List',     fr:'BFT Demon List',       vi:'BFT Demon List' },
+    page_pemonlist:   { es:'BFT PemonList',         en:'BFT PemonList',        ru:'PemonList BFT',     pt:'BFT PemonList',      fr:'BFT PemonList',       vi:'BFT PemonList' },
+    pemon_subtitle:   { es:'La lista independiente de los niveles Platformer más difíciles.', en:'The independent list of the hardest Platformer levels.', ru:'Независимый список самых сложных Platformer-уровней.', pt:'A lista independente dos níveis Platformer mais difíceis.', fr:'La liste indépendante des niveaux Platformer les plus difficiles.', vi:'Danh sách độc lập các màn Platformer khó nhất.' },
+    pemon_submit:     { es:'Enviar record Pemon', en:'Submit Pemon record', ru:'Отправить рекорд Pemon', pt:'Enviar record Pemon', fr:'Soumettre un record Pemon', vi:'Gửi record Pemon' },
+    pemon_search:     { es:'Buscar nivel o creador…', en:'Search level or creator…', ru:'Поиск уровня или создателя…', pt:'Buscar nível ou criador…', fr:'Rechercher un niveau ou créateur…', vi:'Tìm màn chơi hoặc người tạo…' },
+    pemon_add:        { es:'Añadir nivel', en:'Add level', ru:'Добавить уровень', pt:'Adicionar nível', fr:'Ajouter un niveau', vi:'Thêm màn chơi' },
+    pemon_edit:       { es:'Editar nivel', en:'Edit level', ru:'Изменить уровень', pt:'Editar nível', fr:'Modifier le niveau', vi:'Chỉnh sửa màn chơi' },
+    pemon_lunas:      { es:'Lunas', en:'Lunas', ru:'Луны', pt:'Lunas', fr:'Lunas', vi:'Lunas' },
+    pemon_back:       { es:'← Volver a PemonList', en:'← Back to PemonList', ru:'← Вернуться к PemonList', pt:'← Voltar à PemonList', fr:'← Retour à PemonList', vi:'← Quay lại PemonList' },
+    pemon_empty:      { es:'Aún no hay niveles Platformer en PemonList.', en:'There are no Platformer levels in PemonList yet.', ru:'В PemonList пока нет Platformer-уровней.', pt:'Ainda não há níveis Platformer na PemonList.', fr:'Aucun niveau Platformer dans PemonList pour le moment.', vi:'Chưa có màn Platformer nào trong PemonList.' },
+    pemon_error:      { es:'Error al cargar PemonList:', en:'Error loading PemonList:', ru:'Ошибка загрузки PemonList:', pt:'Erro ao carregar a PemonList:', fr:'Erreur lors du chargement de PemonList :', vi:'Lỗi tải PemonList:' },
+    pemon_required:   { es:'Nombre, autor y posición son obligatorios.', en:'Name, author, and position are required.', ru:'Имя, автор и позиция обязательны.', pt:'Nome, autor e posição são obrigatórios.', fr:'Le nom, l’auteur et la position sont obligatoires.', vi:'Tên, tác giả và vị trí là bắt buộc.' },
+    pemon_delete_confirm: { es:'¿Eliminar este nivel de PemonList?', en:'Delete this level from PemonList?', ru:'Удалить этот уровень из PemonList?', pt:'Excluir este nível da PemonList?', fr:'Supprimer ce niveau de PemonList ?', vi:'Xóa màn chơi này khỏi PemonList?' },
+    pemon_missing:    { es:'No se especificó ningún nivel.', en:'No level was specified.', ru:'Уровень не указан.', pt:'Nenhum nível foi especificado.', fr:'Aucun niveau spécifié.', vi:'Chưa chỉ định màn chơi.' },
+    pemon_not_found:  { es:'Este nivel no pertenece a PemonList.', en:'This level does not belong to PemonList.', ru:'Этот уровень не принадлежит PemonList.', pt:'Este nível não pertence à PemonList.', fr:'Ce niveau ne fait pas partie de PemonList.', vi:'Màn chơi này không thuộc PemonList.' },
     page_submit:      { es:'Enviar Record',          en:'Submit Record',        ru:'Отправить рекорд',   pt:'Enviar Record',      fr:'Soumettre un record',  vi:'Gửi Record' },
     page_leaderboard: { es:'Leaderboards',           en:'Leaderboards',         ru:'Таблица лидеров',    pt:'Rankings',           fr:'Classements',          vi:'Bảng xếp hạng' },
     page_guidelines:  { es:'Guidelines',             en:'Guidelines',           ru:'Правила',            pt:'Diretrizes',         fr:'Règles',               vi:'Hướng dẫn' },
@@ -178,6 +194,8 @@
     lv_custom_ids_sub:   { es:'IDs alternativas asociadas a este nivel', en:'Alternative IDs associated with this level', ru:'Альтернативные ID этого уровня', pt:'IDs alternativas associadas a este nível', fr:'IDs alternatives associées à ce niveau', vi:'ID thay thế liên quan đến màn chơi này' },
     lv_history_sub:      { es:'Cambios registrados en este nivel', en:'Recorded changes for this level', ru:'Зафиксированные изменения уровня', pt:'Mudanças registradas neste nível', fr:'Changements enregistrés pour ce niveau', vi:'Các thay đổi được ghi lại cho màn chơi này' },
     lv_loading_records:  { es:'Cargando records...', en:'Loading records...', ru:'Загрузка рекордов...', pt:'Carregando records...', fr:'Chargement des records...', vi:'Đang tải records...' },
+    lv_position:         { es:'Posición', en:'Position', ru:'Позиция', pt:'Posição', fr:'Position', vi:'Vị trí' },
+    lv_difficulty:       { es:'Dificultad', en:'Difficulty', ru:'Сложность', pt:'Dificuldade', fr:'Difficulté', vi:'Độ khó' },
     lv_loading_hist:     { es:'Cargando historial...', en:'Loading history...', ru:'Загрузка истории...', pt:'Carregando histórico...', fr:'Chargement de l\'historique...', vi:'Đang tải lịch sử...' },
 
     /* ─ Submit page ─ */
@@ -489,6 +507,8 @@
   const NAV_HREF_MAP = {
     '/':                   'nav_home',
     '/demonlist.html':     'nav_demonlist',
+    '/pemonlist.html':     'nav_pemonlist',
+    '/submit.html?list=pemon': 'nav_submit_pemon',
     '/leaderboards.html':  'nav_leaderboards',
     '/notifications.html': 'nav_notifications',
     '/submit.html':        'nav_submit',

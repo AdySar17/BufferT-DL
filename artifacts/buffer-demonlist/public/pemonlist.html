@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demon List - BufferTeam</title>
+  <title>PemonList - BufferTeam</title>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/shared.css">
 
@@ -765,16 +765,16 @@
   <header class="top-header">
     <div class="left">
       <img src="/logo.png" class="logo-img" alt="Logo">
-      <div class="logo-text"><span class="logo-full">BFT Demon List</span><span class="logo-short">BFT DL</span></div>
+      <div class="logo-text"><span class="logo-full">BFT PemonList</span><span class="logo-short">BFT PL</span></div>
     </div>
     <div style="display:flex; align-items:center; gap:14px;">
       <nav class="nav-links" id="navLinks">
         <a href="/">Home</a>
         <a href="/demonlist.html">Demon List</a>
-        <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
+        <a href="/pemonlist.html">PemonList</a>
         <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
-        <a href="/submit.html">Enviar Record</a>
+        <a href="/submit.html?list=pemon">Enviar Record Pemon</a>
         <a href="/guidelines.html">Guidelines</a>
         <a href="/panel.html" class="staff-only">Panel de Records</a>
         <a href="/staff-control.html" class="owner-only">Control Staff</a>
@@ -789,7 +789,7 @@
   <!-- LISTA -->
   <div id="listView">
     <div id="searchContainer">
-      <input type="text" id="searchBar" placeholder="🔍 Buscar nivel..." data-i18n-placeholder="dl_search">
+      <input type="text" id="searchBar" placeholder="🔍 Buscar nivel Pemon..." data-i18n-placeholder="pemon_search">
     </div>
     <div id="loadingMsg"><div class="bft-loading"><span class="bft-spinner"></span></div></div>
     <div class="level-container" id="levelContainer"></div>
@@ -812,17 +812,15 @@
       <input id="inp-gdLevelId"  placeholder="ID de Geometry Dash (único, evita reclamos duplicados)" inputmode="numeric" maxlength="20">
       <input id="inp-position"   placeholder="Posición (1 = top)" type="number" min="1">
       <div id="inp-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
-        Puntos automáticos: —
+        Lunas automáticas: —
       </div>
       <input id="inp-thumbnail"  placeholder="URL Thumbnail">
       <input id="inp-background" placeholder="URL Fondo de la card">
       <input id="inp-video"      placeholder="URL Video">
       <select id="inp-difficulty">
-        <option value="Extreme Demon">Extreme Demon</option>
-        <option value="Insane Demon">Insane Demon</option>
-        <option value="Hard Demon">Hard Demon</option>
-        <option value="Medium Demon">Medium Demon</option>
-        <option value="Easy Demon">Easy Demon</option>
+        <option value="Platformer">Platformer</option>
+        <option value="Hard Platformer">Hard Platformer</option>
+        <option value="Extreme Platformer">Extreme Platformer</option>
       </select>
       <input id="inp-min-percent" type="number" min="1" max="100" placeholder="% mínimo requerido (1–100, default 100)">
       <select id="inp-glow">
@@ -931,17 +929,15 @@
       <input id="edit-gdLevelId"  placeholder="ID de Geometry Dash (único, evita reclamos duplicados)" inputmode="numeric" maxlength="20">
       <input id="edit-position"   placeholder="Posición (1 = top)" type="number" min="1">
       <div id="edit-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
-        Puntos automáticos: —
+        Lunas automáticas: —
       </div>
       <input id="edit-thumbnail"  placeholder="URL Thumbnail">
       <input id="edit-background" placeholder="URL Fondo de la card">
       <input id="edit-video"      placeholder="URL Video">
       <select id="edit-difficulty">
-        <option value="Extreme Demon">Extreme Demon</option>
-        <option value="Insane Demon">Insane Demon</option>
-        <option value="Hard Demon">Hard Demon</option>
-        <option value="Medium Demon">Medium Demon</option>
-        <option value="Easy Demon">Easy Demon</option>
+        <option value="Platformer">Platformer</option>
+        <option value="Hard Platformer">Hard Platformer</option>
+        <option value="Extreme Platformer">Extreme Platformer</option>
       </select>
       <input id="edit-min-percent" type="number" min="1" max="100" placeholder="% mínimo requerido (1–100, default 100)">
       <select id="edit-glow">
@@ -1094,8 +1090,8 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-    import { computePoints } from "/points.js";
-    import { isDemon, DEMON_LIST_TYPE } from "/list-utils.js";
+    import { computeLunas } from "/list-utils.js";
+    import { isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
     import { difficultyImage } from "/difficulty.js";
     import {
       collection, getDocs, addDoc, deleteDoc, doc, updateDoc,
@@ -1238,13 +1234,13 @@
       const updates = [];
       finalOrder.forEach((lvl, i) => {
         const newPos    = i + 1;
-        const newValue  = computePoints(newPos);
+        const newValue  = computeLunas(newPos);
         const original  = originalById.get(lvl.id) || {};
         if (Number(original.position) !== newPos || Number(original.value) !== newValue) {
           updates.push({
             id:   lvl.id,
             ref:  doc(db, "levels", lvl.id),
-            data: { position: newPos, value: newValue },
+            data: { position: newPos, value: newValue, listType: PEMON_LIST_TYPE },
             oldPosition: Number(original.position) || null,
             newPosition: newPos
           });
@@ -1260,7 +1256,7 @@
       );
       const all = [];
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-      return all.filter(isDemon);
+      return all.filter(isPemon);
     }
 
     /* ── CREAR TARJETA ─────────────────────────────────────────── */
@@ -1279,18 +1275,18 @@
           <img class="level-thumbnail" src="${nivel.thumbnail || ''}" alt="${nivel.name}">
         </a>
         <div class="level-content">
-          <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Extreme Demon'}">
+          <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Platformer'}">
           <div class="level-info">
             <div class="level-title">#${pos} - ${nivel.name}</div>
-            <div class="level-author">By ${nivel.author} · ${nivel.value || computePoints(pos)} pts</div>
-            <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
+            <div class="level-author">By ${nivel.author} · ${nivel.value || computeLunas(pos)} Lunas</div>
+            <a href="pemon-level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
           </div>
         </div>
       `;
 
       card.querySelector(".level-button").addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
-        window.location.href = `/level.html?id=${nivel.id}`;
+        window.location.href = `/pemon-level.html?id=${nivel.id}`;
       });
       card.querySelector(".btn-edit").addEventListener("click", (e) => {
         e.stopPropagation(); abrirEdicion(nivel);
@@ -1344,7 +1340,7 @@
         const niveles = [];
         snap.forEach(d => {
           const level = { id: d.id, ...d.data() };
-          if (isDemon(level)) niveles.push(level);
+          if (isPemon(level)) niveles.push(level);
         });
 
         nivelesActuales = niveles;
@@ -1355,7 +1351,7 @@
         container.innerHTML = "";
 
         if (niveles.length === 0) {
-          loadingMsg.textContent = "No hay niveles aún. ¡Añade el primero!";
+          loadingMsg.textContent = "No hay niveles Pemon aún. ¡Añade el primero!";
           loadingMsg.style.display = "block";
           return;
         }
@@ -1389,7 +1385,7 @@
         const nuevos = [];
         snap.forEach(d => {
           const level = { id: d.id, ...d.data() };
-          if (isDemon(level)) nuevos.push(level);
+          if (isPemon(level)) nuevos.push(level);
         });
 
         nivelesActuales = [...nivelesActuales, ...nuevos];
@@ -1399,7 +1395,7 @@
         const container = document.getElementById("levelContainer");
         nuevos.forEach(nivel => container.appendChild(crearCard(nivel)));
       } catch (err) {
-        console.error("[demonlist] cargarMas error:", err);
+        console.error("[pemonlist] cargarMas error:", err);
       } finally {
         loadingMore = false;
         sentinel.textContent = "";
@@ -1500,8 +1496,8 @@
       const upd = () => {
         const p = Number(inp.value);
         out.textContent = p > 0
-          ? `Puntos automáticos: ${computePoints(p)} (posición #${p})`
-          : "Puntos automáticos: —";
+          ? `Lunas automáticas: ${computeLunas(p)} (posición #${p})`
+          : "Lunas automáticas: —";
       };
       inp.addEventListener("input", upd);
       inp.addEventListener("focus", upd);
@@ -1568,7 +1564,7 @@
       const glow       = document.getElementById("inp-glow").value.trim();
       const is2P       = document.getElementById("inp-is2P").checked;
       const description = document.getElementById("inp-description").value.trim();
-      const difficulty = document.getElementById("inp-difficulty").value || "Extreme Demon";
+      const difficulty = document.getElementById("inp-difficulty").value || "Platformer";
       const minPercentRaw = parseInt(document.getElementById("inp-min-percent").value, 10);
       /* Solo Top 50 puede tener minPercent < 100 */
       const minPercent = (reqPos <= 50 && Number.isFinite(minPercentRaw))
@@ -1591,10 +1587,10 @@
 
         /* 2. Crear el doc en Firestore con la posición y value calculados */
         const newPos   = insertAt;
-        const newValue = computePoints(newPos);
+        const newValue = computeLunas(newPos);
         const _addPayload = {
           name, author, creators, position: newPos, value: newValue,
-          listType: DEMON_LIST_TYPE,
+          listType: PEMON_LIST_TYPE,
           thumbnail, background, video, glow, is2P,
           description, difficulty, minPercent, tags,
           rewards: _inpSelectedRewards,
@@ -1788,7 +1784,7 @@
         (nivel.background || "").trim() || gdBgUrl(_editPrevGdId);
       document.getElementById("edit-video").value      = nivel.video      || "";
       document.getElementById("edit-glow").value       = nivel.glow       || "";
-      document.getElementById("edit-difficulty").value = nivel.difficulty || "Extreme Demon";
+      document.getElementById("edit-difficulty").value = nivel.difficulty || "Platformer";
       document.getElementById("edit-min-percent").value = Number.isFinite(Number(nivel.minPercent))
         ? Number(nivel.minPercent) : "";
       document.getElementById("edit-is2P").checked     = !!nivel.is2P;
@@ -1803,8 +1799,8 @@
       setTags("edit", existingTags);
       document.getElementById("edit-points-preview").textContent =
         nivel.position
-          ? `Puntos automáticos: ${computePoints(nivel.position)} (posición #${nivel.position})`
-          : "Puntos automáticos: —";
+          ? `Lunas automáticas: ${computeLunas(nivel.position)} (posición #${nivel.position})`
+          : "Lunas automáticas: —";
       /* Aplicar bloqueo de min% según la posición actual */
       document.getElementById("edit-position").dispatchEvent(new Event("input"));
 
@@ -1859,7 +1855,7 @@
       const glow       = document.getElementById("edit-glow").value.trim();
       const is2P       = document.getElementById("edit-is2P").checked;
       const description = document.getElementById("edit-description").value.trim();
-      const difficulty = document.getElementById("edit-difficulty").value || "Extreme Demon";
+      const difficulty = document.getElementById("edit-difficulty").value || "Platformer";
       const minPercentRaw = parseInt(document.getElementById("edit-min-percent").value, 10);
       /* Solo Top 50 puede tener minPercent < 100 */
       const minPercent = (reqPos <= 50 && Number.isFinite(minPercentRaw))
@@ -1882,7 +1878,7 @@
         if (!positionChanged) {
           const _editPayload = {
             name, author, creators, thumbnail, background, video, glow, is2P,
-            listType: DEMON_LIST_TYPE,
+            listType: PEMON_LIST_TYPE,
             description, difficulty, minPercent, tags,
             gdLevelId: gdLevelId ? String(gdLevelId) : "",
             rewards: _editSelectedRewards,
@@ -1902,10 +1898,10 @@
         ordered.splice(insertAt - 1, 0, movingLevel);
 
         /* Persistir el doc movido con todos sus campos editados + nueva pos/value */
-        const newValue = computePoints(insertAt);
+        const newValue = computeLunas(insertAt);
         await updateDoc(doc(db, "levels", id), {
           name, author, creators, thumbnail, background, video, glow, is2P,
-          listType: DEMON_LIST_TYPE,
+          listType: PEMON_LIST_TYPE,
           description, difficulty, minPercent, tags,
           gdLevelId: gdLevelId ? String(gdLevelId) : "",
           rewards: _editSelectedRewards,
@@ -1957,7 +1953,7 @@
           }
           const { notifyDiscord } = await import("/discord-notify.js");
           await notifyDiscord(msg);
-        } catch (e) { console.warn("[demonlist] discord notify fail:", e); }
+        } catch (e) { console.warn("[pemonlist] discord notify fail:", e); }
 
         cerrarModal("editModal");
         cargarNiveles();
@@ -1998,7 +1994,7 @@
             await import("https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js");
           const recsSnap = await gd(q(col(db, "records"), w("levelId", "==", id)));
           recordsCount = recsSnap.size;
-        } catch (e) { console.warn("[demonlist] no se pudo contar records:", e); }
+        } catch (e) { console.warn("[pemonlist] no se pudo contar records:", e); }
 
         /* 1. Eliminar el doc */
         await deleteDoc(doc(db, "levels", id));
@@ -2033,7 +2029,7 @@
           await notifyDiscord(
             `**${removedName}** ha sido eliminado de la Lista con un total de **${recordsCount}** record${recordsCount === 1 ? "" : "s"}.`
           );
-        } catch (e) { console.warn("[demonlist] discord notify fail:", e); }
+        } catch (e) { console.warn("[pemonlist] discord notify fail:", e); }
 
         cerrarModal("confirmModal");
         cargarNiveles();
