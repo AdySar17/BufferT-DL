@@ -441,6 +441,13 @@
   </div>
 
   <div id="listBox" style="display:none;"></div>
+  <section id="platformerSection" style="display:none; margin-top:28px;">
+    <div class="priority-section" style="margin-bottom:12px;">
+      <div class="priority-title">Platformer Records</div>
+      <div class="priority-subtitle">Records de niveles PemonList.</div>
+    </div>
+    <div id="platformerListBox"></div>
+  </section>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -662,6 +669,8 @@
   const $ = (id) => document.getElementById(id);
   const stateBox = $("stateBox");
   const listBox  = $("listBox");
+  const platformerSection = $("platformerSection");
+  const platformerListBox = $("platformerListBox");
   const toastEl  = $("toast");
 
   function showToast(msg, isError = false) {
@@ -675,12 +684,25 @@
     stateBox.innerHTML = `<div class="card state-msg ${isError ? "error" : ""}">${html}</div>`;
     stateBox.style.display = "block";
     listBox.style.display  = "none";
+    platformerSection.style.display = "none";
   }
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, c => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
     })[c]);
+  }
+
+  function formatTimeMs(value) {
+    const total = Number(value);
+    if (!Number.isFinite(total) || total < 0) return "—";
+    const ms = Math.floor(total % 1000);
+    const seconds = Math.floor(total / 1000);
+    const s = seconds % 60;
+    const minutes = Math.floor(seconds / 60);
+    const m = minutes % 60;
+    const h = Math.floor(minutes / 60);
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
   }
 
   function fmtDate(ts) {
@@ -745,8 +767,12 @@
         ? renderPlayer(rec._profile2, rec.player2Id, true)
         : "");
 
+    const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE;
     const isFull   = Number(rec.percent) === 100;
     const isClaim  = !!rec.isNewLevelClaim;
+    const resultHtml = isPemonRecord
+      ? `<span><b>Tiempo:</b> <span class="badge full">${formatTimeMs(rec.timeMs)}</span></span>`
+      : `<span><b>Porcentaje:</b> <span class="badge ${isFull ? "full" : ""}">${Math.round(Number(rec.percent))}%</span></span>`;
     /* V15: cualquier staff (Mod/Admin/Owner) puede aceptar reclamos.
        El Mod podrá crear el nivel + reordenar posiciones, pero NO
        podrá editar después los datos del nivel (lo bloquean las
@@ -790,7 +816,7 @@
         ${levelHeader}
         <div class="rc-players">${playersHtml}</div>
         <div class="rc-meta">
-          <span><b>Porcentaje:</b> <span class="badge ${isFull ? "full" : ""}">${Math.round(Number(rec.percent))}%</span></span>
+          ${resultHtml}
           ${rec.mobile   ? `<span class="badge mobile">P1 móvil</span>` : ``}
           ${rec.mode2P && rec.mobile2P ? `<span class="badge mobile">P2 móvil</span>` : ``}
           ${rec.mode2P  ? `<span class="badge">2 Players</span>` : ``}
@@ -1416,9 +1442,10 @@
       wrap.style.transition = "opacity .25s, transform .25s";
       wrap.style.opacity = "0";
       wrap.style.transform = "translateX(20px)";
+      const target = wrap.closest("#platformerListBox") || listBox;
       setTimeout(() => {
         wrap.remove();
-        if (!listBox.querySelector(".record-card")) renderEmpty();
+        if (!target.querySelector(".record-card")) renderEmpty(target);
       }, 260);
       /* Limpiar el active claim: el record fue aceptado como nuevo nivel */
       if (alContext) {
@@ -1490,6 +1517,7 @@
 
     const accepted = action === "accept";
     const lvl      = rec._level || {};
+    const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE;
     const lvlName  = lvl.name || rec.claimedLevelName || "Nivel desconocido";
     const lvlPos   = lvl.position ? `Top #${lvl.position}` : (rec.isNewLevelClaim ? "Nuevo nivel" : "Top —");
 
@@ -1506,9 +1534,12 @@
     const notes = (staffnotes && staffnotes.trim()) || "—";
     const diffImg = DIFFICULTY_IMAGES[lvl.difficulty] || DIFFICULTY_IMAGES["Extreme Demon"];
 
-    /* Porcentaje del progreso (1-100). */
+    /* Resultado enviado: porcentaje clásico o tiempo Pemon. */
     const pctNum = Math.max(1, Math.min(100, Math.round(Number(rec.percent) || 0)));
     const pctStr = `${pctNum}%`;
+    const resultField = isPemonRecord
+      ? { name: "Tiempo", value: formatTimeMs(rec.timeMs), inline: false }
+      : { name: "Porcentaje", value: pctStr, inline: false };
 
     /* Aceptado → "Record Aceptado" en LIMA (verde lima).
        Rechazado → "Record Rechazado" en ROJO. La carita de
@@ -1518,7 +1549,7 @@
       description: `**${lvlPos} - ${lvlName}**`,
       color: accepted ? 0x7CFC00 /* lima */ : 0xe74c3c /* rojo */,
       fields: [
-        { name: "Porcentaje",  value: pctStr,      inline: false },
+        resultField,
         { name: "Usuario",     value: userField,   inline: false },
         { name: "Dispositivo", value: deviceField, inline: false },
         { name: "Notas",       value: notes.slice(0, 1000), inline: false },
@@ -1540,6 +1571,7 @@
   async function tryGrantBadgesOnAccept(rec) {
     const uid = rec.userId;
     if (!uid || Number(rec.percent) !== 100) return;
+    if (getListType(rec) === PEMON_LIST_TYPE) return;
     try {
       /* Cargar badges de tipo completion que sean obtenibles */
       const badgesSnap = await getDocs(query(
@@ -1610,6 +1642,7 @@
   async function tryAutoEquipHardestBannerOnAccept(rec) {
     const uid = rec.userId;
     if (!uid || Number(rec.percent) !== 100) return;
+    if (getListType(rec) === PEMON_LIST_TYPE) return;
     if (!rec._level || !(Number(rec._level.position) > 0) || !rec._level.rewards?.length) return;
     try {
       /* Obtener todos los records aceptados al 100% del jugador */
@@ -1686,7 +1719,7 @@
         await sendRecordWebhook(recObj, action, staffnotes);
 
         /* Conceder insignias de completion si fue aceptado al 100% */
-        if (action === "accept" && recObj) {
+        if (action === "accept" && recObj && getListType(recObj) !== PEMON_LIST_TYPE) {
           tryGrantBadgesOnAccept(recObj);              /* silencioso, no se espera */
           tryAutoEquipHardestBannerOnAccept(recObj);   /* silencioso, no se espera */
         }
@@ -1695,9 +1728,10 @@
       wrap.style.transition = "opacity .25s, transform .25s";
       wrap.style.opacity = "0";
       wrap.style.transform = "translateX(20px)";
+      const target = wrap.closest("#platformerListBox") || listBox;
       setTimeout(() => {
         wrap.remove();
-        if (!listBox.querySelector(".record-card")) renderEmpty();
+        if (!target.querySelector(".record-card")) renderEmpty(target);
       }, 260);
       showToast(action === "accept" ? "Record aceptado." : "Record rechazado.");
     } catch (err) {
@@ -1708,11 +1742,11 @@
     }
   }
 
-  function renderEmpty() {
-    listBox.innerHTML = `
+  function renderEmpty(target = listBox, message = "No hay records pendientes por revisar.") {
+    target.innerHTML = `
       <div class="card empty">
         <div class="empty-icon">✓</div>
-        <div>No hay records pendientes por revisar.</div>
+        <div>${escapeHtml(message)}</div>
       </div>`;
   }
 
@@ -1783,23 +1817,35 @@
         r.userId !== meUid && r.player2Id !== meUid
       );
 
-      /* === Categorizar por rol del dueño === */
+      /* === Categorizar por rol del dueño, manteniendo Pemon separado === */
       const STAFF_ROLES   = ["Mod", "Admin", "Owner"];
-      const buckets = { staff: [], booster: [], none: [] };
-      visible.forEach(r => {
-        const role = userRoleCache.get(r.userId) || "Default";
-        if (STAFF_ROLES.includes(role))      buckets.staff.push(r);
-        else if (role === "Booster")          buckets.booster.push(r);
-        else                                  buckets.none.push(r);
-      });
+      function categorize(items) {
+        const result = { staff: [], booster: [], none: [] };
+        items.forEach(r => {
+          const role = userRoleCache.get(r.userId) || "Default";
+          if (STAFF_ROLES.includes(role))      result.staff.push(r);
+          else if (role === "Booster")          result.booster.push(r);
+          else                                  result.none.push(r);
+        });
+        return result;
+      }
+      const classicBuckets = categorize(visible.filter(r => getListType(r) !== PEMON_LIST_TYPE));
+      const platformerBuckets = categorize(visible.filter(r => getListType(r) === PEMON_LIST_TYPE));
 
       stateBox.style.display = "none";
       listBox.style.display  = "block";
       listBox.innerHTML = "";
+      platformerSection.style.display = "block";
+      platformerListBox.innerHTML = "";
 
-      const totalVisible = buckets.staff.length + buckets.booster.length + buckets.none.length;
-      if (totalVisible === 0) {
-        if (records.length > 0 && visible.length === 0) {
+      const classicVisible = classicBuckets.staff.length + classicBuckets.booster.length + classicBuckets.none.length;
+      const platformerVisible = platformerBuckets.staff.length + platformerBuckets.booster.length + platformerBuckets.none.length;
+      const classicRecords = records.filter(r => getListType(r) !== PEMON_LIST_TYPE);
+      const platformerRecords = records.filter(r => getListType(r) === PEMON_LIST_TYPE);
+      const classicVisibleRecords = visible.filter(r => getListType(r) !== PEMON_LIST_TYPE);
+      const platformerVisibleRecords = visible.filter(r => getListType(r) === PEMON_LIST_TYPE);
+      if (classicVisible === 0) {
+        if (classicRecords.length > 0 && classicVisibleRecords.length === 0) {
           /* Solo había records propios → no se puede moderar */
           listBox.innerHTML = `
             <div class="card empty">
@@ -1807,14 +1853,26 @@
               <div>Solo hay records pendientes <b>tuyos</b>. Otro miembro del staff debe revisarlos.</div>
             </div>`;
         } else {
-          renderEmpty();
+          renderEmpty(listBox, "No hay records clásicos pendientes por revisar.");
         }
-        return;
+      } else {
+        renderSection("PRIORIDAD POR STAFF",    "Records de Mod, Admin u Owner.",       classicBuckets.staff,   "staff", listBox);
+        renderSection("PRIORIDAD POR BOOSTERS", "Records de usuarios con rol Booster.", classicBuckets.booster, "booster", listBox);
+        renderSection("SIN PRIORIDAD",          "Records de usuarios con rol Default.", classicBuckets.none,    "none", listBox);
       }
 
-      renderSection("PRIORIDAD POR STAFF",    "Records de Mod, Admin u Owner.",       buckets.staff,   "staff");
-      renderSection("PRIORIDAD POR BOOSTERS", "Records de usuarios con rol Booster.", buckets.booster, "booster");
-      renderSection("SIN PRIORIDAD",          "Records de usuarios con rol Default.", buckets.none,    "none");
+      if (platformerVisible === 0) {
+        renderEmpty(
+          platformerListBox,
+          platformerRecords.length > 0 && platformerVisibleRecords.length === 0
+            ? "Solo hay Platformer Records pendientes tuyos."
+            : "No hay Platformer Records pendientes por revisar."
+        );
+      } else {
+        renderSection("PRIORIDAD POR STAFF",    "Records de Mod, Admin u Owner.",       platformerBuckets.staff,   "staff", platformerListBox);
+        renderSection("PRIORIDAD POR BOOSTERS", "Records de usuarios con rol Booster.", platformerBuckets.booster, "booster", platformerListBox);
+        renderSection("SIN PRIORIDAD",          "Records de usuarios con rol Default.", platformerBuckets.none,    "none", platformerListBox);
+      }
     } catch (err) {
       console.error(err);
       setState("Error al cargar records: " + (err.message || err.code || "desconocido"), true);
@@ -1824,23 +1882,23 @@
   /* Cache local de roles para no leer /users repetido */
   const userRoleCache = new Map();
 
-  function renderSection(title, subtitle, items, kind) {
+  function renderSection(title, subtitle, items, kind, target = listBox) {
     const header = document.createElement("div");
     header.className = "priority-section";
     header.innerHTML = `
       <div class="priority-title priority-${kind}">${escapeHtml(title)}</div>
       <div class="priority-sub">${escapeHtml(subtitle)} — ${items.length} pendiente${items.length === 1 ? "" : "s"}</div>
     `;
-    listBox.appendChild(header);
+    target.appendChild(header);
 
     if (items.length === 0) {
       const empty = document.createElement("div");
       empty.className = "card priority-empty";
       empty.textContent = "Sin records en esta categoría.";
-      listBox.appendChild(empty);
+      target.appendChild(empty);
       return;
     }
-    items.forEach(r => listBox.appendChild(buildRecordCard(r)));
+    items.forEach(r => target.appendChild(buildRecordCard(r)));
   }
 
   /* ============================================================

@@ -240,6 +240,64 @@
       text-align: center;
       font-size: 0.9rem;
     }
+    .list-mode-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.025);
+    }
+    .list-mode-button {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      padding: 10px 8px;
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.75);
+      font: 700 .82rem 'Montserrat', sans-serif;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+    .list-mode-button:hover { background: rgba(255,255,255,0.1); }
+    .list-mode-button.active.classic {
+      color: #fff4a8;
+      border-color: rgba(255,215,0,.75);
+      background: linear-gradient(135deg, rgba(255,215,0,.22), rgba(255,175,0,.1));
+      box-shadow: 0 0 12px rgba(255,215,0,.14);
+    }
+    .list-mode-button.active.pemon {
+      color: #a9ddff;
+      border-color: rgba(76,183,255,.8);
+      background: linear-gradient(135deg, rgba(30,130,220,.3), rgba(75,35,190,.16));
+      box-shadow: 0 0 12px rgba(55,150,255,.16);
+    }
+    .gd-icon {
+      display: inline-block;
+      margin-right: 4px;
+      width: 18px;
+      height: 18px;
+      vertical-align: -4px;
+    }
+    .gd-star-icon { filter: drop-shadow(0 0 4px rgba(255,215,0,.62)); }
+    .gd-moon-icon { filter: drop-shadow(0 0 4px rgba(55,150,255,.65)); }
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+    .time-unit { position: relative; }
+    .time-unit input { padding-right: 8px; text-align: center; }
+    .time-unit span {
+      display: block;
+      margin-top: 4px;
+      color: rgba(255,255,255,.5);
+      font-size: .68rem;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+    #timeBlock { display: none; }
+    #timeBlock.open { display: block; }
 
     /* ===== LEVEL PREVIEW ===== */
     #levelPreview {
@@ -572,8 +630,21 @@
         </select>
       </div>
 
-      <label for="percent"><span data-i18n="sub_percent_label">Porcentaje</span> <span class="opt">(1–100)</span></label>
-      <input type="number" id="percent" min="1" max="100" placeholder="Ej: 100">
+      <div id="percentBlock">
+        <label for="percent"><span data-i18n="sub_percent_label">Porcentaje</span> <span class="opt">(1–100)</span></label>
+        <input type="number" id="percent" min="1" max="100" placeholder="Ej: 100">
+      </div>
+
+      <div id="timeBlock">
+        <label><span data-i18n="sub_time_label">Tiempo</span> <span class="opt">(<span data-i18n="sub_time_parts">horas, minutos, segundos y milisegundos</span>)</span></label>
+        <div class="time-grid">
+          <div class="time-unit"><input type="number" id="timeHours" min="0" max="99" placeholder="00" inputmode="numeric"><span data-i18n="sub_time_hours">Horas</span></div>
+          <div class="time-unit"><input type="number" id="timeMinutes" min="0" max="59" placeholder="00" inputmode="numeric"><span data-i18n="sub_time_minutes">Min</span></div>
+          <div class="time-unit"><input type="number" id="timeSeconds" min="0" max="59" placeholder="00" inputmode="numeric"><span data-i18n="sub_time_seconds">Seg</span></div>
+          <div class="time-unit"><input type="number" id="timeMilliseconds" min="0" max="999" placeholder="000" inputmode="numeric"><span data-i18n="sub_time_milliseconds">Ms</span></div>
+        </div>
+        <div class="nl-sub" data-i18n="sub_time_hint">Registra el tiempo total de la completación.</div>
+      </div>
 
       <label for="video" data-i18n="sub_video_label">Link del vídeo</label>
       <input type="url" id="video" placeholder="https://youtu.be/...">
@@ -738,14 +809,43 @@
 
     /* ── Helpers ────────────────────────────────────── */
     const $ = (id) => document.getElementById(id);
-    const requestedListType = new URLSearchParams(location.search).get("list") === PEMON_LIST_TYPE
+    const initialListType = new URLSearchParams(location.search).get("list") === PEMON_LIST_TYPE
       ? PEMON_LIST_TYPE
       : DEMON_LIST_TYPE;
+    let activeListType = initialListType;
+
+    function isPemonMode() {
+      return activeListType === PEMON_LIST_TYPE;
+    }
+
     function getSelectedNewLevelType() {
       const value = $("newLevelType")?.value;
       return [NEW_LEVEL_TYPE_CLASSIC, NEW_LEVEL_TYPE_PLATFORMER, NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO]
-        .includes(value) ? value : NEW_LEVEL_TYPE_CLASSIC;
+        .includes(value)
+        ? value
+        : (isPemonMode() ? NEW_LEVEL_TYPE_PLATFORMER : NEW_LEVEL_TYPE_CLASSIC);
     }
+
+    function syncNewLevelTypeOptions(forceDefault = false) {
+      const select = $("newLevelType");
+      if (!select) return;
+      const types = isPemonMode()
+        ? [NEW_LEVEL_TYPE_PLATFORMER]
+        : [NEW_LEVEL_TYPE_CLASSIC, NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO];
+      const current = select.value;
+      const type = !forceDefault && types.includes(current) ? current : types[0];
+      const labels = {
+        [NEW_LEVEL_TYPE_CLASSIC]: "sub_new_type_classic",
+        [NEW_LEVEL_TYPE_PLATFORMER]: "sub_new_type_platformer",
+        [NEW_LEVEL_TYPE_2P]: "sub_new_type_2p",
+        [NEW_LEVEL_TYPE_SOLO]: "sub_new_type_solo"
+      };
+      select.innerHTML = types.map(value =>
+        `<option value="${value}">${escapeHtml(window.BFT_I18N?.t(labels[value]) || value)}</option>`
+      ).join("");
+      select.value = type;
+    }
+
     function syncNewLevelDifficulty() {
       const type = getSelectedNewLevelType();
       const select = $("newLevelDifficulty");
@@ -766,12 +866,36 @@
       }[type];
       $("newLevelTypeInfo").textContent = window.BFT_I18N?.t(infoKey) || "";
     }
-    $("newLevelType").value = requestedListType === PEMON_LIST_TYPE
-      ? NEW_LEVEL_TYPE_PLATFORMER
-      : NEW_LEVEL_TYPE_CLASSIC;
+
+    function syncRecordInputMode() {
+      const pemon = isPemonMode();
+      $("percentBlock").style.display = pemon ? "none" : "block";
+      $("timeBlock").classList.toggle("open", pemon);
+    }
+
+    function syncListModeUI() {
+      document.querySelectorAll(".list-mode-button").forEach(button => {
+        button.classList.toggle("active",
+          button.dataset.listType === activeListType);
+      });
+      $("levelSearch").placeholder = isPemonMode()
+        ? "🔍 Buscar nivel Pemon por nombre, autor o posición…"
+        : "🔍 Buscar nivel por nombre, autor o posición…";
+      syncNewLevelTypeOptions();
+      syncNewLevelDifficulty();
+      syncRecordInputMode();
+    }
+
     $("newLevelType").addEventListener("change", syncNewLevelDifficulty);
-    window.addEventListener("bft-lang-change", syncNewLevelDifficulty);
+    window.addEventListener("bft-lang-change", () => {
+      syncNewLevelTypeOptions();
+      syncNewLevelDifficulty();
+      renderDropdown($("levelSearch").value);
+    });
+    syncNewLevelTypeOptions(true);
     syncNewLevelDifficulty();
+    syncRecordInputMode();
+
     function showMsg(text, type) {
       const el = $("msg");
       el.textContent = text;
@@ -780,7 +904,29 @@
     }
     function hideMsg() { $("msg").classList.remove("show"); }
 
+    function readTimeMs() {
+      const hours = Number($("timeHours").value || 0);
+      const minutes = Number($("timeMinutes").value || 0);
+      const seconds = Number($("timeSeconds").value || 0);
+      const milliseconds = Number($("timeMilliseconds").value || 0);
+      if (![hours, minutes, seconds, milliseconds].every(Number.isInteger) ||
+          hours < 0 || hours > 99 ||
+          minutes < 0 || minutes > 59 ||
+          seconds < 0 || seconds > 59 ||
+          milliseconds < 0 || milliseconds > 999) {
+        return null;
+      }
+      const total = (((hours * 60) + minutes) * 60 + seconds) * 1000 + milliseconds;
+      return total > 0 ? total : null;
+    }
+
+    function clearTimeInputs() {
+      ["timeHours", "timeMinutes", "timeSeconds", "timeMilliseconds"]
+        .forEach(id => { $(id).value = ""; });
+    }
+
     /* ── Cargar niveles en el <select> ──────────────── */
+    let allLevelsCache = [];
     let levelsCache = [];
     async function loadLevels() {
       try {
@@ -791,19 +937,13 @@
           /* fallback si no hay índice o falta campo */
           snap = await getDocs(collection(db, "levels"));
         }
-        levelsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          .filter(level => getListType(level) === requestedListType);
-        levelsCache.sort((a, b) => (a.position ?? 999999) - (b.position ?? 999999));
-
-        if (!levelsCache.length) {
-          $("levelSearch").placeholder = requestedListType === PEMON_LIST_TYPE
-            ? "No hay niveles Pemon aún" : "No hay niveles aún";
-          $("levelSearch").disabled = true;
-          return;
-        }
+        allLevelsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        allLevelsCache.sort((a, b) => (a.position ?? 999999) - (b.position ?? 999999));
+        levelsCache = allLevelsCache.filter(level => getListType(level) === activeListType);
         $("levelSearch").disabled = false;
+        syncListModeUI();
         renderDropdown("");
-        console.log("[submit] niveles cargados:", levelsCache.length);
+        console.log("[submit] niveles cargados:", allLevelsCache.length);
       } catch (err) {
         console.error("[submit] error cargando niveles:", err);
         $("levelSearch").placeholder = "Error al cargar niveles";
@@ -814,15 +954,44 @@
     /* ── Picker de nivel: input + dropdown filtrable ── */
     let selectedLevelId = "";   /* "" = ninguno · "__NEW__" = nuevo nivel */
 
-    /* Marcador HTML para la opción especial "+ Nuevo nivel" */
+    /* Marcador HTML para la opción especial "+ Nuevo nivel". */
     const NEW_OPTION_HTML = `
       <div class="level-option opt-new" data-id="__NEW__">
         <div class="opt-pos">+</div>
         <div class="opt-info">
-          <div class="opt-name">Nuevo nivel (no está en la lista)</div>
-          <div class="opt-author">Pide al staff que añada un nivel nuevo y registra tu récord</div>
+          <div class="opt-name"><span data-i18n="sub_new_level_option">Nuevo Nivel</span></div>
+          <div class="opt-author" data-i18n="sub_new_level_option_hint">Pide al staff que añada un nivel nuevo y registra tu récord.</div>
         </div>
       </div>`;
+
+    function listModeHTML() {
+      return `
+        <div class="list-mode-row">
+          <button type="button" class="list-mode-button classic" data-list-type="${DEMON_LIST_TYPE}">
+            <svg class="gd-icon gd-star-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#ffd700" d="m12 1.8 2.9 6 6.6 1-4.8 4.7 1.1 6.6-5.8-3.1-5.8 3.1 1.1-6.6-4.8-4.7 6.6-1z"/>
+            </svg><span data-i18n="sub_list_classic">Clásico</span>
+          </button>
+          <button type="button" class="list-mode-button pemon" data-list-type="${PEMON_LIST_TYPE}">
+            <svg class="gd-icon gd-moon-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#58b8ff" d="M20.2 15.1A8.8 8.8 0 0 1 8.9 3.8a9.2 9.2 0 1 0 11.3 11.3Z"/>
+            </svg><span data-i18n="sub_list_lunas">Lunas</span>
+          </button>
+        </div>`;
+    }
+
+    function setActiveListType(listType) {
+      if (![DEMON_LIST_TYPE, PEMON_LIST_TYPE].includes(listType)) return;
+      activeListType = listType;
+      levelsCache = allLevelsCache.filter(level => getListType(level) === activeListType);
+      selectedLevelId = "";
+      $("levelSearch").value = "";
+      $("levelClear").style.display = "none";
+      $("levelPreview").classList.remove("show");
+      $("newLevelBlock").classList.remove("open");
+      syncListModeUI();
+      renderDropdown("");
+    }
 
     function renderDropdown(filter) {
       const dd = $("levelDropdown");
@@ -852,8 +1021,12 @@
         ? `<div class="level-option-empty">Sin resultados en la lista. Usa la opción de arriba para registrar uno nuevo.</div>`
         : "";
 
-      /* La opción "Nuevo" siempre está pineada arriba */
-      dd.innerHTML = NEW_OPTION_HTML + empty + items;
+      /* Nuevo siempre va primero; debajo quedan los selectores de lista. */
+      dd.innerHTML = NEW_OPTION_HTML + listModeHTML() + empty + items;
+      window.BFT_I18N?.apply?.(dd);
+      dd.querySelectorAll(".list-mode-button").forEach(button => {
+        button.classList.toggle("active", button.dataset.listType === activeListType);
+      });
     }
 
     function selectLevel(id) {
@@ -865,6 +1038,9 @@
         $("levelDropdown").classList.remove("open");
         $("levelPreview").classList.remove("show");
         $("newLevelBlock").classList.add("open");
+        syncNewLevelTypeOptions(true);
+        syncNewLevelDifficulty();
+        syncRecordInputMode();
         return;
       }
 
@@ -884,7 +1060,9 @@
       prev.innerHTML =
         `<b>${escapeHtml(lvl.name || "")}</b> · posición ${lvl.position ? `#${lvl.position}` : "—"}<br>` +
         `By ${escapeHtml(author)} · Verificador: ${escapeHtml(verif)}<br>` +
-        `<span style="color:#c7ff3b">% mínimo requerido: ${minPct}%</span>`;
+        (isPemonMode()
+          ? `<span style="color:#58b8ff">PemonList · récord por tiempo</span>`
+          : `<span style="color:#c7ff3b">% mínimo requerido: ${minPct}%</span>`);
       prev.classList.add("show");
     }
 
@@ -909,6 +1087,13 @@
       $("levelDropdown").classList.add("open");
     });
     $("levelDropdown").addEventListener("click", (e) => {
+      const modeButton = e.target.closest(".list-mode-button");
+      if (modeButton) {
+        e.preventDefault();
+        setActiveListType(modeButton.dataset.listType);
+        $("levelDropdown").classList.add("open");
+        return;
+      }
       const opt = e.target.closest(".level-option");
       if (!opt) return;
       selectLevel(opt.dataset.id);
@@ -1089,7 +1274,7 @@
       let claimedLevelName = "", claimedLevelId = "", claimedLevelDifficulty = "";
       const claimedLevelType = isNewClaim
         ? getSelectedNewLevelType()
-        : requestedListType === PEMON_LIST_TYPE
+        : activeListType === PEMON_LIST_TYPE
           ? NEW_LEVEL_TYPE_PLATFORMER
           : NEW_LEVEL_TYPE_CLASSIC;
       if (isNewClaim) {
@@ -1106,17 +1291,23 @@
         }
       }
 
-      const percent = parseInt($("percent").value, 10);
-      if (!Number.isFinite(percent) || percent < 1 || percent > 100) {
+      const isPemonRecord = activeListType === PEMON_LIST_TYPE;
+      const timeMs = isPemonRecord ? readTimeMs() : null;
+      if (isPemonRecord && timeMs === null) {
+        showMsg("Introduce un tiempo válido: minutos y segundos deben estar entre 0 y 59.", "err");
+        return;
+      }
+      const percent = isPemonRecord ? 100 : parseInt($("percent").value, 10);
+      if (!isPemonRecord && (!Number.isFinite(percent) || percent < 1 || percent > 100)) {
         showMsg("El porcentaje debe estar entre 1 y 100.", "err"); return;
       }
 
       /* Para reclamos de NUEVO nivel exigimos 100% (el récord se aceptará al añadirlo) */
-      if (isNewClaim && percent !== 100) {
+      if (isNewClaim && !isPemonRecord && percent !== 100) {
         showMsg("Para reclamar un Nuevo nivel debes enviar el récord al 100%.", "err"); return;
       }
 
-      if (lvl) {
+      if (lvl && !isPemonRecord) {
         const minPct = Number.isFinite(Number(lvl.minPercent)) ? Number(lvl.minPercent) : 100;
         if (percent < minPct) {
           showMsg(`Error, el % mínimo de este nivel es ${minPct}%`, "err"); return;
@@ -1234,10 +1425,18 @@
           ));
           const dup = dupSnap.docs.find(d => {
             const dd = d.data();
-            return Number(dd.percent) === percent && dd.status !== "Rejected";
+            const sameResult = isPemonRecord
+              ? Number(dd.timeMs) === timeMs
+              : Number(dd.percent) === percent;
+            return sameResult && dd.status !== "Rejected";
           });
           if (dup) {
-            showMsg("Ya tienes un récord con este nivel y porcentaje (pendiente o aceptado).", "err");
+            showMsg(
+              isPemonRecord
+                ? "Ya tienes un récord con este nivel y tiempo (pendiente o aceptado)."
+                : "Ya tienes un récord con este nivel y porcentaje (pendiente o aceptado).",
+              "err"
+            );
             return;
           }
         } catch (err) {
@@ -1257,6 +1456,7 @@
           submittedBy: me.uid,
           levelId:    isNewClaim ? null : levelId,
           percent:    percent,
+          timeMs:     timeMs,
           video:      video,
           video2:     video2,
           mobile:     mobile,
@@ -1276,7 +1476,7 @@
           claimedLevelType:      isNewClaim ? claimedLevelType       : "",
           listType: isNewClaim
             ? (claimedLevelType === NEW_LEVEL_TYPE_PLATFORMER ? PEMON_LIST_TYPE : DEMON_LIST_TYPE)
-            : requestedListType
+            : activeListType
         };
         const ref = await addDoc(collection(db, "records"), payload);
         console.log("[submit] OK record id =", ref.id, "newClaim=", isNewClaim);
@@ -1291,10 +1491,11 @@
         clearLevel();
         $("newLevelName").value       = "";
         $("newLevelId").value         = "";
-        $("newLevelType").value = requestedListType === PEMON_LIST_TYPE
+        $("newLevelType").value = activeListType === PEMON_LIST_TYPE
           ? NEW_LEVEL_TYPE_PLATFORMER : NEW_LEVEL_TYPE_CLASSIC;
         syncNewLevelDifficulty();
         $("percent").value = "";
+        clearTimeInputs();
         $("video").value = "";
         $("video2").value = "";
         $("rawFootage").value = "";
