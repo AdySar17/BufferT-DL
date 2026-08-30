@@ -27,7 +27,7 @@
     /* ─ Navegación ─ */
     nav_home:          { es:'Home',              en:'Home',          ru:'Главная',                pt:'Início',        fr:'Accueil',        vi:'Trang chủ' },
     nav_demonlist:     { es:'Demon List',        en:'Demon List',    ru:'Список демонов',         pt:'Demon List',    fr:'Demon List',     vi:'Demon List' },
-    nav_pemonlist:     { es:'PemonList',         en:'PemonList',     ru:'PemonList',              pt:'PemonList',     fr:'PemonList',      vi:'PemonList' },
+    nav_pemonlist:     { es:'Pemon List',        en:'Pemon List',    ru:'Pemon List',             pt:'Pemon List',    fr:'Pemon List',     vi:'Pemon List' },
     nav_submit_pemon:  { es:'Enviar Record Pemon', en:'Submit Pemon Record', ru:'Отправить рекорд Pemon', pt:'Enviar Record Pemon', fr:'Soumettre un record Pemon', vi:'Gửi Record Pemon' },
     nav_leaderboards:  { es:'Leaderboards',      en:'Leaderboards',  ru:'Таблица лидеров',        pt:'Rankings',      fr:'Classements',    vi:'Bảng xếp hạng' },
     nav_notifications: { es:'✉ Notificaciones',  en:'✉ Notifications', ru:'✉ Уведомления',       pt:'✉ Notificações',fr:'✉ Notifications',vi:'✉ Thông báo' },

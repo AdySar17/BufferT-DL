@@ -40,31 +40,30 @@
     .top-header {
       position:fixed; top:0; left:0; width:100%; height:60px;
       display:flex; align-items:center; justify-content:space-between;
-      padding:0 18px; z-index:9999;
-      background:rgba(0,0,0,.6);
+      padding:0 15px; z-index:9999;
+      background:rgba(0,0,0,.55);
       backdrop-filter:blur(10px);
-      border-bottom:1px solid rgba(255,255,255,.05);
     }
     .left { display:flex; align-items:center; gap:10px; }
-    .logo-img { width:36px; height:36px; }
-    .logo-text { color:white; font-weight:700; font-size:1.05rem; }
+    .logo-img { width:38px; height:38px; }
+    .logo-text { color:white; font-weight:700; font-size:1.1rem; }
     .logo-short { display:none; }
-    .nav-links { display:flex; gap:18px; }
+    .nav-links { display:flex; gap:15px; }
     .nav-links a {
-      color:rgba(255,255,255,.8); text-decoration:none; font-size:.92rem;
+      color:white; text-decoration:none; font-size:.95rem;
       transition:color .2s;
     }
-    .nav-links a:hover { color:var(--accent-start); }
+    .nav-links a:hover { color:#7cfc00; }
     .menu-toggle {
-      display:none; font-size:26px; color:white; width:38px; height:38px;
+      display:none; font-size:28px; color:white; width:40px; height:40px;
       align-items:center; justify-content:center; cursor:pointer; user-select:none;
       background:none; border:0;
     }
-    @media(max-width:680px) {
+    @media(max-width:768px) {
       .menu-toggle { display:flex; }
       .nav-links {
         display:none; flex-direction:column; position:absolute; top:60px; right:10px;
-        background:rgba(0,0,0,.92); padding:10px; border-radius:10px; gap:8px;
+        background:rgba(0,0,0,.9); padding:10px; border-radius:10px; gap:8px;
       }
       .nav-links.active { display:flex; }
       .logo-full { display:none; }
@@ -172,7 +171,11 @@
     .record:hover { background:rgba(114,230,255,.07); }
     .rec-left { display:flex; align-items:center; gap:9px; overflow:hidden; min-width:0; flex:1; }
     .rec-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-    .rec-flag { width:34px; height:22px; object-fit:cover; border-radius:3px; flex-shrink:0; }
+    .rec-flag-slot {
+      width:40px; height:26px; flex:0 0 40px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .rec-flag { width:40px; height:26px; object-fit:cover; border-radius:3px; flex-shrink:0; }
     .rec-name { font-weight:600; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .rec-mobile { width:18px; height:18px; object-fit:contain; opacity:.85; }
     .rec-time { font-size:.88rem; color:var(--accent-start); font-weight:700; white-space:nowrap; }
@@ -232,16 +235,20 @@
   <header class="top-header">
     <div class="left">
       <img src="/logo.png" class="logo-img" alt="Logo">
-      <div class="logo-text"><span class="logo-full">BFT PemonList</span><span class="logo-short">BFT PL</span></div>
+      <div class="logo-text"><span class="logo-full">BFT Pemon List</span><span class="logo-short">BFT PL</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:14px;">
       <nav class="nav-links" id="navLinks">
         <a href="/" data-i18n="nav_home">Home</a>
         <a href="/demonlist.html" data-i18n="nav_demonlist">Demon List</a>
-        <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
+        <a href="/pemonlist.html" data-i18n="nav_pemonlist">Pemon List</a>
         <a href="/leaderboards.html" data-i18n="nav_leaderboards">Leaderboards</a>
+        <a href="/notifications.html" data-i18n="nav_notifications">✉ Notificaciones</a>
         <a href="/submit.html?list=pemon" data-i18n="nav_submit_pemon">Enviar Record Pemon</a>
         <a href="/guidelines.html" data-i18n="nav_guidelines">Guidelines</a>
+        <a href="/panel.html" class="staff-only">Panel de Records</a>
+        <a href="/staff-control.html" class="owner-only">Control Staff</a>
+        <a href="/admin-dev.html" class="admin-only">Admin Dev</a>
       </nav>
       <div id="langSlot"></div>
       <div class="auth-slot" id="authSlot"></div>
@@ -421,11 +428,36 @@
       const row = document.createElement("div"); row.className = "record";
       const left = document.createElement("div"); left.className = "rec-left";
       const p1 = record._profile || {};
-      if (p1.country) { const flag = document.createElement("img"); flag.className = "rec-flag"; flag.src = flagUrl(p1.country); flag.alt = countryName(p1.country); flag.onerror = () => { flag.style.display = "none"; }; left.appendChild(flag); }
+      const flagSlot = document.createElement("span");
+      flagSlot.className = "rec-flag-slot";
+      if (p1.country) {
+        const flag = document.createElement("img");
+        flag.className = "rec-flag";
+        flag.src = flagUrl(p1.country, "large");
+        flag.alt = countryName(p1.country);
+        flag.loading = "lazy";
+        flag.decoding = "async";
+        flag.onerror = () => { flag.style.visibility = "hidden"; };
+        flagSlot.appendChild(flag);
+      }
+      left.appendChild(flagSlot);
       const name = document.createElement("a"); name.className = "rec-name"; name.href = `/profile.html?id=${encodeURIComponent(record.userId || "")}`; name.textContent = p1.name || "Jugador"; name.style.cssText = "color:inherit;text-decoration:none;";
       left.appendChild(name);
       if (record.player2Id && record._profile2) {
         const separator = document.createElement("span"); separator.textContent = " + "; separator.style.color = "rgba(114,230,255,.8)"; left.appendChild(separator);
+        const flagSlot2 = document.createElement("span");
+        flagSlot2.className = "rec-flag-slot";
+        if (record._profile2.country) {
+          const flag2 = document.createElement("img");
+          flag2.className = "rec-flag";
+          flag2.src = flagUrl(record._profile2.country, "large");
+          flag2.alt = countryName(record._profile2.country);
+          flag2.loading = "lazy";
+          flag2.decoding = "async";
+          flag2.onerror = () => { flag2.style.visibility = "hidden"; };
+          flagSlot2.appendChild(flag2);
+        }
+        left.appendChild(flagSlot2);
         const second = document.createElement("a"); second.className = "rec-name"; second.href = `/profile.html?id=${encodeURIComponent(record.player2Id)}`; second.textContent = record._profile2.name || "Jugador"; second.style.cssText = "color:inherit;text-decoration:none;opacity:.85;"; left.appendChild(second);
       }
       const right = document.createElement("div"); right.className = "rec-right";

@@ -280,7 +280,11 @@
   .rec-left  { display: flex; align-items: center; gap: 9px; overflow: hidden; min-width: 0; flex: 1; }
   .rec-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-  .rec-flag  { width: 34px; height: 22px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
+  .rec-flag-slot {
+    width: 40px; height: 26px; flex: 0 0 40px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rec-flag  { width: 40px; height: 26px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
   .rec-name  { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
 
   .rec-mobile { width: 18px; height: 18px; object-fit: contain; opacity: .85; }
@@ -346,7 +350,7 @@
     <nav class="nav-links" id="navLinks">
       <a href="/">Home</a>
       <a href="/demonlist.html">Demon List</a>
-      <a href="/pemonlist.html" data-i18n="nav_pemonlist">PemonList</a>
+      <a href="/pemonlist.html" data-i18n="nav_pemonlist">Pemon List</a>
       <a href="/leaderboards.html">Leaderboards</a>
         <a href="/notifications.html">✉ Notificaciones</a>
       <a href="/submit.html">Enviar Record</a>
@@ -850,14 +854,19 @@
 
     const p1 = rec._profile || {};
 
-    if (p1.country) {
-      const flag = document.createElement("img");
-      flag.className = "rec-flag";
-      flag.src = flagUrl(p1.country);
-      flag.alt = p1.country;
-      flag.onerror = () => { flag.style.display = "none"; };
-      left.appendChild(flag);
-    }
+      const flagSlot = document.createElement("span");
+      flagSlot.className = "rec-flag-slot";
+      if (p1.country) {
+        const flag = document.createElement("img");
+        flag.className = "rec-flag";
+        flag.src = flagUrl(p1.country, "large");
+        flag.alt = countryName(p1.country);
+        flag.loading = "lazy";
+        flag.decoding = "async";
+        flag.onerror = () => { flag.style.visibility = "hidden"; };
+        flagSlot.appendChild(flag);
+      }
+      left.appendChild(flagSlot);
 
     const nameLink = document.createElement("a");
     nameLink.className = "rec-name";
@@ -869,21 +878,26 @@
     left.appendChild(nameLink);
 
     /* Segundo jugador si 2P */
-    if (rec.mode2P && rec._profile2) {
+      if (rec.mode2P && rec._profile2) {
       const p2 = rec._profile2;
       const sep = document.createElement("span");
       sep.textContent = " + ";
       sep.style.cssText = "margin: 0 6px; color: rgba(199,255,59,0.7); font-weight:700;";
       left.appendChild(sep);
 
+      const flagSlot2 = document.createElement("span");
+      flagSlot2.className = "rec-flag-slot";
       if (p2.country) {
         const fl2 = document.createElement("img");
         fl2.className = "rec-flag";
-        fl2.src = flagUrl(p2.country);
-        fl2.alt = p2.country;
-        fl2.onerror = () => { fl2.style.display = "none"; };
-        left.appendChild(fl2);
+        fl2.src = flagUrl(p2.country, "large");
+        fl2.alt = countryName(p2.country);
+        fl2.loading = "lazy";
+        fl2.decoding = "async";
+        fl2.onerror = () => { fl2.style.visibility = "hidden"; };
+        flagSlot2.appendChild(fl2);
       }
+      left.appendChild(flagSlot2);
       const n2 = document.createElement("a");
       n2.href = `/profile.html?id=${rec.player2Id || ""}`;
       n2.textContent = p2.name || "Sin nombre";
