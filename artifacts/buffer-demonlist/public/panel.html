@@ -2198,17 +2198,10 @@
 
   /* Gate por rol */
   let initialized = false;
-  onAuthChange((user, data, loading) => {
+  onAuthChange((user, data, loading, profile) => {
     window.__currentUser = user || null;
-    /* Cargamos el nombre PÚBLICO del staff (el del perfil) para
-       mostrarlo al resto cuando reclama un record.  Fire-and-forget:
-       si tarda, meName() cae al displayName de Auth temporalmente. */
-    window.__myProfileName = null;
-    if (user && user.uid) {
-      fetchProfile(user.uid).then(p => {
-        if (p && p.name) window.__myProfileName = p.name;
-      }).catch(() => {});
-    }
+    /* auth.js ya comparte el perfil cargado para el Header y el panel. */
+    window.__myProfileName = (profile && profile.name) || null;
     if (loading) {
       setState("Cargando sesión...");
       $("myClaimsBox").style.display  = "none";

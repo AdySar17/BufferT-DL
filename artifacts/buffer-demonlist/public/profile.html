@@ -1400,16 +1400,13 @@
   }
 
   /* Reaccionar al estado de auth para saber si es el dueño y para auto-redirigir */
-  onAuthChange(async (user) => {
+  onAuthChange((user, data) => {
     currentUser = user;
-    currentUserRole = "Default";
-    /* Cargar el rol del usuario logueado para gating de UI */
-    if (user) {
-      try {
-        const meSnap = await getDoc(doc(db, "users", user.uid));
-        if (meSnap.exists()) currentUserRole = meSnap.data().role || "Default";
-      } catch (e) { /* sin permisos = no es staff */ }
-    }
+    /*
+     * auth.js ya carga users/{uid} una sola vez junto con el perfil. No
+     * repetimos aquí ese getDoc sólo para resolver el rol del visitante.
+     */
+    currentUserRole = (data && data.role) || "Default";
     /* Si la URL no tiene ?id, abrir perfil propio si está logueado */
     if (!targetUid && user) {
       targetUid = user.uid;

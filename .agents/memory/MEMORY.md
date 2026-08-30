@@ -1,0 +1,1 @@
+- [Firebase Auth bootstrap](firebase-auth-bootstrap.md) — keep auth imports canonical and resolve persistence/redirect before the first auth-state decision.

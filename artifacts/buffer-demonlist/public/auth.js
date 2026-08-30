@@ -32,26 +32,39 @@ const app  = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-setPersistence(auth, browserLocalPersistence).catch(err =>
-  console.error("[auth] No se pudo configurar persistencia:", err)
-);
+/*
+ * Firebase puede empezar a resolver el usuario antes de que una llamada
+ * asíncrona a setPersistence termine. Esperamos esta promesa antes de
+ * registrar onAuthStateChanged para que cada página use persistentLocal
+ * storage desde el primer ciclo de autenticación.
+ */
+const persistenceReady = setPersistence(auth, browserLocalPersistence)
+  .then(() => true)
+  .catch(err => {
+    console.error("[auth] No se pudo configurar persistencia:", err);
+    return false;
+  });
 
 export { app, auth, db };
 
 /* ── Estado interno ──────────────────────────────────────────── */
-const HAS_SESSION_KEY = "bft_has_session";
-
 let currentUser        = null;
 let currentUserData    = null;
 let currentProfileData = null;        // doc profiles/{uid} (custom name/photo/country/bio)
-let authResolved       = false;       // ¿se resolvió el primer onAuthStateChanged?
-let expectsLogin    = (typeof localStorage !== "undefined" &&
-                       localStorage.getItem(HAS_SESSION_KEY) === "1");
+let authResolved       = false;       // Firebase confirmó el primer estado
+let userDataResolved   = false;       // users/profiles terminó de cargar
+let authGeneration     = 0;           // evita aplicar datos de una sesión anterior
 
 const listeners = [];
 
 function notify() {
-  const loading = !authResolved && expectsLogin;
+  /*
+   * Mientras Firebase no confirme el primer estado no mostramos "Iniciar
+   * sesión". Si ya hay un usuario confirmado, el Header puede mostrar su
+   * avatar inmediatamente; las lecturas de users/profiles sólo bloquean las
+   * pantallas que necesitan roles, no la identidad de Auth.
+   */
+  const loading = !authResolved || (!!currentUser && !userDataResolved);
   listeners.forEach(cb => {
     try { cb(currentUser, currentUserData, loading, currentProfileData); }
     catch (err) { console.error("[auth] listener error:", err); }
@@ -70,7 +83,9 @@ function notify() {
 /* ── API pública: estado / roles ─────────────────────────────── */
 export function onAuthChange(callback) {
   listeners.push(callback);
-  callback(currentUser, currentUserData, !authResolved && expectsLogin);
+  callback(currentUser, currentUserData,
+    !authResolved || (!!currentUser && !userDataResolved),
+    currentProfileData);
   return () => {
     const i = listeners.indexOf(callback);
     if (i >= 0) listeners.splice(i, 1);
@@ -133,15 +148,7 @@ export async function loginGoogle() {
   }
 }
 
-getRedirectResult(auth).catch(err => {
-  if (err && err.code !== "auth/no-auth-event") {
-    console.error("[auth] redirect result error:", err);
-  }
-});
-
 export async function logout() {
-  try { localStorage.removeItem(HAS_SESSION_KEY); } catch (e) {}
-  expectsLogin = false;
   return signOut(auth);
 }
 
@@ -193,48 +200,70 @@ async function ensureUserDocs(user) {
     getDoc(userRef),
     getDoc(profileRef)
   ]);
-  currentProfileData = freshProfile.exists() ? freshProfile.data() : null;
-  return freshUser.data();
+  return {
+    userData: freshUser.exists() ? freshUser.data() : null,
+    profileData: freshProfile.exists() ? freshProfile.data() : null
+  };
 }
 
-/* ── Timeout de seguridad: si Firebase no resuelve auth en 2s,
-      destrabamos la UI mostrando "no logueado" para que la página no
-      se quede congelada en "Cargando sesión..." ───────────────── */
-const AUTH_TIMEOUT_MS = 2000;
-const authTimeoutId = setTimeout(() => {
-  if (!authResolved) {
-    console.warn("[auth] timeout: auth state no se resolvió en " +
-      AUTH_TIMEOUT_MS + "ms. Asumiendo sin sesión.");
-    authResolved = true;
-    expectsLogin = false;
-    try { localStorage.removeItem(HAS_SESSION_KEY); } catch (e) {}
-    notify();
-  }
-}, AUTH_TIMEOUT_MS);
-
 /* ── Listener global de auth ─────────────────────────────────── */
-onAuthStateChanged(auth, async (user) => {
-  clearTimeout(authTimeoutId);
-  if (user) {
-    try {
-      currentUserData = await ensureUserDocs(user);
-      currentUser     = user;
-    } catch (err) {
-      console.error("[auth] Error inicializando usuario:", err);
-      currentUser     = user;
-      currentUserData = null;
+async function bootstrapAuth() {
+  await persistenceReady;
+
+  /*
+   * Procesamos primero cualquier resultado de redirect. Así una navegación
+   * que vuelve de Google no pasa por un estado intermedio "sin sesión"
+   * antes de que el listener reciba al usuario autenticado.
+   */
+  try {
+    await getRedirectResult(auth);
+  } catch (err) {
+    if (err && err.code !== "auth/no-auth-event") {
+      console.error("[auth] redirect result error:", err);
     }
-    try { localStorage.setItem(HAS_SESSION_KEY, "1"); } catch (e) {}
-    expectsLogin = true;
-  } else {
-    currentUser        = null;
+  }
+
+  onAuthStateChanged(auth, user => {
+    const generation = ++authGeneration;
+
+    /*
+     * Resolvemos la identidad de Firebase antes de leer Firestore. Esto
+     * evita que una cuenta confirmada vuelva a pasar por el botón de login.
+     */
+    currentUser        = user || null;
     currentUserData    = null;
     currentProfileData = null;
-    try { localStorage.removeItem(HAS_SESSION_KEY); } catch (e) {}
-    expectsLogin = false;
-  }
-  authResolved = true;
-  notify();
+    userDataResolved   = !user;
+    authResolved       = true;
+
+    notify();
+
+    if (!user) return;
+
+    ensureUserDocs(user)
+      .then(({ userData, profileData }) => {
+        if (generation !== authGeneration || currentUser?.uid !== user.uid) return;
+        currentUserData    = userData;
+        currentProfileData = profileData;
+        userDataResolved   = true;
+        notify();
+      })
+      .catch(err => {
+        if (generation !== authGeneration || currentUser?.uid !== user.uid) return;
+        console.error("[auth] Error inicializando usuario:", err);
+        currentUserData  = null;
+        userDataResolved = true;
+        notify();
+      });
+  });
+}
+
+bootstrapAuth().catch(err => {
+  /*
+   * No asumimos "sin sesión" ante un fallo temporal. El Header permanece
+   * pendiente hasta que Firebase entregue un estado real.
+   */
+  console.error("[auth] No se pudo iniciar Firebase Auth:", err);
 });
 
 /* ============================================================
@@ -246,10 +275,12 @@ export function mountAuthUI(slotId = "authSlot") {
     console.warn("[auth] No se encontró #" + slotId);
     return;
   }
+  if (slot.dataset.bftAuthMounted === "1") return;
+  slot.dataset.bftAuthMounted = "1";
 
   function render(user, data, loading, profile) {
-    /* 1) Cargando sesión (sólo si había sesión previa) */
-    if (loading) {
+    /* 1) Sólo mostramos loading mientras Auth aún no confirmó identidad. */
+    if (loading && !user) {
       slot.innerHTML = `
         <div class="auth-loading">
           <div class="auth-spinner"></div>
