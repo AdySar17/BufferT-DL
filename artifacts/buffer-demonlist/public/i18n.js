@@ -250,6 +250,7 @@
      profile_ranking_plat: { es:'RANKING PLAT', en:'PLAT RANKING', ru:'РЕЙТИНГ ПЛАТ', pt:'RANKING PLAT', fr:'CLASSEMENT PLAT', vi:'XẾP HẠNG PLAT' },
      profile_lunas:        { es:'Lunas', en:'Moons', ru:'Луны', pt:'Lunas', fr:'Lunes', vi:'Lunas' },
      profile_platform_records:{ es:'Records Platformer', en:'Platformer Records', ru:'Рекорды платформера', pt:'Records de Platformer', fr:'Records Platformer', vi:'Kỷ lục Platformer' },
+     profile_platformer_hardest:{ es:'Platformer Hardest', en:'Platformer Hardest', ru:'Сложнейший Platformer', pt:'Platformer Hardest', fr:'Platformer Hardest', vi:'Platformer Hardest' },
     profile_hardest:      { es:'Hardest', en:'Hardest', ru:'Сложнейший', pt:'Hardest', fr:'Hardest', vi:'Khó nhất' },
     profile_bio_label:    { es:'Biografía', en:'Biography', ru:'Биография', pt:'Biografia', fr:'Biographie', vi:'Tiểu sử' },
     profile_edit_btn:     { es:'Editar perfil', en:'Edit profile', ru:'Редактировать', pt:'Editar perfil', fr:'Modifier le profil', vi:'Chỉnh sửa hồ sơ' },

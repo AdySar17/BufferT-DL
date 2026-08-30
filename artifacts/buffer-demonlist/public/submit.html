@@ -851,13 +851,13 @@
       const select = $("newLevelDifficulty");
       if (!select) return;
       const options = type === NEW_LEVEL_TYPE_PLATFORMER
-        ? ["Platformer", "Hard Platformer", "Extreme Platformer"]
+        ? ["Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon", "Extreme Demon"]
         : ["Extreme Demon", "Insane Demon", "Hard Demon", "Medium Demon", "Easy Demon"];
       const previous = select.value;
       select.innerHTML = options.map(value => `<option value="${value}">${value}</option>`).join("");
       select.value = options.includes(previous)
         ? previous
-        : (type === NEW_LEVEL_TYPE_PLATFORMER ? "Platformer" : "Extreme Demon");
+        : "Extreme Demon";
       const infoKey = {
         [NEW_LEVEL_TYPE_CLASSIC]: "sub_new_type_classic_desc",
         [NEW_LEVEL_TYPE_PLATFORMER]: "sub_new_type_platformer_desc",
