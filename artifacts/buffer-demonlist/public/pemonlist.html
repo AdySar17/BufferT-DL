@@ -1596,6 +1596,27 @@
         await logHistory(history);
         await logChangelog("NEW", newRef.id, name, newPos, null);
 
+        /* Aviso al webhook de niveles: misma estructura que Demon List,
+           pero indicando que el nivel pertenece a la Plataforma. */
+        try {
+          const harderNeighbor = ordered[insertAt - 2];
+          const easierNeighbor = ordered[insertAt];
+          const isFirst = newPos === 1;
+          const isLast  = !easierNeighbor;
+          let msg;
+          if (isFirst) {
+            msg = `**${name}** ha sido posicionado como Top **#1** de la Plataforma, siendo el nuevo Hardest Plataforma del servidor.`;
+          } else if (isLast) {
+            msg = `**${name}** ha sido posicionado en la última posición (Top **#${newPos}**) de la Plataforma, por debajo de **${harderNeighbor.name}** (#${newPos - 1}).`;
+          } else {
+            const easierTxt = `**${easierNeighbor.name}** (#${newPos + 1})`;
+            const harderTxt = `**${harderNeighbor.name}** (#${newPos - 1})`;
+            msg = `**${name}** ha sido posicionado en el top **#${newPos}** de la Plataforma, por encima de ${easierTxt} y por debajo de ${harderTxt}.`;
+          }
+          const { notifyDiscord } = await import("/discord-notify.js");
+          await notifyDiscord(msg);
+        } catch (e) { console.warn("[pemonlist] discord notify new level fail:", e); }
+
         cerrarModal("formModal");
         cargarNiveles();
       } catch (err) {
@@ -1912,13 +1933,13 @@
           const isLast  = !easierNeighbor;
           let msg;
           if (isFirst) {
-            msg = `**${name}** ha sido movido al Top **#1**, siendo el nuevo Hardest del Servidor.`;
+            msg = `**${name}** ha sido movido al Top **#1** de la Plataforma, siendo el nuevo Hardest Plataforma del servidor.`;
           } else if (isLast) {
-            msg = `**${name}** ha sido movido a la última posición (Top **#${insertAt}**) por debajo de **${harderNeighbor.name}** (#${insertAt - 1}).`;
+            msg = `**${name}** ha sido movido a la última posición (Top **#${insertAt}**) de la Plataforma, por debajo de **${harderNeighbor.name}** (#${insertAt - 1}).`;
           } else {
             const easierTxt = `**${easierNeighbor.name}** (#${insertAt + 1})`;
             const harderTxt = `**${harderNeighbor.name}** (#${insertAt - 1})`;
-            msg = `**${name}** ha sido movido al top **#${insertAt}** por encima de ${easierTxt} y por debajo de ${harderTxt}.`;
+            msg = `**${name}** ha sido movido al top **#${insertAt}** de la Plataforma, por encima de ${easierTxt} y por debajo de ${harderTxt}.`;
           }
           const { notifyDiscord } = await import("/discord-notify.js");
           await notifyDiscord(msg);

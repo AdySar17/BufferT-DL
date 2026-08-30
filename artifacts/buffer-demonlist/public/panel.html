@@ -767,7 +767,8 @@
         ? renderPlayer(rec._profile2, rec.player2Id, true)
         : "");
 
-    const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE;
+    const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE ||
+      lvl.listType === PEMON_LIST_TYPE;
     const isFull   = Number(rec.percent) === 100;
     const isClaim  = !!rec.isNewLevelClaim;
     const resultHtml = isPemonRecord
@@ -1425,15 +1426,17 @@
         const easierNeighbor = ordered[insertAt];     // pos newPos+1 (más abajo en la lista)
         const isFirst = newPos === 1;
         const isLast  = !easierNeighbor;
+        const platformLabel = isPemonLevel ? " de la Plataforma" : "";
+        const hardestLabel = isPemonLevel ? "Hardest Plataforma del servidor" : "Hardest del Servidor";
         let msg;
         if (isFirst) {
-          msg = `**${name}** ha sido posicionado como Top **#1**, siendo el nuevo Hardest del Servidor.`;
+          msg = `**${name}** ha sido posicionado como Top **#1**${platformLabel}, siendo el nuevo ${hardestLabel}.`;
         } else if (isLast) {
-          msg = `**${name}** ha sido posicionado en la última posición (Top **#${newPos}**) por debajo de **${harderNeighbor.name}** (#${newPos - 1}).`;
+          msg = `**${name}** ha sido posicionado en la última posición (Top **#${newPos}**)${platformLabel}, por debajo de **${harderNeighbor.name}** (#${newPos - 1}).`;
         } else {
           const easierTxt = `**${easierNeighbor.name}** (#${newPos + 1})`;
           const harderTxt = `**${harderNeighbor.name}** (#${newPos - 1})`;
-          msg = `**${name}** ha sido posicionado en el top **#${newPos}**, por encima de ${easierTxt} y por debajo de ${harderTxt}.`;
+          msg = `**${name}** ha sido posicionado en el top **#${newPos}**${platformLabel}, por encima de ${easierTxt} y por debajo de ${harderTxt}.`;
         }
         const { notifyDiscord } = await import("/discord-notify.js");
         await notifyDiscord(msg);
@@ -1459,8 +1462,9 @@
       try {
         const recForHook = {
           ...rec,
+          listType: targetListType,
           isNewLevelClaim: false,
-          _level: { name, position: newPos, difficulty },
+          _level: { name, position: newPos, difficulty, listType: targetListType },
         };
         await sendRecordWebhook(recForHook, "accept", staffnotes);
       } catch (e) { console.warn("[panel] discord records notify (claim) fail:", e); }
@@ -1574,7 +1578,9 @@
     const embed = {
       title: accepted ? "🟢 Record Aceptado" : "🔴 Record Rechazado",
       description: `**${lvlPos} - ${lvlName}**`,
-      color: accepted ? 0x7CFC00 /* lima */ : 0xe74c3c /* rojo */,
+      color: accepted
+        ? (isPemonRecord ? 0x65D9FF /* azul plataforma */ : 0x7CFC00 /* lima */)
+        : 0xe74c3c /* rojo */,
       fields: [
         resultField,
         { name: "Usuario",     value: userField,   inline: false },
