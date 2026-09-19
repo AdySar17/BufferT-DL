@@ -182,3 +182,46 @@ input[type="submit"]:not(:disabled):active {
   font-size: 0.88rem;
   font-family: 'Montserrat', sans-serif;
 }
+
+/* Overlay global para cargas iniciales y saltos dentro de listas */
+.bft-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(3px);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+.bft-loading-overlay.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.bft-loading-panel {
+  min-width: min(280px, calc(100vw - 40px));
+  padding: 28px 30px;
+  border: 1px solid rgba(124,252,0,0.28);
+  border-radius: 16px;
+  background: rgba(8,18,8,0.92);
+  box-shadow: 0 14px 50px rgba(0,0,0,0.55), 0 0 28px rgba(124,252,0,0.12);
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+}
+.bft-loading-overlay .bft-spinner {
+  width: 64px;
+  height: 64px;
+  border-width: 6px;
+  display: block;
+  margin: 0 auto 18px;
+}
+.bft-loading-label {
+  color: rgba(255,255,255,0.82);
+  font-size: 0.92rem;
+  font-weight: 600;
+}

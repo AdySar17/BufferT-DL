@@ -863,10 +863,17 @@
   }
 </style>
   <link rel="stylesheet" href="/shared.css">
+  <script src="/loading.js"></script>
   <script src="/i18n.js"></script>
   <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
 </head>
 <body>
+<div id="bftLoadingOverlay" class="bft-loading-overlay" role="status" aria-live="polite" aria-hidden="false">
+  <div class="bft-loading-panel">
+    <span class="bft-spinner" aria-hidden="true"></span>
+    <div class="bft-loading-label">Cargando perfil...</div>
+  </div>
+</div>
 
 <!-- NAV -->
 <header class="top-header">
@@ -1334,9 +1341,11 @@
     if (profileLoaded) return;
     profileLoaded = true;
     recordsLoaded = true;
-    loadProfile(uid);
-    loadRecords(uid);
-    loadRankings(uid);
+    Promise.allSettled([
+      loadProfile(uid),
+      loadRecords(uid),
+      loadRankings(uid)
+    ]).finally(() => window.BFT_LOADING?.hide());
   }
   if (targetUid) kickOff(targetUid);
 
@@ -1413,6 +1422,10 @@
       const url = new URL(location.href);
       url.searchParams.set("id", targetUid);
       history.replaceState(null, "", url.toString());
+    }
+    if (!targetUid && !user) {
+      $("state").textContent = "Inicia sesión para ver tu perfil, o abre el enlace de un usuario.";
+      window.BFT_LOADING?.hide();
     }
 
     isOwner = !!user && !!targetUid && user.uid === targetUid;

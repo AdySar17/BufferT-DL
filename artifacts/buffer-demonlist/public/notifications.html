@@ -149,10 +149,17 @@
   }
 </style>
   <link rel="stylesheet" href="/shared.css">
+  <script src="/loading.js"></script>
   <script src="/i18n.js"></script>
   <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
 </head>
 <body>
+<div id="bftLoadingOverlay" class="bft-loading-overlay" role="status" aria-live="polite" aria-hidden="false">
+  <div class="bft-loading-panel">
+    <span class="bft-spinner" aria-hidden="true"></span>
+    <div class="bft-loading-label">Cargando notificaciones...</div>
+  </div>
+</div>
 
 <header class="top-header">
   <div class="left">
@@ -239,6 +246,7 @@
   });
 
   async function loadNotifications(uid) {
+    window.BFT_LOADING?.show("Cargando notificaciones...");
     stateMsg.style.display = "block";
     stateMsg.classList.remove("error");
     stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_loading') : "Cargando notificaciones...";
@@ -287,6 +295,8 @@
       console.error("[notifications] load error:", err);
       stateMsg.classList.add("error");
       stateMsg.textContent = (window.BFT_I18N ? window.BFT_I18N.t('notif_error') : "Error al cargar las notificaciones") + ": " + (err.message || "");
+    } finally {
+      window.BFT_LOADING?.hide();
     }
   }
 
@@ -346,12 +356,14 @@
   onAuthChange((user, data, loading) => {
     if (loading) {
       stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_session') : "Cargando sesión...";
+      window.BFT_LOADING?.show("Cargando sesión...");
       return;
     }
     if (!user) {
       stateMsg.classList.add("error");
       stateMsg.textContent = window.BFT_I18N ? window.BFT_I18N.t('notif_login_req') : "Inicia sesión para ver tus notificaciones.";
       listEl.innerHTML = "";
+      window.BFT_LOADING?.hide();
       return;
     }
     if (!initialized) {

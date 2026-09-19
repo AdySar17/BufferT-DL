@@ -45,7 +45,16 @@
     }
 
     /* ===== SEARCH ===== */
-    #searchContainer { text-align: center; margin: 30px 0 20px; }
+    #searchContainer {
+      text-align: center;
+      margin: 30px 0 20px;
+      position: sticky;
+      top: 60px;
+      z-index: 100;
+      padding: 10px 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(10px);
+    }
     #searchBar {
       width: 80%; max-width: 600px;
       padding: 12px 18px;
@@ -287,6 +296,24 @@
       cursor: pointer;
     }
     .level-button:hover { background: rgba(255,255,255,0.35); }
+    .list-jump-button {
+      display: block;
+      width: fit-content;
+      margin: 8px auto 0;
+      padding: 7px 12px;
+      border: 1px solid rgba(124,252,0,0.5);
+      border-radius: 8px;
+      background: rgba(124,252,0,0.12);
+      color: #d8ffad;
+      font: 700 0.72rem 'Montserrat', sans-serif;
+      letter-spacing: 0.35px;
+      cursor: pointer;
+    }
+    .list-jump-button:hover { background: rgba(124,252,0,0.28); }
+    .level-card.list-jump-target {
+      outline: 3px solid rgba(199,255,59,0.9);
+      box-shadow: 0 0 34px rgba(124,252,0,0.7);
+    }
 
     /* ===== MODALES (base compartida) =====
        El backdrop ahora SCROLLEA: en móvil los formularios largos
@@ -756,10 +783,17 @@
       .card-admin { opacity: 1; }
     }
   </style>
+  <script src="/loading.js"></script>
   <script src="/i18n.js"></script>
   <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
 </head>
 <body>
+  <div id="bftLoadingOverlay" class="bft-loading-overlay" role="status" aria-live="polite" aria-hidden="false">
+    <div class="bft-loading-panel">
+      <span class="bft-spinner" aria-hidden="true"></span>
+      <div class="bft-loading-label">Cargando lista...</div>
+    </div>
+  </div>
 
   <!-- HEADER -->
   <header class="top-header">
@@ -1315,10 +1349,11 @@
     }
 
     /* ── CREAR TARJETA ─────────────────────────────────────────── */
-    function crearCard(nivel) {
+    function crearCard(nivel, options = {}) {
       const pos  = Number(nivel.position) || 1;
       const card = document.createElement("div");
       card.className = "level-card " + (nivel.glow || "");
+      card.dataset.levelId = nivel.id;
       card.style.backgroundImage = nivel.background ? `url('${nivel.background}')` : "";
 
       card.innerHTML = `
@@ -1335,6 +1370,7 @@
             <div class="level-title">#${pos} - ${nivel.name}</div>
             <div class="level-author">By ${nivel.author} · ${nivel.value || "—"} pts · Tier ${resolveTier(nivel)}</div>
             <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
+            ${options.searchResult ? `<button type="button" class="list-jump-button">VER EN LISTA</button>` : ""}
           </div>
         </div>
       `;
@@ -1343,6 +1379,13 @@
         e.preventDefault(); e.stopPropagation();
         window.location.href = `/level.html?id=${nivel.id}`;
       });
+      if (options.searchResult) {
+        card.querySelector(".list-jump-button").addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          irALista(nivel);
+        });
+      }
       card.querySelector(".btn-edit").addEventListener("click", (e) => {
         e.stopPropagation(); abrirEdicion(nivel);
       });
@@ -1350,6 +1393,36 @@
         e.stopPropagation(); abrirConfirmar(nivel.id, nivel.name);
       });
       return card;
+    }
+
+    function renderLoadedLevels() {
+      const container = document.getElementById("levelContainer");
+      container.innerHTML = "";
+      nivelesActuales.forEach(nivel => container.appendChild(crearCard(nivel)));
+    }
+
+    async function irALista(nivel) {
+      const bar = document.getElementById("searchBar");
+      searchMode = false;
+      if (_observer) _observer.disconnect();
+      bar.value = "";
+      window.BFT_LOADING?.show("Cargando posición en la lista...");
+
+      try {
+        while (!nivelesActuales.some(item => item.id === nivel.id) && hasMore) {
+          await cargarMas();
+        }
+        renderLoadedLevels();
+        setupObserver();
+        const target = document.querySelector(`[data-level-id="${CSS.escape(nivel.id)}"]`);
+        if (target) {
+          target.classList.add("list-jump-target");
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => target.classList.remove("list-jump-target"), 2400);
+        }
+      } finally {
+        window.BFT_LOADING?.hide();
+      }
     }
 
     /* ── SENTINEL para infinite scroll ─────────────────────────── */
@@ -1384,6 +1457,7 @@
       hasMore         = true;
       allLevelsCache  = null;
       searchMode      = false;
+      window.BFT_LOADING?.show("Cargando lista...");
 
       try {
         const q = query(
@@ -1418,6 +1492,8 @@
         loadingMsg.textContent = "Error al cargar: " + err.message;
         loadingMsg.style.display = "block";
         console.error(err);
+      } finally {
+        window.BFT_LOADING?.hide();
       }
     }
 
@@ -1499,7 +1575,7 @@
 
         const container = document.getElementById("levelContainer");
         container.innerHTML = "";
-        filtrados.forEach(nivel => container.appendChild(crearCard(nivel)));
+         filtrados.forEach(nivel => container.appendChild(crearCard(nivel, { searchResult: true })));
       };
 
       bar.addEventListener("input", bar._searchHandler);

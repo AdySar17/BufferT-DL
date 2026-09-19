@@ -371,10 +371,17 @@
   select.al-input option { background:#141414; color:#fff; }
 </style>
   <link rel="stylesheet" href="/shared.css">
+  <script src="/loading.js"></script>
   <script src="/i18n.js"></script>
   <script>document.addEventListener('DOMContentLoaded',function(){if(window.BFT_I18N)window.BFT_I18N.renderSelector('langSlot');});</script>
 </head>
 <body>
+<div id="bftLoadingOverlay" class="bft-loading-overlay" role="status" aria-live="polite" aria-hidden="false">
+  <div class="bft-loading-panel">
+    <span class="bft-spinner" aria-hidden="true"></span>
+    <div class="bft-loading-label">Cargando panel...</div>
+  </div>
+</div>
 
 <header class="top-header">
   <div class="left">
@@ -2040,6 +2047,7 @@
 
   async function loadPending() {
     setState("Cargando records pendientes...");
+    window.BFT_LOADING?.show("Cargando panel...");
     try {
       const snap = await getDocs(query(
         collection(db, "records"),
@@ -2164,6 +2172,8 @@
     } catch (err) {
       console.error(err);
       setState("Error al cargar records: " + (err.message || err.code || "desconocido"), true);
+    } finally {
+      window.BFT_LOADING?.hide();
     }
   }
 
@@ -2769,6 +2779,7 @@
     window.__myProfileName = (profile && profile.name) || null;
     if (loading) {
       setState("Cargando sesión...");
+      window.BFT_LOADING?.show("Cargando sesión...");
       $("myClaimsBox").style.display  = "none";
       $("ownerToolsBox").style.display = "none";
       return;
@@ -2777,12 +2788,14 @@
       setState("Debes iniciar sesión con una cuenta del staff para acceder al panel.", true);
       $("myClaimsBox").style.display  = "none";
       $("ownerToolsBox").style.display = "none";
+      window.BFT_LOADING?.hide();
       return;
     }
     if (!isStaff()) {
       setState("Acceso restringido. Solo Mod, Admin u Owner pueden acceder a este panel.", true);
       $("myClaimsBox").style.display  = "none";
       $("ownerToolsBox").style.display = "none";
+      window.BFT_LOADING?.hide();
       return;
     }
     /* Sólo Owner ve la herramienta de recálculo. */
