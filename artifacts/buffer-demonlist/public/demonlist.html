@@ -1137,6 +1137,7 @@
     import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
     import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
+    import { youtubeThumbnailFromVideo } from "/video-utils.js";
     import { isDemon, DEMON_LIST_TYPE } from "/list-utils.js";
     import { difficultyImage } from "/difficulty.js";
     import {
@@ -1626,9 +1627,9 @@
         document.getElementById(`${prefix}-author`).value = level.author || "";
         document.getElementById(`${prefix}-creators`).value = level.creators.join(", ");
         document.getElementById(`${prefix}-description`).value = level.description || "";
-        /* Nunca se toca el video/record existente. La miniatura sí puede
-           venir del showcase de YouTube de la fuente. */
-        if (level.thumbnail) document.getElementById(`${prefix}-thumbnail`).value = level.thumbnail;
+        /* La miniatura sólo se deriva del video guardado en BufferList. */
+        document.getElementById(`${prefix}-thumbnail`).value =
+          youtubeThumbnailFromVideo(document.getElementById(`${prefix}-video`).value);
         document.getElementById(`${prefix}-is2P`).checked = !!level.twoPlayer;
         document.getElementById(`${prefix}-gdLevelId`).value = level.gdLevelId || gdLevelId;
         document.getElementById(`${prefix}-aredl-id`).value = level.aredlId || "";
@@ -1745,7 +1746,9 @@
       const gdLevelId  = document.getElementById("inp-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("inp-position").value) || 0));
       const tier       = Number(document.getElementById("inp-tier").value) || DEFAULT_TIER;
-      const thumbnail  = document.getElementById("inp-thumbnail").value.trim();
+      const thumbnail  = youtubeThumbnailFromVideo(
+        document.getElementById("inp-video").value
+      );
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("inp-background").value.trim()
                       || gdBgUrl(gdLevelId);
@@ -2080,7 +2083,9 @@
       const gdLevelId  = document.getElementById("edit-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("edit-position").value) || 0));
       const tier       = Number(document.getElementById("edit-tier").value) || DEFAULT_TIER;
-      const thumbnail  = document.getElementById("edit-thumbnail").value.trim();
+      const thumbnail  = youtubeThumbnailFromVideo(
+        document.getElementById("edit-video").value
+      );
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("edit-background").value.trim()
                       || gdBgUrl(gdLevelId);

@@ -30,10 +30,6 @@ function normalizeName(value) {
     .toLowerCase();
 }
 
-function youtubeThumbnail(videoId) {
-  return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
-}
-
 function firstFiniteNumber(...values) {
   return values
     .map(value => Number(value))
@@ -108,7 +104,6 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
     creators: detail.Meta?.Publisher?.name ? [detail.Meta.Publisher.name] : [],
     description: detail.Meta?.Description || "",
     tags,
-    thumbnail: youtubeThumbnail(detail.Showcase),
     twoPlayer: !!detail.Meta?.IsTwoPlayer,
     gddlData: {
       score: rating,
