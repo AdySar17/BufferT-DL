@@ -87,10 +87,12 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
     ? Number(detail.Rating)
     : (Number.isFinite(Number(detail.DefaultRating)) ? Number(detail.DefaultRating) : null);
   const ranking = firstFiniteNumber(
-    detail.AREDLPosition,
     detail.Position,
     detail.Rank,
     detail.Ranking,
+    detail.DifficultyIndex,
+    detail.DifficultyRank,
+    detail.LeaderboardPosition,
   );
 
   return {
@@ -114,6 +116,8 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
     gddlData: {
       rating,
       ranking,
+      difficultyIndex: Number.isFinite(Number(detail.DifficultyIndex))
+        ? Number(detail.DifficultyIndex) : null,
       positionType: ranking != null ? "ranking" : "rating",
       defaultRating: Number.isFinite(Number(detail.DefaultRating)) ? Number(detail.DefaultRating) : null,
       enjoyment: detail.Enjoyment ?? null,

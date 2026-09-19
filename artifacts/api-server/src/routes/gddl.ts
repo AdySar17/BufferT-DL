@@ -26,6 +26,9 @@ router.get("/gddl/levels", (req, res) => forward(req, res, "/levels"));
 router.get("/gddl/levels/:levelId/tags", (req, res) =>
   forward(req, res, `/levels/${encodeURIComponent(req.params.levelId)}/tags`),
 );
+router.get("/gddl/levels/:levelId/packs", (req, res) =>
+  forward(req, res, `/levels/${encodeURIComponent(req.params.levelId)}/packs`),
+);
 router.get("/gddl/levels/:levelId", (req, res) =>
   forward(req, res, `/levels/${encodeURIComponent(req.params.levelId)}`),
 );

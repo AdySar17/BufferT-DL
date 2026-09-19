@@ -707,7 +707,7 @@
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import {
     calculateClassicScores, computeTierPoints, DEFAULT_PEMON_TIER, DEFAULT_TIER,
-    resolveTier
+    resolveTier, inferTierFromValue
   } from "/points.js";
   import {
     computeLunas, getListType, getNewLevelType, getNewLevelSuffix,
@@ -1198,7 +1198,7 @@
         if (getListType(data) === DEMON_LIST_TYPE &&
             (source === "aredl"
               ? (data.difficulty || "Extreme Demon") === "Extreme Demon"
-              : ["Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon"].includes(data.difficulty))) {
+              : true)) {
           existing.push(data);
         }
       });
@@ -2286,6 +2286,217 @@
     }
   }
   $("btnRecalcPoints").addEventListener("click", recalcAllPoints);
+
+  /* ============================================================
+   *   HERRAMIENTAS OWNER: sincronización informativa de /levels
+   *   ----------------------------------------------------------
+   *   Estas acciones sólo escriben campos informativos del nivel.
+   *   Nunca incluyen `video`, records, puntos, autenticación,
+   *   submitter ni posiciones editables de BufferList.
+   * ============================================================ */
+  const GDDL_DIFFICULTIES = new Set([
+    "Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon"
+  ]);
+
+  function refreshSourceForLevel(level) {
+    if (getListType(level) !== DEMON_LIST_TYPE) return "";
+    if ((level.difficulty || "Extreme Demon") === "Extreme Demon") return "aredl";
+    return GDDL_DIFFICULTIES.has(level.difficulty) ? "gddl" : "";
+  }
+
+  function refreshedBackground(level, gdLevelId) {
+    const oldId = String(level.gdLevelId || "").trim();
+    const oldGenerated = gdBgUrl(oldId);
+    const current = String(level.background || "").trim();
+    if (!current || current === oldGenerated) return gdBgUrl(gdLevelId);
+    return current;
+  }
+
+  function commonApiLevelFields(level, data) {
+    const gdLevelId = String(data.gdLevelId || level.gdLevelId || "").trim();
+    const fields = {
+      name: data.name || level.name || "",
+      author: data.author || level.author || "",
+      creators: Array.isArray(data.creators) ? data.creators : (level.creators || []),
+      description: data.description || "",
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      gdLevelId: gdLevelId,
+      background: refreshedBackground(level, gdLevelId)
+    };
+    if (data.thumbnail) fields.thumbnail = data.thumbnail;
+    return fields;
+  }
+
+  function apiFieldsForLevel(level, source, data) {
+    const fields = commonApiLevelFields(level, data);
+    if (source === "aredl") {
+      return {
+        ...fields,
+        aredlId: data.aredlId || null,
+        aredlPosition: Number.isFinite(Number(data.aredlPosition))
+          ? Number(data.aredlPosition) : null
+      };
+    }
+    return {
+      ...fields,
+      gddlId: data.gddlId || null,
+      gddlPosition: Number.isFinite(Number(data.gddlPosition))
+        ? Number(data.gddlPosition) : null,
+      gddlRanking: Number.isFinite(Number(data.gddlRanking))
+        ? Number(data.gddlRanking) : null,
+      gddlPositionType: data.gddlPositionType || "rating",
+      gddlRating: Number.isFinite(Number(data.gddlRating))
+        ? Number(data.gddlRating) : null,
+      gddlDefaultRating: Number.isFinite(Number(data.gddlDefaultRating))
+        ? Number(data.gddlDefaultRating) : null,
+      gddlDifficulty: data.gddlDifficulty || "",
+      gddlShowcase: data.gddlShowcase || "",
+      gddlData: data.gddlData || null
+    };
+  }
+
+  async function refreshAllApiData() {
+    if (!isOwner()) {
+      showToast("Sólo el Owner puede ejecutar esta acción.", true);
+      return;
+    }
+    const btn = $("btnRefreshApiData");
+    const status = $("refreshApiStatus");
+    if (!confirm(
+      "¿Actualizar los datos informativos de todos los niveles Demon?\n\n" +
+      "Se conservarán exactamente los videos, records, puntos, posiciones " +
+      "de BufferList, autenticación y submitters."
+    )) return;
+
+    btn.disabled = true;
+    btn.textContent = "Actualizando…";
+    status.style.color = "rgba(230,230,230,0.75)";
+    status.textContent = "Leyendo niveles…";
+    try {
+      const snap = await getDocs(collection(db, "levels"));
+      const levels = snap.docs.map(item => ({ id: item.id, ...item.data() }));
+      const targets = levels.filter(level => refreshSourceForLevel(level));
+      const updates = [];
+      const failures = [];
+
+      for (let index = 0; index < targets.length; index += 1) {
+        const level = targets[index];
+        const source = refreshSourceForLevel(level);
+        status.textContent =
+          `Consultando ${index + 1}/${targets.length}: ${level.name || level.id}…`;
+        try {
+          const data = source === "aredl"
+            ? await lookupAredlLevel({
+                gdLevelId: String(level.gdLevelId || ""),
+                name: level.name || ""
+              })
+            : await lookupGddlLevel({
+                gdLevelId: String(level.gdLevelId || ""),
+                name: level.name || ""
+              });
+          updates.push({
+            id: level.id,
+            data: apiFieldsForLevel(level, source, data)
+          });
+        } catch (error) {
+          failures.push({
+            name: level.name || level.id,
+            message: error?.message || "consulta fallida"
+          });
+        }
+      }
+
+      let written = 0;
+      const CHUNK = 400;
+      for (let index = 0; index < updates.length; index += CHUNK) {
+        const batch = writeBatch(db);
+        updates.slice(index, index + CHUNK).forEach(item => {
+          batch.update(doc(db, "levels", item.id), item.data);
+        });
+        await batch.commit();
+        written += Math.min(CHUNK, updates.length - index);
+        status.textContent = `Guardados ${written}/${updates.length} niveles…`;
+      }
+
+      status.style.color = failures.length ? "#ffd27a" : "#7fff3b";
+      status.textContent =
+        `✔ Listo: ${written} actualizados, ${failures.length} con error ` +
+        `(de ${targets.length} compatibles).`;
+      if (failures.length) console.warn("[panel] refresh API failures:", failures);
+      showToast(
+        failures.length
+          ? `Actualizados ${written}; ${failures.length} no se pudieron consultar.`
+          : `Actualizados ${written} niveles.`
+      );
+    } catch (error) {
+      console.error("[panel] refreshAllApiData error:", error);
+      status.style.color = "#ff7a7a";
+      status.textContent = "Error: " + (error.message || error.code || "desconocido");
+      showToast("Error al actualizar datos: " + (error.message || error.code || "desconocido"), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Actualizar datos de todos los niveles";
+    }
+  }
+
+  async function updateAllTiers() {
+    if (!isOwner()) {
+      showToast("Sólo el Owner puede ejecutar esta acción.", true);
+      return;
+    }
+    const btn = $("btnUpdateTiers");
+    const status = $("tiersStatus");
+    if (!confirm(
+      "¿Actualizar el Tier de los niveles Demon usando los rangos " +
+      "existentes de puntos?\n\nNo se modificarán puntos, posiciones ni records."
+    )) return;
+
+    btn.disabled = true;
+    btn.textContent = "Actualizando…";
+    status.style.color = "rgba(230,230,230,0.75)";
+    status.textContent = "Leyendo niveles…";
+    try {
+      const snap = await getDocs(collection(db, "levels"));
+      const changes = [];
+      snap.forEach(item => {
+        const level = { id: item.id, ...item.data() };
+        if (getListType(level) !== DEMON_LIST_TYPE) return;
+        const newTier = inferTierFromValue(level.value, DEFAULT_TIER);
+        if (Number(level.tier) !== newTier) {
+          changes.push({ id: item.id, tier: newTier });
+        }
+      });
+
+      const CHUNK = 400;
+      let written = 0;
+      for (let index = 0; index < changes.length; index += CHUNK) {
+        const batch = writeBatch(db);
+        changes.slice(index, index + CHUNK).forEach(item => {
+          batch.update(doc(db, "levels", item.id), { tier: item.tier });
+        });
+        await batch.commit();
+        written += Math.min(CHUNK, changes.length - index);
+        status.textContent = `Tiers actualizados ${written}/${changes.length}…`;
+      }
+
+      status.style.color = "#7fff3b";
+      status.textContent = changes.length
+        ? `✔ Listo: ${changes.length} Tiers actualizados.`
+        : "✔ Nada que actualizar: los Tiers ya coinciden con sus rangos.";
+      showToast(`Tiers actualizados: ${changes.length}.`);
+    } catch (error) {
+      console.error("[panel] updateAllTiers error:", error);
+      status.style.color = "#ff7a7a";
+      status.textContent = "Error: " + (error.message || error.code || "desconocido");
+      showToast("Error al actualizar Tiers: " + (error.message || error.code || "desconocido"), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Actualizar Tiers automáticamente";
+    }
+  }
+
+  $("btnRefreshApiData").addEventListener("click", refreshAllApiData);
+  $("btnUpdateTiers").addEventListener("click", updateAllTiers);
 
   /* ============================================================
    *   PANEL DE RECLAMOS — Mis reclamos activos (y todos para Admin/Owner)
