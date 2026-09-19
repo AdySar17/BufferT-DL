@@ -1538,7 +1538,9 @@
         levelDoc.aredlPosition = aredlPosition;
       }
       if (gddlId) levelDoc.gddlId = gddlId;
-      if (Number.isFinite(gddlPosition)) levelDoc.gddlPosition = gddlPosition;
+      if (Number.isFinite(gddlPosition) && gddlPosition > 0) {
+        levelDoc.gddlPosition = gddlPosition;
+      }
       if (_alGddlData) levelDoc.gddlData = _alGddlData;
       const newRef = await addDoc(collection(db, "levels"), levelDoc);
       placeholder.id = newRef.id;
@@ -2340,6 +2342,8 @@
     return {
       ...fields,
       gddlId: data.gddlId || null,
+      gddlScore: Number.isFinite(Number(data.gddlScore))
+        ? Number(data.gddlScore) : null,
       gddlPosition: Number.isFinite(Number(data.gddlPosition))
         ? Number(data.gddlPosition) : null,
       gddlRanking: Number.isFinite(Number(data.gddlRanking))

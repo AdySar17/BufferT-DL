@@ -8,3 +8,9 @@ The official GDDL API is documented through the Scalar OpenAPI registry and expo
 **Why:** Direct browser requests from BufferList are blocked by GDDL's `Access-Control-Allow-Origin` policy.
 
 **How to apply:** Keep the proxy limited to the known read-only levels and tags paths; never turn it into a generic URL forwarder or store GDDL credentials.
+
+For level ordering, use the detailed response field `Rating` as GDDL's numeric Score. `DefaultRating` is only a fallback when `Rating` is null; `DifficultyIndex`, `AREDLPosition`, and other rank-like fields are not BufferList positions.
+
+**Why:** GDDL's detailed schema identifies `Rating` as the community score, while the other indexes represent different concepts and can incorrectly place a level at the top.
+
+**How to apply:** Normalize the GDDL difficulty and compare `Rating` only with existing BufferList levels of that same difficulty. Keep the resulting BufferList position as an editable suggestion.

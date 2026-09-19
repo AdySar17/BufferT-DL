@@ -1796,7 +1796,9 @@
           _addPayload.aredlPosition = aredlPosition;
         }
         if (gddlId) _addPayload.gddlId = gddlId;
-        if (Number.isFinite(gddlPosition)) _addPayload.gddlPosition = gddlPosition;
+        if (Number.isFinite(gddlPosition) && gddlPosition > 0) {
+          _addPayload.gddlPosition = gddlPosition;
+        }
         if (_sourceMetadata.inp) _addPayload.gddlData = _sourceMetadata.inp;
         const newRef   = await addDoc(collection(db, "levels"), _addPayload);
         placeholder.id = newRef.id;
@@ -2033,7 +2035,14 @@
         fillAredlForm("edit", nivel.id);
       } else if (nivel.aredlPosition) {
         setAredlStatus("edit", `AREDl #${nivel.aredlPosition} · datos guardados`);
-      } else if (nivel.gddlPosition) {
+      } else if (
+        Number.isFinite(Number(
+          nivel.gddlScore ??
+          nivel.gddlRating ??
+          nivel.gddlData?.score ??
+          nivel.gddlData?.rating
+        ))
+      ) {
         setAredlStatus("edit", `${gddlStatusText(nivel)} · datos guardados`);
       }
     };
@@ -2115,7 +2124,8 @@
               ? aredlPosition
               : null,
             gddlId,
-            gddlPosition: Number.isFinite(gddlPosition) ? gddlPosition : null,
+            gddlPosition: Number.isFinite(gddlPosition) && gddlPosition > 0
+              ? gddlPosition : null,
             gddlData: _sourceMetadata.edit,
             rewards: _editSelectedRewards,
             customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
@@ -2148,7 +2158,8 @@
             ? aredlPosition
             : null,
           gddlId,
-          gddlPosition: Number.isFinite(gddlPosition) ? gddlPosition : null,
+          gddlPosition: Number.isFinite(gddlPosition) && gddlPosition > 0
+            ? gddlPosition : null,
           gddlData: _sourceMetadata.edit,
           rewards: _editSelectedRewards,
           customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status })),

@@ -86,20 +86,17 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
   const rating = Number.isFinite(Number(detail.Rating))
     ? Number(detail.Rating)
     : (Number.isFinite(Number(detail.DefaultRating)) ? Number(detail.DefaultRating) : null);
-  const ranking = firstFiniteNumber(
-    detail.Position,
-    detail.Rank,
-    detail.Ranking,
-    detail.DifficultyIndex,
-    detail.DifficultyRank,
-    detail.LeaderboardPosition,
-  );
-
   return {
     gddlId: detail.ID != null ? String(detail.ID) : requestedId,
-    gddlPosition: ranking,
-    gddlRanking: ranking,
-    gddlPositionType: ranking != null ? "ranking" : "rating",
+    /*
+     * `Rating` is the numeric score shown by GDDL. DifficultyIndex and
+     * AREDLPosition are different indexes and must never become a
+     * BufferList position.
+     */
+    gddlScore: rating,
+    gddlPosition: null,
+    gddlRanking: null,
+    gddlPositionType: "rating",
     gddlRating: rating,
     gddlDefaultRating: Number.isFinite(Number(detail.DefaultRating))
       ? Number(detail.DefaultRating) : null,
@@ -114,11 +111,9 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
     thumbnail: youtubeThumbnail(detail.Showcase),
     twoPlayer: !!detail.Meta?.IsTwoPlayer,
     gddlData: {
+      score: rating,
       rating,
-      ranking,
-      difficultyIndex: Number.isFinite(Number(detail.DifficultyIndex))
-        ? Number(detail.DifficultyIndex) : null,
-      positionType: ranking != null ? "ranking" : "rating",
+      positionType: "rating",
       defaultRating: Number.isFinite(Number(detail.DefaultRating)) ? Number(detail.DefaultRating) : null,
       enjoyment: detail.Enjoyment ?? null,
       deviation: detail.Deviation ?? null,
@@ -145,53 +140,91 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
 }
 
 /*
- * GDDL puede entregar una posición/ranking (menor número = más difícil) y,
- * cuando no existe, un rating (mayor número = más difícil). La comparación
- * se hace contra todos los niveles demonios de BufferList, sin filtrar por Tier.
+ * GDDL `Rating` es el Score numérico que aparece en la ficha del nivel.
+ * Un Score mayor significa mayor dificultad. La comparación se hace sólo
+ * contra niveles de la misma dificultad y nunca usa Tier, DifficultyIndex
+ * ni un ranking externo para construir la posición de BufferList.
  */
 export function suggestGddlBufferPosition(gddlLevel, bufferLevels = [], excludeId = "") {
-  const targetRanking = firstFiniteNumber(
-    gddlLevel?.gddlRanking,
-    gddlLevel?.gddlPositionType === "ranking" ? gddlLevel?.gddlPosition : null,
-  );
-  const targetRating = firstFiniteNumber(
+  const targetScore = firstFiniteNumber(
+    gddlLevel?.gddlScore,
     gddlLevel?.gddlRating,
+    gddlLevel?.gddlData?.score,
     gddlLevel?.gddlData?.rating,
-    targetRanking == null ? gddlLevel?.gddlPosition : null,
   );
-  const existing = bufferLevels.filter(level => level?.id !== excludeId);
+  if (targetScore == null) return null;
 
-  if (targetRanking != null && gddlLevel?.gddlPositionType !== "rating") {
-    const ahead = existing
-      .map(level => firstFiniteNumber(level?.gddlRanking, level?.gddlData?.ranking,
-        level?.gddlPositionType === "ranking" ? level?.gddlPosition : null))
-      .filter(position => position != null && position < targetRanking);
-    if (ahead.length || existing.some(level =>
-      firstFiniteNumber(level?.gddlRanking, level?.gddlData?.ranking,
-        level?.gddlPositionType === "ranking" ? level?.gddlPosition : null) != null)) {
-      return ahead.length + 1;
-    }
+  function normalizeDifficulty(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+demon$/, "");
   }
 
-  if (targetRating == null) return null;
-  const aheadByRating = existing
-    .map(level => firstFiniteNumber(
-      level?.gddlRating,
-      level?.gddlData?.rating,
-      level?.gddlPositionType === "ranking" ? null : level?.gddlPosition,
-    ))
-    .filter(rating => rating != null && rating > targetRating);
-  return aheadByRating.length + 1;
+  function levelDifficulty(level) {
+    return normalizeDifficulty(
+      level?.gddlDifficulty ||
+      level?.gddlData?.difficulty ||
+      level?.difficulty
+    );
+  }
+
+  const targetDifficulty = levelDifficulty(gddlLevel);
+  if (!targetDifficulty) return null;
+
+  const sameDifficulty = bufferLevels
+    .filter(level =>
+      level?.id !== excludeId &&
+      levelDifficulty(level) === targetDifficulty
+    )
+    .map((level, index) => ({
+      level,
+      score: firstFiniteNumber(
+        level?.gddlScore,
+        level?.gddlRating,
+        level?.gddlData?.score,
+        level?.gddlData?.rating,
+      ),
+      position: Number(level?.position),
+      index,
+    }))
+    .filter(item => item.score != null && Number.isFinite(item.position) && item.position > 0)
+    .sort((a, b) =>
+      b.score - a.score ||
+      a.position - b.position ||
+      a.index - b.index
+    );
+
+  if (!sameDifficulty.length) return null;
+
+  /*
+   * Insert before the first existing level whose score is <= the new score.
+   * Its current BufferList position is the editable suggestion: writing at
+   * that position shifts it and the following levels down automatically.
+   * Equal scores therefore resolve deterministically before the older entry.
+   */
+  const boundary = sameDifficulty.find(item => item.score <= targetScore);
+  if (boundary) {
+    const isStrictlyAboveTop =
+      boundary === sameDifficulty[0] && targetScore > boundary.score;
+    return Math.max(
+      1,
+      Math.floor(boundary.position) - (isStrictlyAboveTop ? 1 : 0),
+    );
+  }
+
+  const last = sameDifficulty[sameDifficulty.length - 1];
+  return Math.max(1, Math.floor(last.position) + 1);
 }
 
 export function gddlStatusText(level) {
-  const ranking = Number(level?.gddlRanking ??
-    (level?.gddlPositionType === "ranking" ? level?.gddlPosition : null));
-  if (Number.isFinite(ranking)) {
-    return `GDDL · posición #${ranking} · datos encontrados`;
-  }
-  const rating = Number(level?.gddlRating ?? level?.gddlData?.rating ?? level?.gddlPosition);
-  return Number.isFinite(rating)
-    ? `GDDL · rating ${rating.toFixed(2)} · datos encontrados`
+  const score = Number(
+    level?.gddlScore ??
+    level?.gddlRating ??
+    level?.gddlData?.score ??
+    level?.gddlData?.rating
+  );
+  return Number.isFinite(score)
+    ? `GDDL · Score ${score.toFixed(2)} · datos encontrados`
     : "Datos encontrados en GDDL";
 }
