@@ -8,9 +8,28 @@
 const GDDL_API_BASE = "https://gdladder.com/api";
 
 function getPathSegments(req) {
+  /*
+   * Vercel's catch-all query parameter is not stable for this deployment:
+   * production may omit it or let a user query parameter override it.
+   * Parse the request pathname as a compatibility fallback.
+   */
   const raw = req.query?.path;
   const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  return values.map(value => decodeURIComponent(String(value)));
+  if (values.length) {
+    return values.map(value => decodeURIComponent(String(value)));
+  }
+
+  const pathname = new URL(
+    req.url || "",
+    "https://bufferteamdl.vercel.app",
+  ).pathname;
+  const prefix = "/api/gddl/";
+  if (!pathname.startsWith(prefix)) return [];
+  return pathname
+    .slice(prefix.length)
+    .split("/")
+    .filter(Boolean)
+    .map(value => decodeURIComponent(value));
 }
 
 function upstreamPath(segments) {
