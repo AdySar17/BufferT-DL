@@ -215,7 +215,7 @@ function LanguageSelector({ lang, setLang }: { lang: string; setLang: (c: string
 }
 
 /* ─── Tipos para datos en vivo ─── */
-type LiveLevel  = { id: string; name: string; author: string; position: number; value: number; thumbnail?: string; background?: string; glow?: string; video?: string; };
+type LiveLevel  = { id: string; name: string; author: string; position: number; value: number; listType?: string; thumbnail?: string; background?: string; glow?: string; video?: string; };
 type LiveRecord = {
   id: string;
   playerName: string;

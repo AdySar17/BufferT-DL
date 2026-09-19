@@ -504,6 +504,21 @@
         </div>
       </div>
       <div>
+        <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Tier</label>
+        <select id="alTier" class="al-input">
+          <option value="1">Tier 1 — Free Demons (5–100)</option>
+          <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
+          <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
+          <option value="4">Tier 4 — Medium Demon (401–750)</option>
+          <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
+          <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
+          <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
+          <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
+          <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
+          <option value="10" selected>Tier 10 — Extreme Demons (10001–50000)</option>
+        </select>
+      </div>
+      <div>
         <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Dificultad</label>
         <select id="alDifficulty" class="al-input">
           <option value="Extreme Demon">Extreme Demon</option>
@@ -659,7 +674,10 @@
     collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc,
     writeBatch, serverTimestamp, deleteField, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { computePoints } from "/points.js";
+  import {
+    calculateClassicScores, computeTierPoints, DEFAULT_PEMON_TIER, DEFAULT_TIER,
+    resolveTier
+  } from "/points.js";
   import {
     computeLunas, getListType, getNewLevelType, getNewLevelSuffix,
     PEMON_LIST_TYPE, DEMON_LIST_TYPE, NEW_LEVEL_TYPE_PLATFORMER,
@@ -1149,6 +1167,9 @@
     $("alDifficulty").innerHTML = targetListType === PEMON_LIST_TYPE
       ? '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>'
       : '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>';
+    $("alTier").value = targetListType === PEMON_LIST_TYPE
+      ? String(DEFAULT_PEMON_TIER)
+      : String(DEFAULT_TIER);
     const claimedName = rec.claimedLevelName || "";
     $("alName").value       = normalizeNewLevelName(claimedName, claimType);
     $("alAuthor").value     = "";
@@ -1228,7 +1249,9 @@
     const p = Number($("alPosition").value);
     const pemon = alContext?.rec?.listType === PEMON_LIST_TYPE;
     $("alPointsPreview").textContent = (p > 0)
-      ? `${pemon ? "Lunas" : "Puntos"} automáticos: ${pemon ? computeLunas(p) : computePoints(p)} (posición #${p})`
+      ? (pemon
+        ? `Lunas automáticas: ${computeLunas(p)} (posición #${p})`
+        : `Puntos del Tier: ${computeTierPoints(Number($("alTier").value) || DEFAULT_TIER, 1, 1)} máx. (se ajustan según niveles del Tier)`)
       : `${pemon ? "Lunas" : "Puntos"} automáticos: —`;
     const isPemon = alContext?.rec?.listType === PEMON_LIST_TYPE ||
       getNewLevelType(alContext?.rec) === NEW_LEVEL_TYPE_PLATFORMER;
@@ -1256,6 +1279,7 @@
       ? "PemonList ordena los records por tiempo; el porcentaje mínimo no aplica."
       : (locked ? "% mínimo bloqueado para niveles fuera del Top 50." : "");
   });
+  $("alTier").addEventListener("change", () => $("alPosition").dispatchEvent(new Event("input")));
 
   $("alConfirm").onclick = async () => {
     if (!alContext) return;
@@ -1268,6 +1292,7 @@
     const author    = $("alAuthor").value.trim();
     const creators  = $("alCreators").value.split(",").map(s => s.trim()).filter(Boolean);
     const reqPos    = Math.max(1, Math.floor(Number($("alPosition").value) || 0));
+    const tier      = Number($("alTier").value) || DEFAULT_TIER;
     const thumbnail   = $("alThumbnail").value.trim();
     /* Si el staff borró el campo, restaurar automáticamente el URL generado */
     const background  = $("alBackground").value.trim()
@@ -1332,15 +1357,17 @@
       });
 
       const insertAt = Math.min(reqPos, ordered.length + 1);
-      const placeholder = { id: "__NEW__", name, author };
+      const placeholder = { id: "__NEW__", name, author, tier, position: insertAt };
       ordered.splice(insertAt - 1, 0, placeholder);
 
       /* 2) Crear el doc del nivel en su posición pedida */
       const newPos   = insertAt;
-      const newValue = targetListType === PEMON_LIST_TYPE ? computeLunas(newPos) : computePoints(newPos);
+      const newValue = targetListType === PEMON_LIST_TYPE
+        ? computeLunas(newPos)
+        : computeTierPoints(tier, 1, 1);
       const levelDoc = {
         name, author, creators,
-        position: newPos, value: newValue,
+        position: newPos, value: newValue, tier,
         listType: targetListType,
         levelType: claimType,
         thumbnail, background, video,
@@ -1389,16 +1416,38 @@
         console.warn("[panel] auto-banner creation failed:", bannerErr);
       }
 
-      /* 3) Re-shift de las demás posiciones (writeBatch en chunks) */
-      const originalById = new Map(all.map(l => [l.id, { position: l.position, value: l.value }]));
+      /* 3) Re-shift de las demás posiciones y recalcular los puntos
+         dentro de cada Tier (writeBatch en chunks). */
+      const originalById = new Map(all.map(l => [l.id, {
+        position: l.position, value: l.value, tier: l.tier
+      }]));
+      const finalScores = targetListType === PEMON_LIST_TYPE
+        ? null
+        : calculateClassicScores(ordered);
+      const newScore = finalScores?.get(newRef.id);
+      if (newScore) {
+        await updateDoc(doc(db, "levels", newRef.id), {
+          value: newScore.value,
+          tier: newScore.tier
+        });
+      }
       const updates = [];
       ordered.forEach((lvl, i) => {
         if (lvl.id === newRef.id) return;
         const p = i + 1;
-        const v = targetListType === PEMON_LIST_TYPE ? computeLunas(p) : computePoints(p);
+        const score = targetListType === PEMON_LIST_TYPE
+          ? { tier: resolveTier(lvl, DEFAULT_PEMON_TIER), value: computeLunas(p) }
+          : (finalScores.get(lvl.id) || {
+              tier: resolveTier(lvl, DEFAULT_TIER),
+              value: computeTierPoints(DEFAULT_TIER, 1, 1)
+            });
+        const v = score.value;
         const orig = originalById.get(lvl.id) || {};
-        if (Number(orig.position) !== p || Number(orig.value) !== v) {
-          updates.push({ ref: doc(db, "levels", lvl.id), data: { position: p, value: v, listType: targetListType } });
+        if (Number(orig.position) !== p || Number(orig.value) !== v ||
+            Number(orig.tier) !== score.tier) {
+          updates.push({ ref: doc(db, "levels", lvl.id), data: {
+            position: p, value: v, tier: score.tier, listType: targetListType
+          } });
         }
       });
       const CHUNK = 450;
@@ -2012,18 +2061,28 @@
       const total = all.length;
       status.textContent = `Niveles encontrados: ${total}. Calculando…`;
 
+      const classicScores = calculateClassicScores(
+        all.filter(level => getListType(level) !== PEMON_LIST_TYPE)
+      );
       /* Construir la lista de cambios. */
       const changes = [];
       for (const lvl of all) {
         const pos = Number(lvl.position);
         if (!Number.isFinite(pos) || pos < 1) continue; /* sin posición válida */
-        const newVal = getListType(lvl) === PEMON_LIST_TYPE
-          ? computeLunas(pos)
-          : computePoints(pos);
+        const pemon = getListType(lvl) === PEMON_LIST_TYPE;
+        const fallbackTier = pemon ? DEFAULT_PEMON_TIER : DEFAULT_TIER;
+        const score = pemon
+          ? { tier: resolveTier(lvl, fallbackTier), value: computeLunas(pos) }
+          : (classicScores.get(lvl.id) || {
+              tier: resolveTier(lvl, fallbackTier),
+              value: computeTierPoints(fallbackTier, 1, 1)
+            });
+        const newVal = score.value;
+        const newTier = score.tier;
         const oldVal = Number(lvl.value);
-        if (!Number.isFinite(oldVal) || oldVal !== newVal) {
+        if (!Number.isFinite(oldVal) || oldVal !== newVal || Number(lvl.tier) !== newTier) {
           changes.push({
-            id: lvl.id, newVal, oldVal, pos, name: lvl.name,
+            id: lvl.id, newVal, newTier, oldVal, pos, name: lvl.name,
             listType: getListType(lvl)
           });
         }
@@ -2045,6 +2104,7 @@
         const batch = writeBatch(db);
         slice.forEach(c => batch.update(doc(db, "levels", c.id), {
           value: c.newVal,
+          tier: c.newTier,
           listType: c.listType || DEMON_LIST_TYPE
         }));
         await batch.commit();

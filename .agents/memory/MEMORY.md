@@ -1,1 +1,2 @@
 - [Firebase Auth bootstrap](firebase-auth-bootstrap.md) — keep auth imports canonical and resolve persistence/redirect before the first auth-state decision.
+- [Tier scoring compatibility](tier-scoring-compatibility.md) — Tier points use each Tier’s range and intra-Tier order; legacy levels infer their Tier from stored value.

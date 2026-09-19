@@ -814,6 +814,18 @@
       <div id="inp-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
         Puntos automáticos: —
       </div>
+      <select id="inp-tier" aria-label="Tier del nivel">
+        <option value="1">Tier 1 — Free Demons (5–100)</option>
+        <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
+        <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
+        <option value="4">Tier 4 — Medium Demon (401–750)</option>
+        <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
+        <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
+        <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
+        <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
+        <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
+        <option value="10" selected>Tier 10 — Extreme Demons (10001–50000)</option>
+      </select>
       <input id="inp-thumbnail"  placeholder="URL Thumbnail">
       <input id="inp-background" placeholder="URL Fondo de la card">
       <input id="inp-video"      placeholder="URL Video">
@@ -933,6 +945,18 @@
       <div id="edit-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
         Puntos automáticos: —
       </div>
+      <select id="edit-tier" aria-label="Tier del nivel">
+        <option value="1">Tier 1 — Free Demons (5–100)</option>
+        <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
+        <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
+        <option value="4">Tier 4 — Medium Demon (401–750)</option>
+        <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
+        <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
+        <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
+        <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
+        <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
+        <option value="10">Tier 10 — Extreme Demons (10001–50000)</option>
+      </select>
       <input id="edit-thumbnail"  placeholder="URL Thumbnail">
       <input id="edit-background" placeholder="URL Fondo de la card">
       <input id="edit-video"      placeholder="URL Video">
@@ -1094,7 +1118,7 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-    import { computePoints } from "/points.js";
+    import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier } from "/points.js";
     import { isDemon, DEMON_LIST_TYPE } from "/list-utils.js";
     import { difficultyImage } from "/difficulty.js";
     import {
@@ -1236,15 +1260,22 @@
        devuelve sólo los que cambiaron respecto al estado original. */
     function diffReorder(originalById, finalOrder) {
       const updates = [];
+      const scoreById = calculateClassicScores(finalOrder);
       finalOrder.forEach((lvl, i) => {
         const newPos    = i + 1;
-        const newValue  = computePoints(newPos);
+        const score      = scoreById.get(lvl.id) || {
+          tier: resolveTier(lvl, DEFAULT_TIER),
+          value: computeTierPoints(DEFAULT_TIER, 1, 1)
+        };
+        const newValue  = score.value;
         const original  = originalById.get(lvl.id) || {};
-        if (Number(original.position) !== newPos || Number(original.value) !== newValue) {
+        if (Number(original.position) !== newPos ||
+            Number(original.value) !== newValue ||
+            Number(original.tier) !== score.tier) {
           updates.push({
             id:   lvl.id,
             ref:  doc(db, "levels", lvl.id),
-            data: { position: newPos, value: newValue },
+            data: { position: newPos, value: newValue, tier: score.tier },
             oldPosition: Number(original.position) || null,
             newPosition: newPos
           });
@@ -1282,7 +1313,7 @@
           <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Extreme Demon'}">
           <div class="level-info">
             <div class="level-title">#${pos} - ${nivel.name}</div>
-            <div class="level-author">By ${nivel.author} · ${nivel.value || computePoints(pos)} pts</div>
+            <div class="level-author">By ${nivel.author} · ${nivel.value || "—"} pts · Tier ${resolveTier(nivel)}</div>
             <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
           </div>
         </div>
@@ -1494,21 +1525,24 @@
     }
 
     /* Preview de puntos en vivo cuando se escribe la posición */
-    function bindPointsPreview(inpId, previewId) {
+    function bindPointsPreview(inpId, previewId, tierId) {
       const inp = document.getElementById(inpId);
       const out = document.getElementById(previewId);
+      const tierInp = document.getElementById(tierId);
       const upd = () => {
         const p = Number(inp.value);
+        const tier = Number(tierInp.value) || DEFAULT_TIER;
         out.textContent = p > 0
-          ? `Puntos automáticos: ${computePoints(p)} (posición #${p})`
+          ? `Puntos del Tier: ${computeTierPoints(tier, 1, 1)} máx. (se ajustan según niveles del Tier)`
           : "Puntos automáticos: —";
       };
       inp.addEventListener("input", upd);
       inp.addEventListener("focus", upd);
+      tierInp.addEventListener("change", upd);
       return upd;
     }
-    bindPointsPreview("inp-position",  "inp-points-preview");
-    bindPointsPreview("edit-position", "edit-points-preview");
+    bindPointsPreview("inp-position",  "inp-points-preview",  "inp-tier");
+    bindPointsPreview("edit-position", "edit-points-preview", "edit-tier");
 
     /* ── MIN % SOLO PARA TOP 50 ──────────────────────────────────
        Si la posición es > 50, el campo minPercent se bloquea a 100
@@ -1560,6 +1594,7 @@
          que los usuarios reclamen este nivel como "Nuevo" en submit. */
       const gdLevelId  = document.getElementById("inp-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("inp-position").value) || 0));
+      const tier       = Number(document.getElementById("inp-tier").value) || DEFAULT_TIER;
       const thumbnail  = document.getElementById("inp-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("inp-background").value.trim()
@@ -1586,14 +1621,15 @@
         const originalById = new Map(allLvls.map(l => [l.id, { position: l.position, value: l.value }]));
         const ordered      = ordenarNiveles(allLvls);
         const insertAt     = Math.min(reqPos, ordered.length + 1);
-        const placeholder  = { id: "__NEW__", name, author };
+        const placeholder  = { id: "__NEW__", name, author, tier, position: insertAt };
         ordered.splice(insertAt - 1, 0, placeholder);
 
         /* 2. Crear el doc en Firestore con la posición y value calculados */
         const newPos   = insertAt;
-        const newValue = computePoints(newPos);
+        const newValue = calculateClassicScores([{ id: "__NEW__", position: newPos, tier }])
+          .get("__NEW__").value;
         const _addPayload = {
-          name, author, creators, position: newPos, value: newValue,
+          name, author, creators, position: newPos, value: newValue, tier,
           listType: DEMON_LIST_TYPE,
           thumbnail, background, video, glow, is2P,
           description, difficulty, minPercent, tags,
@@ -1605,6 +1641,12 @@
         placeholder.id = newRef.id;
 
         /* 3. Reordenar y persistir cambios de los demás (shift down) */
+        const finalScores = calculateClassicScores(ordered);
+        const newScore = finalScores.get(newRef.id);
+        await updateDoc(doc(db, "levels", newRef.id), {
+          value: newScore?.value || newValue,
+          tier: newScore?.tier || tier
+        });
         const updates = diffReorder(originalById, ordered).filter(u => u.id !== newRef.id);
         await commitInChunks(updates);
 
@@ -1781,6 +1823,7 @@
                                                           : (nivel.creators || "");
       document.getElementById("edit-gdLevelId").value  = nivel.gdLevelId  || "";
       document.getElementById("edit-position").value   = nivel.position   || "";
+      document.getElementById("edit-tier").value       = String(resolveTier(nivel, DEFAULT_TIER));
       document.getElementById("edit-thumbnail").value  = nivel.thumbnail || "";
       /* Background Level: custom > auto-generado desde gdLevelId */
       _editPrevGdId = (nivel.gdLevelId || "").trim();
@@ -1803,7 +1846,7 @@
       setTags("edit", existingTags);
       document.getElementById("edit-points-preview").textContent =
         nivel.position
-          ? `Puntos automáticos: ${computePoints(nivel.position)} (posición #${nivel.position})`
+          ? `Puntos del Tier: ${computeTierPoints(resolveTier(nivel), 1, 1)} máx. (se ajustan según niveles del Tier)`
           : "Puntos automáticos: —";
       /* Aplicar bloqueo de min% según la posición actual */
       document.getElementById("edit-position").dispatchEvent(new Event("input"));
@@ -1851,6 +1894,7 @@
                             .split(",").map(s => s.trim()).filter(Boolean);
       const gdLevelId  = document.getElementById("edit-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("edit-position").value) || 0));
+      const tier       = Number(document.getElementById("edit-tier").value) || DEFAULT_TIER;
       const thumbnail  = document.getElementById("edit-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("edit-background").value.trim()
@@ -1879,11 +1923,12 @@
         const positionChanged = oldPos !== reqPos;
 
         /* 1. Si SÓLO cambian campos no-posicionales: update simple, sin historial */
-        if (!positionChanged) {
+        const tierChanged = resolveTier(original, DEFAULT_TIER) !== tier;
+        if (!positionChanged && !tierChanged) {
           const _editPayload = {
             name, author, creators, thumbnail, background, video, glow, is2P,
             listType: DEMON_LIST_TYPE,
-            description, difficulty, minPercent, tags,
+            description, difficulty, minPercent, tags, tier,
             gdLevelId: gdLevelId ? String(gdLevelId) : "",
             rewards: _editSelectedRewards,
             customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
@@ -1895,18 +1940,21 @@
         }
 
         /* 2. Cambia posición → reorganizar todos */
-        const originalById = new Map(allLvls.map(l => [l.id, { position: l.position, value: l.value }]));
+        const originalById = new Map(allLvls.map(l => [l.id, {
+          position: l.position, value: l.value, tier: l.tier
+        }]));
         const ordered      = ordenarNiveles(allLvls).filter(l => l.id !== id);
         const insertAt     = Math.min(reqPos, ordered.length + 1);
-        const movingLevel  = { ...original, name, author };
+        const movingLevel  = { ...original, name, author, tier, position: insertAt };
         ordered.splice(insertAt - 1, 0, movingLevel);
 
         /* Persistir el doc movido con todos sus campos editados + nueva pos/value */
-        const newValue = computePoints(insertAt);
+        const scoreById = calculateClassicScores(ordered);
+        const newValue = scoreById.get(id)?.value || computeTierPoints(tier, 1, 1);
         await updateDoc(doc(db, "levels", id), {
           name, author, creators, thumbnail, background, video, glow, is2P,
           listType: DEMON_LIST_TYPE,
-          description, difficulty, minPercent, tags,
+          description, difficulty, minPercent, tags, tier,
           gdLevelId: gdLevelId ? String(gdLevelId) : "",
           rewards: _editSelectedRewards,
           customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status })),

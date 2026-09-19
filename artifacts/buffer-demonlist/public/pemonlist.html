@@ -814,6 +814,18 @@
       <div id="inp-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
         Lunas automáticas: —
       </div>
+      <select id="inp-tier" aria-label="Tier del nivel">
+        <option value="1" selected>Tier 1 — Free Demons (5–100)</option>
+        <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
+        <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
+        <option value="4">Tier 4 — Medium Demon (401–750)</option>
+        <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
+        <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
+        <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
+        <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
+        <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
+        <option value="10">Tier 10 — Extreme Demons (10001–50000)</option>
+      </select>
       <input id="inp-thumbnail"  placeholder="URL Thumbnail">
       <input id="inp-background" placeholder="URL Fondo de la card">
       <input id="inp-video"      placeholder="URL Video">
@@ -932,6 +944,18 @@
       <div id="edit-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
         Lunas automáticas: —
       </div>
+      <select id="edit-tier" aria-label="Tier del nivel">
+        <option value="1">Tier 1 — Free Demons (5–100)</option>
+        <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
+        <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
+        <option value="4">Tier 4 — Medium Demon (401–750)</option>
+        <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
+        <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
+        <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
+        <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
+        <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
+        <option value="10">Tier 10 — Extreme Demons (10001–50000)</option>
+      </select>
       <input id="edit-thumbnail"  placeholder="URL Thumbnail">
       <input id="edit-background" placeholder="URL Fondo de la card">
       <input id="edit-video"      placeholder="URL Video">
@@ -1093,6 +1117,7 @@
   <script type="module">
     import { db } from "/auth.js";
     import { computeLunas } from "/list-utils.js";
+    import { DEFAULT_PEMON_TIER, resolveTier } from "/points.js";
     import { isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
     import { difficultyImage } from "/difficulty.js";
     import {
@@ -1239,12 +1264,18 @@
       finalOrder.forEach((lvl, i) => {
         const newPos    = i + 1;
         const newValue  = computeLunas(newPos);
+        const newTier   = resolveTier(lvl, DEFAULT_PEMON_TIER);
         const original  = originalById.get(lvl.id) || {};
-        if (Number(original.position) !== newPos || Number(original.value) !== newValue) {
+        if (Number(original.position) !== newPos ||
+            Number(original.value) !== newValue ||
+            Number(original.tier) !== newTier) {
           updates.push({
             id:   lvl.id,
             ref:  doc(db, "levels", lvl.id),
-            data: { position: newPos, value: newValue, listType: PEMON_LIST_TYPE },
+            data: {
+              position: newPos, value: newValue, tier: newTier,
+              listType: PEMON_LIST_TYPE
+            },
             oldPosition: Number(original.position) || null,
             newPosition: newPos
           });
@@ -1526,6 +1557,7 @@
     function bindPointsPreview(inpId, previewId) {
       const inp = document.getElementById(inpId);
       const out = document.getElementById(previewId);
+      const tierInp = document.getElementById(inpId.replace("position", "tier"));
       const upd = () => {
         const p = Number(inp.value);
         out.textContent = p > 0
@@ -1534,6 +1566,7 @@
       };
       inp.addEventListener("input", upd);
       inp.addEventListener("focus", upd);
+      tierInp.addEventListener("change", upd);
       return upd;
     }
     bindPointsPreview("inp-position",  "inp-points-preview");
@@ -1565,6 +1598,7 @@
          que los usuarios reclamen este nivel como "Nuevo" en submit. */
       const gdLevelId  = document.getElementById("inp-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("inp-position").value) || 0));
+      const tier       = Number(document.getElementById("inp-tier").value) || DEFAULT_PEMON_TIER;
       const thumbnail  = document.getElementById("inp-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("inp-background").value.trim()
@@ -1593,7 +1627,7 @@
         const newPos   = insertAt;
         const newValue = computeLunas(newPos);
         const _addPayload = {
-          name, author, creators, position: newPos, value: newValue,
+          name, author, creators, position: newPos, value: newValue, tier,
           listType: PEMON_LIST_TYPE,
           thumbnail, background, video, glow, is2P,
            description, difficulty, tags,
@@ -1802,6 +1836,7 @@
                                                           : (nivel.creators || "");
       document.getElementById("edit-gdLevelId").value  = nivel.gdLevelId  || "";
       document.getElementById("edit-position").value   = nivel.position   || "";
+      document.getElementById("edit-tier").value       = String(resolveTier(nivel, DEFAULT_PEMON_TIER));
       document.getElementById("edit-thumbnail").value  = nivel.thumbnail || "";
       /* Background Level: custom > auto-generado desde gdLevelId */
       _editPrevGdId = (nivel.gdLevelId || "").trim();
@@ -1870,6 +1905,7 @@
                             .split(",").map(s => s.trim()).filter(Boolean);
       const gdLevelId  = document.getElementById("edit-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("edit-position").value) || 0));
+      const tier       = Number(document.getElementById("edit-tier").value) || DEFAULT_PEMON_TIER;
       const thumbnail  = document.getElementById("edit-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("edit-background").value.trim()
@@ -1897,7 +1933,7 @@
           const _editPayload = {
             name, author, creators, thumbnail, background, video, glow, is2P,
             listType: PEMON_LIST_TYPE,
-             description, difficulty, tags,
+             description, difficulty, tags, tier,
              minPercent: deleteField(),
             gdLevelId: gdLevelId ? String(gdLevelId) : "",
             rewards: _editSelectedRewards,
@@ -1910,10 +1946,12 @@
         }
 
         /* 2. Cambia posición → reorganizar todos */
-        const originalById = new Map(allLvls.map(l => [l.id, { position: l.position, value: l.value }]));
+        const originalById = new Map(allLvls.map(l => [l.id, {
+          position: l.position, value: l.value, tier: l.tier
+        }]));
         const ordered      = ordenarNiveles(allLvls).filter(l => l.id !== id);
         const insertAt     = Math.min(reqPos, ordered.length + 1);
-        const movingLevel  = { ...original, name, author };
+        const movingLevel  = { ...original, name, author, tier, position: insertAt };
         ordered.splice(insertAt - 1, 0, movingLevel);
 
         /* Persistir el doc movido con todos sus campos editados + nueva pos/value */
@@ -1921,7 +1959,7 @@
         await updateDoc(doc(db, "levels", id), {
           name, author, creators, thumbnail, background, video, glow, is2P,
           listType: PEMON_LIST_TYPE,
-           description, difficulty, tags,
+           description, difficulty, tags, tier,
            minPercent: deleteField(),
           gdLevelId: gdLevelId ? String(gdLevelId) : "",
           rewards: _editSelectedRewards,

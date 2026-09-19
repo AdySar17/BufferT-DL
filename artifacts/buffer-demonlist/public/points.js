@@ -1,101 +1,101 @@
 /* ============================================================
- *  BFT Demon List — Cálculo automático de puntos por posición
+ *  BFT Demon List — puntuación por Tier
  *
- *  Curva (piecewise log-lineal) — versión "exclusiva top":
- *    Anclas (posición → puntos):
- *
- *       Pos     Puntos
- *       1       50000
- *       2       47500
- *       3       45500
- *       5       42500
- *       10      38000
- *       25      27000      ← caída extrema 1-25
- *       50      18000
- *       75      13500
- *       100     10000      ← caída fuerte 25-100
- *       150      8200
- *       200      7000
- *       300      5600
- *       500      4200      ← caída media-fuerte 100-500
- *       750      3200
- *       1000     2500      ← caída media 500-1000
- *       1500     1800
- *       2000     1300
- *       3000      850      ← caída media-suave 1000-3000
- *       4000      500
- *       5000      300
- *       6000      180      ← caída baja 3000-6000
- *       7000      100
- *       8000       45
- *       9000       15
- *       10000       5      ← caída muy baja pero constante 6000-10000
- *
- *    Entre dos anclas (p1 → v1) y (p2 → v2) interpolamos
- *    LINEALMENTE en escala log(p):
- *
- *        t = (ln(p) - ln(p1)) / (ln(p2) - ln(p1))
- *        v = v1 + (v2 - v1) * t
- *
- *    Caída suave dentro de cada tramo, monótona decreciente, sin
- *    saltos en las anclas.
- *
- *  Garantías:
- *    • computePoints(1)     = 50000
- *    • computePoints(10000) = 5
- *    • Nunca devuelve negativos.
- *    • Mejor posición ⇒ más puntos (orden estricto).
- *    • Redondeo a máximo 1 decimal.
- *    • Las posiciones > 10000 quedan congeladas en 5.
+ *  Cada Tier tiene su propio rango de puntos y su propia curva.
+ *  Dentro de un Tier, los niveles se ordenan por posición global:
+ *  el primero recibe el máximo y el último el mínimo.
  * ============================================================ */
 
-/* (posición, puntos) — DEBEN estar ordenadas por posición ascendente
- * y por puntos descendente. */
-const ANCHORS = [
-  [     1, 50000],
-  [     5, 42500],
-  [    25, 20000],
-  [    75,  7500],
-  [   150,  4000],
-  [   300,  1000],
-  [   600,   800],
-  [  1000,   500],
-  [  3000,   250],
-  [  6000,   100],
-  [  7500,    50],
-  [ 10000,     5],
+export const TIERS = [
+  { id: 1,  label: "Free Demons",                         min: 5,     max: 100,   curve: 0.72 },
+  { id: 2,  label: "Mid Easy Demons",                     min: 101,   max: 200,   curve: 0.78 },
+  { id: 3,  label: "Easy Demon → Free Medium Demon",      min: 201,   max: 400,   curve: 0.84 },
+  { id: 4,  label: "Medium Demon",                        min: 401,   max: 750,   curve: 0.90 },
+  { id: 5,  label: "Easy Hard Demon",                     min: 751,   max: 1400,  curve: 0.96 },
+  { id: 6,  label: "Very Hard Demon",                     min: 1401,  max: 2500,  curve: 1.02 },
+  { id: 7,  label: "Easy Insane Demon",                   min: 2501,  max: 5000,  curve: 1.08 },
+  { id: 8,  label: "Insane Demon",                        min: 5001,  max: 7500,  curve: 1.16 },
+  { id: 9,  label: "Hard Insane Demon → Easy Extreme Demon", min: 7501, max: 10000, curve: 1.28 },
+  { id: 10, label: "Extreme Demons",                      min: 10001, max: 50000, curve: 1.42 },
 ];
 
-export const TOP_POINTS    = ANCHORS[0][1];                  // 50000
-export const BOTTOM_POINTS = ANCHORS[ANCHORS.length - 1][1]; //     5
-export const MAX_POSITIONS = ANCHORS[ANCHORS.length - 1][0]; // 10000
+export const DEFAULT_TIER = 10;
+export const DEFAULT_PEMON_TIER = 1;
 
-function round1(v) {
-  /* Máximo 1 decimal, nunca negativo. */
-  if (!Number.isFinite(v) || v <= 0) return 0;
-  return Math.round(v * 10) / 10;
+const TIER_MAP = new Map(TIERS.map(tier => [tier.id, tier]));
+
+export function normalizeTier(value) {
+  const tier = Number(value);
+  return Number.isInteger(tier) && TIER_MAP.has(tier) ? tier : null;
 }
 
-export function computePoints(position) {
-  const p = Number(position);
-  if (!Number.isFinite(p) || p < 1) return 0;
-  if (p >= MAX_POSITIONS) return BOTTOM_POINTS;
+export function getTier(tier) {
+  return TIER_MAP.get(normalizeTier(tier) || DEFAULT_TIER);
+}
 
-  /* Buscar el tramo [p1, p2] que contiene p. */
-  for (let i = 1; i < ANCHORS.length; i++) {
-    const [p1, v1] = ANCHORS[i - 1];
-    const [p2, v2] = ANCHORS[i];
-    if (p <= p2) {
-      if (p === p1) return round1(v1);
-      if (p === p2) return round1(v2);
-      const lp = Math.log(p);
-      const l1 = Math.log(p1);
-      const l2 = Math.log(p2);
-      const t  = (lp - l1) / (l2 - l1);
-      return round1(v1 + (v2 - v1) * t);
-    }
+export function inferTierFromValue(value, fallback = DEFAULT_TIER) {
+  const points = Number(value);
+  if (Number.isFinite(points)) {
+    const match = TIERS.find(tier => points >= tier.min && points <= tier.max);
+    if (match) return match.id;
   }
-  return BOTTOM_POINTS;
+  return normalizeTier(fallback) || DEFAULT_TIER;
 }
 
-/* Sin export default a propósito: usar imports nombrados. */
+export function resolveTier(level, fallback = DEFAULT_TIER) {
+  return normalizeTier(level?.tier) || inferTierFromValue(level?.value, fallback);
+}
+
+function round1(value) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Calcula el valor de un nivel dentro de su Tier.
+ * tierPosition es 1-indexed y tierCount es la cantidad total del Tier.
+ */
+export function computeTierPoints(tier, tierPosition = 1, tierCount = 1) {
+  const definition = getTier(tier);
+  const count = Math.max(1, Math.floor(Number(tierCount) || 1));
+  const rank = Math.min(count, Math.max(1, Math.floor(Number(tierPosition) || 1)));
+  const progress = count === 1 ? 0 : (rank - 1) / (count - 1);
+  const curvedProgress = Math.pow(progress, definition.curve);
+  return round1(definition.max - (definition.max - definition.min) * curvedProgress);
+}
+
+/**
+ * Devuelve los valores Classic calculados para un conjunto de niveles.
+ * Los niveles sin tier conservan compatibilidad mediante su valor anterior.
+ */
+export function calculateClassicScores(levels) {
+  const groups = new Map();
+  levels.forEach((level, index) => {
+    const tier = resolveTier(level);
+    if (!groups.has(tier)) groups.set(tier, []);
+    groups.get(tier).push({ level, index, tier });
+  });
+
+  const result = new Map();
+  groups.forEach((items, tier) => {
+    items.sort((a, b) => {
+      const positionA = Number(a.level.position);
+      const positionB = Number(b.level.position);
+      const validA = Number.isFinite(positionA) && positionA > 0;
+      const validB = Number.isFinite(positionB) && positionB > 0;
+      if (validA && validB && positionA !== positionB) return positionA - positionB;
+      if (validA !== validB) return validA ? -1 : 1;
+      return a.index - b.index;
+    });
+    items.forEach((entry, index) => {
+      result.set(entry.level.id, {
+        tier,
+        value: computeTierPoints(tier, index + 1, items.length),
+      });
+    });
+  });
+  return result;
+}
+
+/* Alias descriptivo para código que necesita recalcular una lista Classic. */
+export const calculateTierScores = calculateClassicScores;
