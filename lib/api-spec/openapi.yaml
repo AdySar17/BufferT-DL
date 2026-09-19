@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: gddl
+    description: Public read-only proxy for the official GDDL API
 paths:
   /healthz:
     get:
@@ -24,6 +26,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /gddl/tags:
+    get:
+      operationId: getGddlTags
+      tags: [gddl]
+      summary: Get GDDL tags
+      responses:
+        "200":
+          description: GDDL tag data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+  /gddl/levels:
+    get:
+      operationId: searchGddlLevels
+      tags: [gddl]
+      summary: Search levels in GDDL
+      parameters:
+        - name: name
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 25 }
+      responses:
+        "200":
+          description: GDDL search response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /gddl/levels/{levelId}:
+    get:
+      operationId: getGddlLevel
+      tags: [gddl]
+      summary: Get a level from GDDL
+      parameters:
+        - name: levelId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: GDDL level data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /gddl/levels/{levelId}/tags:
+    get:
+      operationId: getGddlLevelTags
+      tags: [gddl]
+      summary: Get tags assigned to a GDDL level
+      parameters:
+        - name: levelId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: GDDL level tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
 components:
   schemas:
     HealthStatus:

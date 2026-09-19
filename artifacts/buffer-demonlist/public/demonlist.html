@@ -811,11 +811,13 @@
       <input id="inp-creators"   placeholder="Creadores (separados por coma)">
       <div style="display:flex;gap:7px;align-items:stretch;">
         <input id="inp-gdLevelId"  placeholder="ID de Geometry Dash (único, evita reclamos duplicados)" inputmode="numeric" maxlength="20" style="flex:1;">
-        <button type="button" id="inp-aredl-lookup" style="white-space:nowrap;border:1px solid rgba(199,255,59,.35);border-radius:8px;background:rgba(199,255,59,.1);color:#c7ff3b;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;">AREDl</button>
+        <button type="button" id="inp-aredl-lookup" style="white-space:nowrap;border:1px solid rgba(199,255,59,.35);border-radius:8px;background:rgba(199,255,59,.1);color:#c7ff3b;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;">Autocompletar</button>
       </div>
       <div id="inp-aredl-status" style="font-size:.72rem;color:rgba(230,230,230,.55);text-align:left;min-height:15px;"></div>
       <input type="hidden" id="inp-aredl-id">
       <input type="hidden" id="inp-aredl-position">
+      <input type="hidden" id="inp-gddl-id">
+      <input type="hidden" id="inp-gddl-position">
       <input id="inp-position"   placeholder="Posición (1 = top)" type="number" min="1">
       <div id="inp-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
         Puntos automáticos: —
@@ -948,11 +950,13 @@
       <input id="edit-creators"   placeholder="Creadores (separados por coma)">
       <div style="display:flex;gap:7px;align-items:stretch;">
         <input id="edit-gdLevelId"  placeholder="ID de Geometry Dash (único, evita reclamos duplicados)" inputmode="numeric" maxlength="20" style="flex:1;">
-        <button type="button" id="edit-aredl-lookup" style="white-space:nowrap;border:1px solid rgba(199,255,59,.35);border-radius:8px;background:rgba(199,255,59,.1);color:#c7ff3b;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;">AREDl</button>
+        <button type="button" id="edit-aredl-lookup" style="white-space:nowrap;border:1px solid rgba(199,255,59,.35);border-radius:8px;background:rgba(199,255,59,.1);color:#c7ff3b;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;">Autocompletar</button>
       </div>
       <div id="edit-aredl-status" style="font-size:.72rem;color:rgba(230,230,230,.55);text-align:left;min-height:15px;"></div>
       <input type="hidden" id="edit-aredl-id">
       <input type="hidden" id="edit-aredl-position">
+      <input type="hidden" id="edit-gddl-id">
+      <input type="hidden" id="edit-gddl-position">
       <input id="edit-position"   placeholder="Posición (1 = top)" type="number" min="1">
       <div id="edit-points-preview" style="font-size:.85rem;color:#9bdc4d;margin:-6px 0 8px 4px;">
         Puntos automáticos: —
@@ -1132,6 +1136,7 @@
     import { db } from "/auth.js";
     import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
+    import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
     import { isDemon, DEMON_LIST_TYPE } from "/list-utils.js";
     import { difficultyImage } from "/difficulty.js";
     import {
@@ -1162,6 +1167,7 @@
     let _allBannersCache     = null;
     let _editSelectedRewards = [];
     let _inpSelectedRewards  = [];
+    const _sourceMetadata = { inp: null, edit: null };
 
     /* ===== Custom IDs state ===== */
     let _inpCustomIds  = [];
@@ -1567,24 +1573,29 @@
       status.style.color = isError ? "#ff9a9a" : "#9bdc4d";
     }
 
-    function isExtremeForm(prefix) {
-      return document.getElementById(`${prefix}-difficulty`)?.value === "Extreme Demon";
+    function sourceForForm(prefix) {
+      const difficulty = document.getElementById(`${prefix}-difficulty`)?.value;
+      return difficulty === "Extreme Demon" ? "aredl"
+        : ["Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon"].includes(difficulty)
+          ? "gddl" : "";
     }
 
     function updateAredlButton(prefix) {
       const button = document.getElementById(`${prefix}-aredl-lookup`);
       if (!button) return;
-      const enabled = isExtremeForm(prefix);
+      const source = sourceForForm(prefix);
+      const enabled = !!source;
       button.disabled = !enabled;
       button.style.opacity = enabled ? "1" : ".4";
       button.title = enabled
-        ? "Consultar datos actuales en AREDL V2"
-        : "Disponible sólo para Extreme Demon";
+        ? `Consultar datos actuales en ${source === "aredl" ? "AREDL V2" : "GDDL"}`
+        : "Disponible para Demon y dificultad compatible";
     }
 
     async function fillAredlForm(prefix, excludeId = "") {
-      if (!isExtremeForm(prefix)) {
-        setAredlStatus(prefix, "La integración sólo aplica a Extreme Demon.", true);
+      const source = sourceForForm(prefix);
+      if (!source) {
+        setAredlStatus(prefix, "Selecciona una dificultad Demon compatible.", true);
         return;
       }
       const requestNumber = ++aredlRequestNumber;
@@ -1592,16 +1603,22 @@
       const name = document.getElementById(`${prefix}-name`).value.trim();
       const button = document.getElementById(`${prefix}-aredl-lookup`);
       if (button) button.disabled = true;
-      setAredlStatus(prefix, "Consultando AREDL V2…");
+      setAredlStatus(prefix, `Consultando ${source === "aredl" ? "AREDL V2" : "GDDL"}…`);
 
       try {
-        const level = await lookupAredlLevel({ gdLevelId, name });
+        const level = source === "aredl"
+          ? await lookupAredlLevel({ gdLevelId, name })
+          : await lookupGddlLevel({ gdLevelId, name });
         const allLevels = await fetchAllLevels();
-        const existingExtreme = allLevels.filter(item =>
+        const existing = allLevels.filter(item =>
           item.id !== excludeId &&
-          (item.difficulty || "Extreme Demon") === "Extreme Demon"
+          (source === "aredl"
+            ? (item.difficulty || "Extreme Demon") === "Extreme Demon"
+            : ["Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon"].includes(item.difficulty))
         );
-        const suggestedPosition = await suggestBufferPosition(level, existingExtreme, excludeId);
+        const suggestedPosition = source === "aredl"
+          ? await suggestBufferPosition(level, existing, excludeId)
+          : suggestGddlBufferPosition(level, existing, excludeId);
         if (requestNumber !== aredlRequestNumber) return;
 
         aredlApplying = true;
@@ -1609,12 +1626,16 @@
         document.getElementById(`${prefix}-author`).value = level.author || "";
         document.getElementById(`${prefix}-creators`).value = level.creators.join(", ");
         document.getElementById(`${prefix}-description`).value = level.description || "";
-        document.getElementById(`${prefix}-video`).value = level.video || "";
-        document.getElementById(`${prefix}-thumbnail`).value = level.thumbnail || "";
+        /* Nunca se toca el video/record existente. La miniatura sí puede
+           venir del showcase de YouTube de la fuente. */
+        if (level.thumbnail) document.getElementById(`${prefix}-thumbnail`).value = level.thumbnail;
         document.getElementById(`${prefix}-is2P`).checked = !!level.twoPlayer;
         document.getElementById(`${prefix}-gdLevelId`).value = level.gdLevelId || gdLevelId;
         document.getElementById(`${prefix}-aredl-id`).value = level.aredlId || "";
         document.getElementById(`${prefix}-aredl-position`).value = level.aredlPosition || "";
+        document.getElementById(`${prefix}-gddl-id`).value = level.gddlId || "";
+        document.getElementById(`${prefix}-gddl-position`).value = level.gddlPosition || "";
+        _sourceMetadata[prefix] = level.gddlData || null;
         setTags(prefix, level.tags);
         if (suggestedPosition) {
           document.getElementById(`${prefix}-position`).value = suggestedPosition;
@@ -1623,11 +1644,11 @@
         aredlApplying = false;
         setAredlStatus(
           prefix,
-          `${aredlStatusText(level)}${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
+          `${source === "aredl" ? aredlStatusText(level) : gddlStatusText(level)}${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
         );
       } catch (error) {
         aredlApplying = false;
-        setAredlStatus(prefix, error.message || "No se pudieron consultar los datos de AREDL.", true);
+        setAredlStatus(prefix, error.message || `No se pudieron consultar los datos de ${source.toUpperCase()}.`, true);
       } finally {
         updateAredlButton(prefix);
       }
@@ -1644,9 +1665,12 @@
       const nameInput = document.getElementById(`${prefix}-name`);
       difficulty.addEventListener("change", () => {
         updateAredlButton(prefix);
-        if (!isExtremeForm(prefix)) {
+        if (!sourceForForm(prefix)) {
           document.getElementById(`${prefix}-aredl-id`).value = "";
           document.getElementById(`${prefix}-aredl-position`).value = "";
+          document.getElementById(`${prefix}-gddl-id`).value = "";
+          document.getElementById(`${prefix}-gddl-position`).value = "";
+          _sourceMetadata[prefix] = null;
           setAredlStatus(prefix, "");
         }
       });
@@ -1655,11 +1679,14 @@
           if (!aredlApplying) {
             document.getElementById(`${prefix}-aredl-id`).value = "";
             document.getElementById(`${prefix}-aredl-position`).value = "";
+            document.getElementById(`${prefix}-gddl-id`).value = "";
+            document.getElementById(`${prefix}-gddl-position`).value = "";
+            _sourceMetadata[prefix] = null;
             setAredlStatus(prefix, "");
           }
         });
         input.addEventListener("blur", () => {
-          if (prefix === "inp" && isExtremeForm(prefix) && input.value.trim()) {
+          if (prefix === "inp" && sourceForForm(prefix) && input.value.trim()) {
             fillAredlForm(prefix);
           }
         });
@@ -1735,6 +1762,8 @@
       const tags = getTags("inp");
       const aredlId = document.getElementById("inp-aredl-id").value.trim();
       const aredlPosition = Number(document.getElementById("inp-aredl-position").value);
+      const gddlId = document.getElementById("inp-gddl-id").value.trim();
+      const gddlPosition = Number(document.getElementById("inp-gddl-position").value);
 
       if (!name || !author) { alert("Nombre y host son obligatorios."); return; }
       if (!reqPos)           { alert("Debes indicar una posición (≥ 1)."); return; }
@@ -1766,6 +1795,9 @@
         if (Number.isFinite(aredlPosition) && aredlPosition > 0) {
           _addPayload.aredlPosition = aredlPosition;
         }
+        if (gddlId) _addPayload.gddlId = gddlId;
+        if (Number.isFinite(gddlPosition)) _addPayload.gddlPosition = gddlPosition;
+        if (_sourceMetadata.inp) _addPayload.gddlData = _sourceMetadata.inp;
         const newRef   = await addDoc(collection(db, "levels"), _addPayload);
         placeholder.id = newRef.id;
 
@@ -1953,6 +1985,9 @@
       document.getElementById("edit-gdLevelId").value  = nivel.gdLevelId  || "";
       document.getElementById("edit-aredl-id").value    = nivel.aredlId || "";
       document.getElementById("edit-aredl-position").value = nivel.aredlPosition || "";
+      document.getElementById("edit-gddl-id").value = nivel.gddlId || "";
+      document.getElementById("edit-gddl-position").value = nivel.gddlPosition || "";
+      _sourceMetadata.edit = nivel.gddlData || null;
       document.getElementById("edit-position").value   = nivel.position   || "";
       document.getElementById("edit-tier").value       = String(resolveTier(nivel, DEFAULT_TIER));
       document.getElementById("edit-thumbnail").value  = nivel.thumbnail || "";
@@ -1992,12 +2027,14 @@
 
       document.getElementById("editModal").classList.add("open");
       updateAredlButton("edit");
-      if (!nivel.aredlId &&
+      if (!nivel.aredlId && !nivel.gddlId &&
           (nivel.gdLevelId || nivel.name) &&
-          (nivel.difficulty || "Extreme Demon") === "Extreme Demon") {
+          sourceForForm("edit")) {
         fillAredlForm("edit", nivel.id);
       } else if (nivel.aredlPosition) {
         setAredlStatus("edit", `AREDl #${nivel.aredlPosition} · datos guardados`);
+      } else if (nivel.gddlPosition) {
+        setAredlStatus("edit", `GDDL · rating ${Number(nivel.gddlPosition).toFixed(2)} · datos guardados`);
       }
     };
 
@@ -2051,6 +2088,8 @@
       const tags = getTags("edit");
       const aredlId = document.getElementById("edit-aredl-id").value.trim();
       const aredlPosition = Number(document.getElementById("edit-aredl-position").value);
+      const gddlId = document.getElementById("edit-gddl-id").value.trim();
+      const gddlPosition = Number(document.getElementById("edit-gddl-position").value);
 
       if (!name || !author) { alert("Nombre y host son obligatorios."); return; }
       if (!reqPos)           { alert("Debes indicar una posición (≥ 1)."); return; }
@@ -2075,6 +2114,9 @@
             aredlPosition: Number.isFinite(aredlPosition) && aredlPosition > 0
               ? aredlPosition
               : null,
+            gddlId,
+            gddlPosition: Number.isFinite(gddlPosition) ? gddlPosition : null,
+            gddlData: _sourceMetadata.edit,
             rewards: _editSelectedRewards,
             customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
           };
@@ -2105,6 +2147,9 @@
           aredlPosition: Number.isFinite(aredlPosition) && aredlPosition > 0
             ? aredlPosition
             : null,
+          gddlId,
+          gddlPosition: Number.isFinite(gddlPosition) ? gddlPosition : null,
+          gddlData: _sourceMetadata.edit,
           rewards: _editSelectedRewards,
           customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status })),
           position: insertAt, value: newValue
