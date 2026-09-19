@@ -476,7 +476,13 @@
       <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">
         ID de Geometry Dash <span style="text-transform:none; letter-spacing:0; color:rgba(230,230,230,0.5);">(prellenado con el del usuario, edítalo si es incorrecto)</span>
       </label>
-      <input id="alGdLevelId" type="text" inputmode="numeric" maxlength="20" class="al-input" placeholder="Ej: 70682040">
+      <div style="display:flex;gap:7px;align-items:stretch;">
+        <input id="alGdLevelId" type="text" inputmode="numeric" maxlength="20" class="al-input" placeholder="Ej: 70682040" style="flex:1;">
+        <button id="alAredlLookup" type="button" style="white-space:nowrap;border:1px solid rgba(199,255,59,.35);border-radius:8px;background:rgba(199,255,59,.1);color:#c7ff3b;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;">AREDl</button>
+      </div>
+      <div id="alAredlStatus" style="font-size:.72rem;color:rgba(230,230,230,.55);text-align:left;min-height:15px;"></div>
+      <input type="hidden" id="alAredlId">
+      <input type="hidden" id="alAredlPosition">
     </div>
 
     <div style="display:grid; gap:10px;">
@@ -683,6 +689,7 @@
     PEMON_LIST_TYPE, DEMON_LIST_TYPE, NEW_LEVEL_TYPE_PLATFORMER,
     NEW_LEVEL_TYPE_2P, NEW_LEVEL_TYPE_SOLO
   } from "/list-utils.js";
+  import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
 
   const $ = (id) => document.getElementById(id);
   const stateBox = $("stateBox");
@@ -1127,6 +1134,69 @@
     return id ? `https://levelthumbs.prevter.me/thumbnail/${id}` : "";
   }
   let _alPrevGdId = "";
+  let _alAredlApplying = false;
+  let _alAredlRequest = 0;
+
+  function setAlAredlStatus(message, isError = false) {
+    const status = $("alAredlStatus");
+    status.textContent = message;
+    status.style.color = isError ? "#ff9a9a" : "#9bdc4d";
+  }
+
+  async function lookupAlAredl() {
+    const isExtreme = getNewLevelType(alContext?.rec) !== NEW_LEVEL_TYPE_PLATFORMER &&
+      $("alDifficulty").value === "Extreme Demon";
+    if (!isExtreme) {
+      setAlAredlStatus("La integración sólo aplica a Extreme Demon.", true);
+      return;
+    }
+    const requestNumber = ++_alAredlRequest;
+    $("alAredlLookup").disabled = true;
+    setAlAredlStatus("Consultando AREDL V2…");
+    try {
+      const level = await lookupAredlLevel({
+        gdLevelId: $("alGdLevelId").value.trim(),
+        name: $("alName").value.trim()
+      });
+      const snap = await getDocs(collection(db, "levels"));
+      const existingExtreme = [];
+      snap.forEach(item => {
+        const data = { id: item.id, ...item.data() };
+        if (getListType(data) === DEMON_LIST_TYPE &&
+            (data.difficulty || "Extreme Demon") === "Extreme Demon") {
+          existingExtreme.push(data);
+        }
+      });
+      const suggestedPosition = await suggestBufferPosition(level, existingExtreme);
+      if (requestNumber !== _alAredlRequest) return;
+
+      _alAredlApplying = true;
+      $("alName").value = level.name || "";
+      $("alAuthor").value = level.author || "";
+      $("alCreators").value = level.creators.join(", ");
+      $("alDescription").value = level.description || "";
+      $("alTags").value = level.tags.join(", ");
+      $("alVideo").value = level.video || "";
+      $("alThumbnail").value = level.thumbnail || "";
+      $("alGdLevelId").value = level.gdLevelId || $("alGdLevelId").value;
+      $("alAredlId").value = level.aredlId || "";
+      $("alAredlPosition").value = level.aredlPosition || "";
+      if (suggestedPosition) $("alPosition").value = suggestedPosition;
+      _alPrevGdId = $("alGdLevelId").value.trim();
+      if (!$("alBackground").value.trim()) $("alBackground").value = gdBgUrl(_alPrevGdId);
+      $("alPosition").dispatchEvent(new Event("input"));
+      _alAredlApplying = false;
+      setAlAredlStatus(
+        `${aredlStatusText(level)}${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
+      );
+    } catch (error) {
+      _alAredlApplying = false;
+      setAlAredlStatus(error.message || "No se pudieron consultar los datos de AREDL.", true);
+    } finally {
+      $("alAredlLookup").disabled = false;
+    }
+  }
+  $("alAredlLookup").addEventListener("click", lookupAlAredl);
 
   function normalizeNewLevelName(value, type) {
     const baseName = String(value || "")
@@ -1205,11 +1275,19 @@
     $("alDescription").value= "";
     $("alStaffNotes").value = "";
     $("alErr").style.display = "none";
+    $("alAredlId").value = "";
+    $("alAredlPosition").value = "";
+    setAlAredlStatus("");
     $("alPointsPreview").textContent = "Puntos automáticos: —";
     /* Resetear IDs Custom */
     _alCustomIds.length = 0;
     renderAlCustomIds();
     $("alBackdrop").style.display = "flex";
+    if (targetListType === DEMON_LIST_TYPE &&
+        $("alDifficulty").value === "Extreme Demon" &&
+        (rec.claimedLevelId || claimedName)) {
+      setTimeout(lookupAlAredl, 0);
+    }
   }
   function normalizePemonDifficulty(value) {
     const legacy = {
@@ -1243,6 +1321,21 @@
       $("alBackground").value = gdBgUrl(newId);
     }
     _alPrevGdId = newId;
+    if (!_alAredlApplying) {
+      $("alAredlId").value = "";
+      $("alAredlPosition").value = "";
+      setAlAredlStatus("");
+    }
+  });
+  $("alName").addEventListener("input", () => {
+    if (!_alAredlApplying) {
+      $("alAredlId").value = "";
+      $("alAredlPosition").value = "";
+      setAlAredlStatus("");
+    }
+  });
+  $("alDifficulty").addEventListener("change", () => {
+    if ($("alDifficulty").value !== "Extreme Demon") setAlAredlStatus("");
   });
 
   $("alPosition").addEventListener("input", () => {
@@ -1317,6 +1410,8 @@
                           .filter(Boolean)
                           .slice(0, 12);
     const customIds = _alCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }));
+    const aredlId = $("alAredlId").value.trim();
+    const aredlPosition = Number($("alAredlPosition").value);
 
     function showErr(t) { $("alErr").textContent = t; $("alErr").style.display = "block"; }
     $("alErr").style.display = "none";
@@ -1381,6 +1476,10 @@
       /* gdLevelId final: lo que el staff dejó en el input del modal
          (prellenado con rec.claimedLevelId, pero editable). */
       if (finalGdId) levelDoc.gdLevelId = String(finalGdId);
+      if (aredlId) levelDoc.aredlId = aredlId;
+      if (Number.isFinite(aredlPosition) && aredlPosition > 0) {
+        levelDoc.aredlPosition = aredlPosition;
+      }
       const newRef = await addDoc(collection(db, "levels"), levelDoc);
       placeholder.id = newRef.id;
 
