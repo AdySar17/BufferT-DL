@@ -2034,7 +2034,7 @@
       } else if (nivel.aredlPosition) {
         setAredlStatus("edit", `AREDl #${nivel.aredlPosition} · datos guardados`);
       } else if (nivel.gddlPosition) {
-        setAredlStatus("edit", `GDDL · rating ${Number(nivel.gddlPosition).toFixed(2)} · datos guardados`);
+        setAredlStatus("edit", `${gddlStatusText(nivel)} · datos guardados`);
       }
     };
 
