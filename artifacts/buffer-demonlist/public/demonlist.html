@@ -55,8 +55,16 @@
       background: rgba(0,0,0,0.72);
       backdrop-filter: blur(10px);
     }
+    .search-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: min(760px, 94%);
+      margin: 0 auto;
+    }
     #searchBar {
-      width: 80%; max-width: 600px;
+      width: auto; flex: 1; max-width: 600px;
       padding: 12px 18px;
       border-radius: 12px;
       border: 2px solid rgba(255,255,255,0.3);
@@ -68,6 +76,19 @@
       transition: border-color 0.3s;
     }
     #searchBar:focus { border-color: rgba(124,252,0,0.6); }
+    .optimization-button {
+      flex: 0 0 auto;
+      padding: 11px 14px;
+      border: 1px solid rgba(199,255,59,0.4);
+      border-radius: 10px;
+      background: rgba(124,252,0,0.13);
+      color: #dfffbd;
+      font: 700 0.76rem 'Montserrat', sans-serif;
+      letter-spacing: .35px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .optimization-button:hover { background: rgba(124,252,0,0.28); }
 
     /* ===== ADD BUTTON ===== */
     .add-btn {
@@ -314,6 +335,26 @@
       outline: 3px solid rgba(199,255,59,0.9);
       box-shadow: 0 0 34px rgba(124,252,0,0.7);
     }
+    .level-card.optimization-no-background {
+      width: 80%;
+      padding: 12px 18px;
+      min-height: 74px;
+      border: 1px solid rgba(50,120,50,0.35);
+      background: #030703;
+      box-shadow: 0 5px 16px rgba(0,0,0,0.35);
+      transition: transform .2s ease, box-shadow .2s ease, background .25s ease;
+    }
+    .level-card.optimization-no-background:hover,
+    .level-card.optimization-no-background:active,
+    .level-card.optimization-no-background:focus-within {
+      background: linear-gradient(110deg, #061006 0%, #174d1a 48%, #7cfc00 150%);
+      box-shadow: 0 0 24px rgba(124,252,0,0.38);
+      transform: translateY(-1px);
+    }
+    .level-card.optimization-no-background.glow-arcoiris:hover,
+    .level-card.optimization-no-background.glow-arcoiris:focus-within {
+      animation: none;
+    }
 
     /* ===== MODALES (base compartida) =====
        El backdrop ahora SCROLLEA: en móvil los formularios largos
@@ -346,6 +387,25 @@
       .modal-content { padding: 22px 18px; }
     }
     .modal-content h2 { margin-bottom: 18px; font-size: 1.3rem; }
+    .optimization-modal-content { position: relative; max-width: 420px; text-align: left; }
+    .optimization-modal-content h2 { text-align: center; }
+    .optimization-help {
+      color: rgba(255,255,255,0.62);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .optimization-close {
+      position: absolute;
+      top: 12px; right: 14px;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,0.7);
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .optimization-close:hover { color: #c7ff3b; }
     .modal-content input {
       display: block;
       width: 100%;
@@ -779,7 +839,9 @@
       .level-title { font-size: 1rem; }
       .level-author { font-size: 0.85rem; }
       .level-button { display: inline-block; margin-top: 8px; }
-      #searchBar { width: 90%; font-size: 0.9rem; }
+      .search-controls { width: 94%; flex-wrap: wrap; }
+      .search-controls #searchBar { flex: 1 1 100%; width: 100%; max-width: none; font-size: 0.9rem; }
+      .search-controls .optimization-button { width: 100%; }
       .card-admin { opacity: 1; }
     }
   </style>
@@ -823,10 +885,37 @@
   <!-- LISTA -->
   <div id="listView">
     <div id="searchContainer">
-      <input type="text" id="searchBar" placeholder="🔍 Buscar nivel..." data-i18n-placeholder="dl_search">
+      <div class="search-controls">
+        <input type="text" id="searchBar" placeholder="🔍 Buscar nivel..." data-i18n-placeholder="dl_search">
+        <button type="button" class="optimization-button" onclick="openOptimizationModal()">OPTIMIZACIÓN</button>
+      </div>
     </div>
     <div id="loadingMsg"><div class="bft-loading"><span class="bft-spinner"></span></div></div>
     <div class="level-container" id="levelContainer"></div>
+  </div>
+
+  <!-- MODAL: OPTIMIZACIÓN -->
+  <div id="optimizationModal" class="modal" aria-hidden="true">
+    <div class="modal-content optimization-modal-content">
+      <button type="button" class="optimization-close" onclick="closeOptimizationModal()" aria-label="Cerrar">✕</button>
+      <h2>Optimización</h2>
+      <p class="optimization-help">Desactiva elementos visuales para reducir la carga de imágenes en dispositivos lentos.</p>
+      <label class="modal-checkbox-row">
+        <input type="checkbox" id="opt-hide-thumbnails">
+        <span>Ocultar Miniaturas</span>
+      </label>
+      <label class="modal-checkbox-row">
+        <input type="checkbox" id="opt-hide-backgrounds">
+        <span>Ocultar Fondos</span>
+      </label>
+      <label class="modal-checkbox-row">
+        <input type="checkbox" id="opt-hide-difficulty">
+        <span>Ocultar Dificultad</span>
+      </label>
+      <div class="modal-btns">
+        <button type="button" class="btn-cancel" onclick="closeOptimizationModal()">Cerrar</button>
+      </div>
+    </div>
   </div>
 
   <!-- PANEL DETALLE -->
@@ -1174,6 +1263,8 @@
     import { youtubeThumbnailFromVideo } from "/video-utils.js";
     import { isDemon, DEMON_LIST_TYPE } from "/list-utils.js";
     import { difficultyImage } from "/difficulty.js";
+    import { gdBgUrl } from "/level-visuals.js";
+    import { readListOptimization, writeListOptimization } from "/list-optimization.js";
     import {
       collection, getDocs, addDoc, deleteDoc, doc, updateDoc,
       writeBatch, serverTimestamp, query, orderBy, limit, startAfter
@@ -1187,16 +1278,10 @@
     let loadingMore     = false;
     let allLevelsCache  = null; // caché completa (carga perezosa, para búsqueda)
     let searchMode      = false;
+    let optimizationPrefs = readListOptimization();
 
     /* ========== HELPERS DE REORGANIZACIÓN ========== */
 
-    /* ── Background Level automático ──────────────────────────────────
-       NO es thumbnail. Se usa exclusivamente como fondo/banner visual.
-       Formato: https://levelthumbs.prevter.me/thumbnail/LEVEL_ID       */
-    function gdBgUrl(gdId) {
-      const id = (gdId || "").trim();
-      return id ? `https://levelthumbs.prevter.me/thumbnail/${id}` : "";
-    }
     let _inpPrevGdId  = "";
     let _editPrevGdId = "";
     let _allBannersCache     = null;
@@ -1354,18 +1439,27 @@
       const card = document.createElement("div");
       card.className = "level-card " + (nivel.glow || "");
       card.dataset.levelId = nivel.id;
-      card.style.backgroundImage = nivel.background ? `url('${nivel.background}')` : "";
+      if (!optimizationPrefs.hideBackgrounds && nivel.background) {
+        card.style.backgroundImage = `url('${nivel.background}')`;
+      }
+      if (optimizationPrefs.hideBackgrounds) {
+        card.classList.add("optimization-no-background");
+      }
 
       card.innerHTML = `
         <div class="card-admin">
           <button class="btn-edit"   data-id="${nivel.id}">Editar</button>
           <button class="btn-delete" data-id="${nivel.id}" data-name="${nivel.name}">Eliminar</button>
         </div>
-        <a href="${nivel.video || '#'}" target="_blank" style="z-index:2;position:relative;">
-          <img class="level-thumbnail" src="${nivel.thumbnail || ''}" alt="${nivel.name}">
-        </a>
+        ${optimizationPrefs.hideThumbnails ? "" : `
+          <a href="${nivel.video || '#'}" target="_blank" style="z-index:2;position:relative;">
+            <img class="level-thumbnail" src="${nivel.thumbnail || ''}" alt="${nivel.name}">
+          </a>
+        `}
         <div class="level-content">
-          <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Extreme Demon'}">
+          ${optimizationPrefs.hideDifficulty ? "" : `
+            <img class="level-diff" src="${difficultyImage(nivel.difficulty)}" alt="${nivel.difficulty || 'Extreme Demon'}">
+          `}
           <div class="level-info">
             <div class="level-title">#${pos} - ${nivel.name}</div>
             <div class="level-author">By ${nivel.author} · ${nivel.value || "—"} pts · Tier ${resolveTier(nivel)}</div>
@@ -1400,6 +1494,56 @@
       container.innerHTML = "";
       nivelesActuales.forEach(nivel => container.appendChild(crearCard(nivel)));
     }
+
+    function renderSearchResults(niveles, term) {
+      const container = document.getElementById("levelContainer");
+      const filtered = niveles.filter(lv => {
+        const t = (lv.name || "").toLowerCase();
+        const a = (lv.author || "").toLowerCase();
+        return t.includes(term) || a.includes(term);
+      });
+      container.innerHTML = "";
+      filtered.forEach(nivel => container.appendChild(crearCard(nivel, { searchResult: true })));
+    }
+
+    function rerenderOptimizationView() {
+      const term = document.getElementById("searchBar").value.toLowerCase().trim();
+      if (searchMode && term) {
+        renderSearchResults(allLevelsCache || nivelesActuales, term);
+      } else {
+        renderLoadedLevels();
+      }
+    }
+
+    function syncOptimizationControls() {
+      document.getElementById("opt-hide-thumbnails").checked = optimizationPrefs.hideThumbnails;
+      document.getElementById("opt-hide-backgrounds").checked = optimizationPrefs.hideBackgrounds;
+      document.getElementById("opt-hide-difficulty").checked = optimizationPrefs.hideDifficulty;
+    }
+
+    function updateOptimizationPreferences() {
+      optimizationPrefs = writeListOptimization({
+        hideThumbnails: document.getElementById("opt-hide-thumbnails").checked,
+        hideBackgrounds: document.getElementById("opt-hide-backgrounds").checked,
+        hideDifficulty: document.getElementById("opt-hide-difficulty").checked
+      });
+      rerenderOptimizationView();
+    }
+
+    window.openOptimizationModal = function() {
+      syncOptimizationControls();
+      const modal = document.getElementById("optimizationModal");
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+    };
+    window.closeOptimizationModal = function() {
+      const modal = document.getElementById("optimizationModal");
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+    };
+    ["opt-hide-thumbnails", "opt-hide-backgrounds", "opt-hide-difficulty"].forEach(id => {
+      document.getElementById(id).addEventListener("change", updateOptimizationPreferences);
+    });
 
     async function irALista(nivel) {
       const bar = document.getElementById("searchBar");
@@ -1567,15 +1711,7 @@
           bar.placeholder = prev;
         }
 
-        const filtrados = allLevelsCache.filter(lv => {
-          const t = (lv.name   || "").toLowerCase();
-          const a = (lv.author || "").toLowerCase();
-          return t.includes(term) || a.includes(term);
-        });
-
-        const container = document.getElementById("levelContainer");
-        container.innerHTML = "";
-         filtrados.forEach(nivel => container.appendChild(crearCard(nivel, { searchResult: true })));
+         renderSearchResults(allLevelsCache, term);
       };
 
       bar.addEventListener("input", bar._searchHandler);

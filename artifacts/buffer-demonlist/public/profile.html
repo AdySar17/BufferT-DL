@@ -1147,7 +1147,8 @@
 <script type="module">
   import { db, onAuthChange, refreshProfile } from "/auth.js";
   import { DIFFICULTY_IMAGES } from "/difficulty.js";
-  import { computeLunas, isDemon, isPemon } from "/list-utils.js";
+  import { computeLunas, isDemon, isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
+  import { levelBackgroundUrl } from "/level-visuals.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
            collection, query, where, getDocs }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1601,6 +1602,18 @@
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
   }
 
+  function isNewLevelRecord(record) {
+    return !!(record?.isNewLevelClaim && String(record.claimedLevelId || "").trim());
+  }
+
+  function isNewPemonRecord(record) {
+    return isNewLevelRecord(record) && record.listType === PEMON_LIST_TYPE;
+  }
+
+  function isNewDemonRecord(record) {
+    return isNewLevelRecord(record) && !isNewPemonRecord(record);
+  }
+
   /* Los nombres antiguos de dificultad Pemon siguen siendo válidos para
      records/niveles existentes, pero visualmente usan las imágenes Classic
      equivalentes. */
@@ -1652,7 +1665,7 @@
       }));
       myRecords = myRecords.filter(r => {
         const level = levelsCache.get(r.levelId);
-        return level && (isDemon(level) || isPemon(level));
+        return isNewLevelRecord(r) || (level && (isDemon(level) || isPemon(level)));
       });
 
       /* Cargar profiles del compañero (player1 si soy player2, o viceversa) */
@@ -1790,11 +1803,11 @@
       : myRecords.filter(r => r.status === "Accepted");
     renderPlatformRecords(allVisibleRecords.filter(r => {
       const lvl = levelsCache.get(r.levelId);
-      return lvl && isPemon(lvl);
+      return (lvl && isPemon(lvl)) || isNewPemonRecord(r);
     }));
     const visibleRecords = allVisibleRecords.filter(r => {
       const lvl = levelsCache.get(r.levelId);
-      return lvl && isDemon(lvl);
+      return (lvl && isDemon(lvl)) || isNewDemonRecord(r);
     });
 
     $("recordsCount").textContent = visibleRecords.length;
@@ -1824,7 +1837,7 @@
       const card = document.createElement("article");
       card.className = "lvl-card";
 
-      const bgUrl = lvl.background || lvl.imageURL || lvl.thumbnail || "";
+      const bgUrl = levelBackgroundUrl(lvl, rec);
       if (bgUrl) {
         const bgEl = document.createElement("div");
         bgEl.className = "lvl-card-bg";
@@ -2091,7 +2104,7 @@
     const card = document.createElement("article");
     card.className = "lvl-card";
 
-    const bgUrl = lvl.background || lvl.imageURL || lvl.thumbnail || "";
+    const bgUrl = levelBackgroundUrl(lvl, rec);
     if (bgUrl) {
       const bgEl = document.createElement("div");
       bgEl.className = "lvl-card-bg";

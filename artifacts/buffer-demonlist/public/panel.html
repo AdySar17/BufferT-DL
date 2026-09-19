@@ -725,6 +725,7 @@
   import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
   import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
   import { youtubeThumbnailFromVideo } from "/video-utils.js";
+  import { gdBgUrl } from "/level-visuals.js";
 
   const $ = (id) => document.getElementById(id);
   const stateBox = $("stateBox");
@@ -1161,13 +1162,6 @@
     renderAlCustomIds();
   };
 
-  /* ── Background Level automático ──────────────────────────────────
-     NO es thumbnail. Se usa exclusivamente como fondo/banner visual.
-     Formato: https://levelthumbs.prevter.me/thumbnail/LEVEL_ID       */
-  function gdBgUrl(gdId) {
-    const id = (gdId || "").trim();
-    return id ? `https://levelthumbs.prevter.me/thumbnail/${id}` : "";
-  }
   let _alPrevGdId = "";
   let _alAredlApplying = false;
   let _alAredlRequest = 0;
