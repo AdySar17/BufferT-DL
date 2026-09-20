@@ -1175,6 +1175,28 @@
   const profilesCache = new Map(); // id -> {name, country}
   let myRecords = [];              // records where I'm involved (after status filter)
   let editingRecord = null;        // current record in update modal
+  let allRecordsPromise = null;    // shared background source for rankings
+  let allLevelsPromise = null;     // shared score catalog for records + rankings
+
+  function getAllRecords() {
+    if (!allRecordsPromise) {
+      allRecordsPromise = getDocs(collection(db, "records"))
+        .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }
+    return allRecordsPromise;
+  }
+
+  function getAllLevels() {
+    if (!allLevelsPromise) {
+      allLevelsPromise = getDocs(collection(db, "levels"))
+        .then(snap => {
+          const levels = new Map();
+          snap.forEach(d => levels.set(d.id, { id: d.id, ...d.data() }));
+          return buildScoredLevelMap(levels);
+        });
+    }
+    return allLevelsPromise;
+  }
 
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -1342,17 +1364,18 @@
   }
 
   /* === Kick-off independiente de auth ===
-     loadProfile y loadRecords son independientes y se lanzan en paralelo:
-     los records se muestran aunque el doc profiles/{uid} no exista. */
+     La información principal y los Records no esperan al ranking global.
+     El ranking se carga en segundo plano porque necesita leer toda la
+     colección de Records para calcular posiciones globales. */
   function kickOff(uid) {
     if (profileLoaded) return;
     profileLoaded = true;
     recordsLoaded = true;
     Promise.allSettled([
       loadProfile(uid),
-      loadRecords(uid),
-      loadRankings(uid)
+      loadRecords(uid)
     ]).finally(() => window.BFT_LOADING?.hide());
+    loadRankings(uid);
   }
   if (targetUid) kickOff(targetUid);
 
@@ -1364,14 +1387,11 @@
     const platEl = $("pPlatRank");
     if (!classicEl && !platEl) return;
     try {
-      const [recsSnap, lvlSnap] = await Promise.all([
-        getDocs(collection(db, "records")),
-        getDocs(collection(db, "levels"))
+      const [records, levels] = await Promise.all([
+        getAllRecords(),
+        getAllLevels()
       ]);
-      const lvlMap = new Map();
-      lvlSnap.forEach(d => lvlMap.set(d.id, d.data()));
-      const records = recsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const aggregate = aggregatePlayerStats(records, lvlMap).players;
+      const aggregate = aggregatePlayerStats(records, levels).players;
 
       const rankOf = (field) => {
         const mine = Number(aggregate.get(uid)?.[field] || 0);
@@ -1638,37 +1658,26 @@
     $("recordsList").innerHTML = "";
 
     try {
-      /* 1) records donde es jugador 1 */
-      const q1 = await getDocs(query(collection(db, "records"), where("userId", "==", uid)));
-      /* 2) records donde es jugador 2 */
-      const q2 = await getDocs(query(collection(db, "records"), where("player2Id", "==", uid)));
+      /* Una sola ronda de red para ambos roles del jugador. */
+      const [q1, q2] = await Promise.all([
+        getDocs(query(collection(db, "records"), where("userId", "==", uid))),
+        getDocs(query(collection(db, "records"), where("player2Id", "==", uid)))
+      ]);
 
       const map = new Map();
       q1.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
       q2.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
       myRecords = [...map.values()];
 
-      /* Cargar levels involucrados */
-      const lvlIds = [...new Set(myRecords.map(r => r.levelId).filter(Boolean))];
-      await Promise.all(lvlIds.map(async id => {
-        if (levelsCache.has(id)) return;
-        try {
-          const ls = await getDoc(doc(db, "levels", id));
-          if (ls.exists()) levelsCache.set(id, { id, ...ls.data() });
-        } catch (e) { console.warn("level load fail", id, e); }
-      }));
+      /* El catálogo puntuado completo se comparte con el ranking global.
+         Así se evita una lectura por nivel y se conserva la curva Tier global. */
+      const scoredLevels = await getAllLevels();
+      levelsCache.clear();
+      scoredLevels.forEach((level, id) => levelsCache.set(id, level));
       myRecords = myRecords.filter(r => {
         const level = levelsCache.get(r.levelId);
         return isNewLevelRecord(r) || (level && (isDemon(level) || isPemon(level)));
       });
-      const allLevelsSnap = await getDocs(collection(db, "levels"));
-      const allLevels = new Map();
-      allLevelsSnap.forEach(docSnap => {
-        allLevels.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
-      });
-      const scoredLevels = buildScoredLevelMap(allLevels);
-      levelsCache.clear();
-      scoredLevels.forEach((level, id) => levelsCache.set(id, level));
 
       /* Cargar profiles del compañero (player1 si soy player2, o viceversa) */
       const otherIds = new Set();
@@ -1910,7 +1919,7 @@
          rec.status === "Accepted" &&
          isDemon(lvl) &&
          scoredDemonRecordIds.has(rec.id) &&
-         Number(rec.percent) > 0 &&
+         Number(rec.percent) > 0
        ) {
         const earned = computeRecordPoints(rec, lvl);
         const pts    = document.createElement("div");
