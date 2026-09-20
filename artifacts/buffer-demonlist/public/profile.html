@@ -1156,7 +1156,7 @@
    } from "/record-scoring.js";
   import { levelBackgroundUrl } from "/level-visuals.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
-           collection, query, where, getDocs }
+           collection, getDocs }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { COUNTRY_LIST, countryName } from "/country-utils.js";
 
@@ -1170,7 +1170,6 @@
   let profileData = null;
   let currentUser = null;
   let profileLoaded = false;     // ya intentamos cargar el perfil al menos una vez
-  let recordsLoaded = false;
   const levelsCache = new Map();   // id -> {id,name,author,value,is2P,thumbnail,position,difficulty}
   const profilesCache = new Map(); // id -> {name, country}
   let myRecords = [];              // records where I'm involved (after status filter)
@@ -1363,19 +1362,22 @@
     }
   }
 
-  /* === Kick-off independiente de auth ===
-     La información principal y los Records no esperan al ranking global.
-     El ranking se carga en segundo plano porque necesita leer toda la
-     colección de Records para calcular posiciones globales. */
-  function kickOff(uid) {
+  /* === Carga ordenada del perfil ===
+     Primero se muestra la información principal. Después, Records,
+     estadísticas y rankings reutilizan las mismas promesas de niveles y
+     records en memoria, sin lanzar lecturas duplicadas. */
+  async function kickOff(uid) {
     if (profileLoaded) return;
     profileLoaded = true;
-    recordsLoaded = true;
-    Promise.allSettled([
-      loadProfile(uid),
-      loadRecords(uid)
-    ]).finally(() => window.BFT_LOADING?.hide());
-    loadRankings(uid);
+    try {
+      await loadProfile(uid);
+      await Promise.allSettled([
+        loadRecords(uid),
+        loadRankings(uid)
+      ]);
+    } finally {
+      window.BFT_LOADING?.hide();
+    }
   }
   if (targetUid) kickOff(targetUid);
 
@@ -1658,15 +1660,17 @@
     $("recordsList").innerHTML = "";
 
     try {
-      /* Una sola ronda de red para ambos roles del jugador. */
-      const [q1, q2] = await Promise.all([
-        getDocs(query(collection(db, "records"), where("userId", "==", uid))),
-        getDocs(query(collection(db, "records"), where("player2Id", "==", uid)))
-      ]);
-
+      /*
+       * Rankings también necesita el catálogo completo. Reutilizar esta
+       * promesa evita dos queries filtradas más otra lectura global.
+       */
+      const allRecords = await getAllRecords();
       const map = new Map();
-      q1.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
-      q2.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+      allRecords.forEach(record => {
+        if (record.userId === uid || record.player2Id === uid) {
+          map.set(record.id, record);
+        }
+      });
       myRecords = [...map.values()];
 
       /* El catálogo puntuado completo se comparte con el ranking global.
@@ -1915,12 +1919,12 @@
       const aside = document.createElement("div");
       aside.className = "lvl-aside";
 
-       if (
+       const hasScoredDemonRecord =
          rec.status === "Accepted" &&
          isDemon(lvl) &&
          scoredDemonRecordIds.has(rec.id) &&
-         Number(rec.percent) > 0
-       ) {
+         Number(rec.percent) > 0;
+       if (hasScoredDemonRecord) {
         const earned = computeRecordPoints(rec, lvl);
         const pts    = document.createElement("div");
         if (earned > 0) {
