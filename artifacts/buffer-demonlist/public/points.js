@@ -1,23 +1,38 @@
 /* ============================================================
  *  BFT Demon List — puntuación por Tier
  *
- *  Cada Tier tiene su propio rango de puntos y su propia curva.
- *  Dentro de un Tier, los niveles se ordenan por posición global:
- *  el primero recibe el máximo y el último el mínimo.
+ *  Los niveles Classic usan 39 Tiers. El valor indicado para cada Tier es
+ *  su límite superior/base; dentro del Tier cada nivel recibe un valor
+ *  individual según su posición relativa.
  * ============================================================ */
 
-export const TIERS = [
-  { id: 1,  label: "Free Demons",                         min: 5,     max: 100,   curve: 0.72 },
-  { id: 2,  label: "Mid Easy Demons",                     min: 101,   max: 200,   curve: 0.78 },
-  { id: 3,  label: "Easy Demon → Free Medium Demon",      min: 201,   max: 400,   curve: 0.84 },
-  { id: 4,  label: "Medium Demon",                        min: 401,   max: 750,   curve: 0.90 },
-  { id: 5,  label: "Easy Hard Demon",                     min: 751,   max: 1400,  curve: 0.96 },
-  { id: 6,  label: "Very Hard Demon",                     min: 1401,  max: 2500,  curve: 1.02 },
-  { id: 7,  label: "Easy Insane Demon",                   min: 2501,  max: 5000,  curve: 1.08 },
-  { id: 8,  label: "Insane Demon",                        min: 5001,  max: 7500,  curve: 1.16 },
-  { id: 9,  label: "Hard Insane Demon → Easy Extreme Demon", min: 7501, max: 10000, curve: 1.28 },
-  { id: 10, label: "Extreme Demons",                      min: 10001, max: 50000, curve: 1.42 },
+export const TIER_BASE_VALUES = [
+  5, 40, 75, 100, 120, 143, 171, 204, 244, 291,
+  348, 415, 496, 592, 707, 845, 1010, 1210, 1440, 1720,
+  2060, 2460, 2940, 3510, 4190, 5000, 5980, 7150, 8550, 10200,
+  12200, 14600, 17400, 20800, 24800, 29600, 35300, 42000, 50000
 ];
+
+const TIER_LABELS = [
+  "Free Demons", "Mid Easy Demons", "Easy Demon", "Medium Demon",
+  "Hard Demon", "Very Hard Demon", "Insane Demon", "Very Hard Insane",
+  "Hard Insane", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon", "Extreme Demon",
+  "Extreme Demon", "Extreme Demon", "Extreme Demon"
+];
+
+export const TIERS = TIER_BASE_VALUES.map((max, index) => ({
+  id: index + 1,
+  label: TIER_LABELS[index] || "Demon",
+  min: index === 0 ? 1 : TIER_BASE_VALUES[index - 1] + 0.000001,
+  max,
+  curve: 0.92
+}));
 
 export const DEFAULT_TIER = 10;
 export const DEFAULT_PEMON_TIER = 1;
@@ -39,16 +54,35 @@ export function inferTierFromValue(value, fallback = DEFAULT_TIER) {
     const match = TIERS.find(tier => points >= tier.min && points <= tier.max);
     if (match) return match.id;
   }
-  return normalizeTier(fallback) || DEFAULT_TIER;
+  return normalizeTier(fallback);
 }
 
 export function resolveTier(level, fallback = DEFAULT_TIER) {
-  return normalizeTier(level?.tier) || inferTierFromValue(level?.value, fallback);
+  const savedTier = normalizeTier(level?.tier);
+  if (savedTier) return savedTier;
+
+  /*
+   * Compatibilidad con documentos de la curva anterior: 50,000 era el
+   * máximo de Extreme y varios documentos legacy lo guardan sin `tier`.
+   * No lo reinterpretamos como Tier 39 antes de que el Owner ejecute la
+   * actualización basada en GDDL/AREDL.
+   */
+  const legacyTop = TIER_BASE_VALUES[TIER_BASE_VALUES.length - 1];
+  if (Number(level?.value) >= legacyTop) return normalizeTier(fallback);
+  return inferTierFromValue(level?.value, fallback);
 }
 
-function round1(value) {
+export function tierFromGddlRating(rating, fallback = null) {
+  const value = Number(rating);
+  if (!Number.isFinite(value) || value <= 0) {
+    return normalizeTier(fallback);
+  }
+  return Math.min(TIERS.length, Math.max(1, Math.round(value)));
+}
+
+function round6(value) {
   if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.round(value * 10) / 10;
+  return Math.round(value * 1000000) / 1000000;
 }
 
 /**
@@ -61,7 +95,9 @@ export function computeTierPoints(tier, tierPosition = 1, tierCount = 1) {
   const rank = Math.min(count, Math.max(1, Math.floor(Number(tierPosition) || 1)));
   const progress = count === 1 ? 0 : (rank - 1) / (count - 1);
   const curvedProgress = Math.pow(progress, definition.curve);
-  return round1(definition.max - (definition.max - definition.min) * curvedProgress);
+  return round6(
+    definition.max - (definition.max - definition.min) * curvedProgress
+  );
 }
 
 /**

@@ -1257,7 +1257,7 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-    import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier } from "/points.js";
+    import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, TIERS } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
     import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
     import { youtubeThumbnailFromVideo } from "/video-utils.js";
@@ -1291,6 +1291,23 @@
     const _manualOverrides = { inp: {}, edit: {} };
     const _autoFormValues = { inp: {}, edit: {} };
     const _externalLookupUsed = { inp: false, edit: false };
+
+    function populateTierSelects() {
+      ["inp-tier", "edit-tier"].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const current = Number(select.value);
+        select.replaceChildren(...TIERS.map(tier => {
+          const option = document.createElement("option");
+          option.value = String(tier.id);
+          option.textContent = `Tier ${tier.id} — ${tier.label} (máx. ${tier.max})`;
+          return option;
+        }));
+        select.value = String(Number.isInteger(current) && current >= 1 && current <= TIERS.length
+          ? current : DEFAULT_TIER);
+      });
+    }
+    populateTierSelects();
 
     function applyExternalField(prefix, field, value) {
       if (_manualOverrides[prefix]?.[field]) return false;

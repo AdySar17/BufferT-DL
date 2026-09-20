@@ -457,13 +457,13 @@
           <div id="refreshApiStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
         <div style="padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:10px;">
-          <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Actualizar Tiers + Scores GDDL</div>
+          <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Actualizar Tiers + Puntos GDDL</div>
           <div style="font-size:.78rem; color:rgba(230,230,230,.65); line-height:1.4; margin-bottom:9px;">
             Actualiza el Tier existente y sincroniza el Score real de GDDL para
             Easy, Medium, Hard e Insane. Extreme continúa con AREDL.
           </div>
           <button id="btnUpdateTiers" class="btn" style="width:100%; background:rgba(199,255,59,.14); color:#c7ff3b; border:1px solid rgba(199,255,59,.35);">
-            Actualizar Tiers + Scores GDDL
+            Actualizar Tiers + Puntos GDDL
           </button>
           <div id="tiersStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
@@ -715,7 +715,7 @@
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import {
     calculateClassicScores, computeTierPoints, DEFAULT_PEMON_TIER, DEFAULT_TIER,
-    resolveTier, inferTierFromValue
+    resolveTier, inferTierFromValue, TIERS, tierFromGddlRating
   } from "/points.js";
   import {
     computeLunas, getListType, getNewLevelType, getNewLevelSuffix,
@@ -724,6 +724,7 @@
   } from "/list-utils.js";
   import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
   import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
+  import { computeRecordPoints } from "/record-scoring.js";
   import { youtubeThumbnailFromVideo } from "/video-utils.js";
   import { gdBgUrl } from "/level-visuals.js";
 
@@ -733,6 +734,21 @@
   const platformerSection = $("platformerSection");
   const platformerListBox = $("platformerListBox");
   const toastEl  = $("toast");
+
+  function populateTierSelects() {
+    const select = $("alTier");
+    if (!select) return;
+    const current = Number(select.value);
+    select.replaceChildren(...TIERS.map(tier => {
+      const option = document.createElement("option");
+      option.value = String(tier.id);
+      option.textContent = `Tier ${tier.id} — ${tier.label} (máx. ${tier.max})`;
+      return option;
+    }));
+    select.value = String(Number.isInteger(current) && current >= 1 && current <= TIERS.length
+      ? current : DEFAULT_TIER);
+  }
+  populateTierSelects();
 
   function showToast(msg, isError = false) {
     toastEl.textContent = msg;
@@ -831,6 +847,9 @@
     const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE ||
       lvl.listType === PEMON_LIST_TYPE;
     const isFull   = Number(rec.percent) === 100;
+    const earnedPoints = rec.status === "Accepted"
+      ? computeRecordPoints(rec, lvl)
+      : 0;
     const isClaim  = !!rec.isNewLevelClaim;
     const resultHtml = isPemonRecord
       ? `<span><b>Tiempo:</b> <span class="badge full">${formatTimeMs(rec.timeMs)}</span></span>`
@@ -879,6 +898,9 @@
         <div class="rc-players">${playersHtml}</div>
         <div class="rc-meta">
           ${resultHtml}
+          ${earnedPoints > 0
+            ? `<span><b>Puntos:</b> <span class="badge full">+${earnedPoints}</span></span>`
+            : ""}
           ${rec.mobile   ? `<span class="badge mobile">P1 móvil</span>` : ``}
           ${rec.mode2P && rec.mobile2P ? `<span class="badge mobile">P2 móvil</span>` : ``}
           ${rec.mode2P  ? `<span class="badge">2 Players</span>` : ``}
@@ -2303,7 +2325,7 @@
    *   submitter ni posiciones editables de BufferList.
    * ============================================================ */
   const GDDL_DIFFICULTIES = new Set([
-    "Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon"
+    "Easy Demon", "Medium Demon", "Hard Demon", "Insane Demon", "Extreme Demon"
   ]);
 
   function refreshSourceForLevel(level) {
@@ -2441,13 +2463,13 @@
     const btn = $("btnUpdateTiers");
     const status = $("tiersStatus");
     if (!confirm(
-      "¿Actualizar Tiers y Scores GDDL de todos los niveles Demon?\n\n" +
-      "Se conservarán videos, records, posiciones, puntos y todos los " +
-      "datos no relacionados. Extreme Demon mantiene AREDL."
+      "¿Actualizar Tiers y puntos de todos los niveles Demon?\n\n" +
+      "Se conservarán videos, records y posiciones. GDDL sólo determinará " +
+      "el Tier; Extreme Demon mantendrá AREDL para su ranking."
     )) return;
 
     btn.disabled = true;
-    btn.textContent = "Actualizando Tiers + Scores…";
+    btn.textContent = "Actualizando Tiers + Puntos…";
     status.style.color = "rgba(230,230,230,0.75)";
     status.textContent = "Leyendo niveles…";
     try {
@@ -2456,88 +2478,125 @@
         .map(item => ({ id: item.id, ...item.data() }))
         .filter(level => getListType(level) === DEMON_LIST_TYPE);
       const changes = [];
-      const gddlTargets = levels.filter(level =>
-        GDDL_DIFFICULTIES.has(level.difficulty)
-      );
+      const gddlTargets = levels.filter(level => GDDL_DIFFICULTIES.has(level.difficulty));
       const gddlFailures = [];
+      const gddlNoRating = [];
+      const fetched = new Map();
       let tierChanges = 0;
       let gddlScoresFound = 0;
       let processed = 0;
 
       /*
-       * Sólo estos campos de GDDL se sincronizan aquí. Nunca se incluye
-       * `video`, `position`, `value`, records, submitter ni autenticación.
-       * Si GDDL no entrega Rating/Score, no se reemplaza ningún Score previo.
+       * Primero se consulta GDDL sin escribir. Así los Extreme sin Rating
+       * pueden compararse con todos los Extreme que sí tienen un Tier
+       * determinado por Rating, en lugar de depender del orden de la lista.
        */
-      for (const level of levels) {
-        const payload = {};
-        const hasManualTier = level.manualOverrides?.tier === true;
-        const newTier = hasManualTier
-          ? (Number(level.tier) || DEFAULT_TIER)
-          : inferTierFromValue(level.value, DEFAULT_TIER);
-        if (Number(level.tier) !== newTier) {
-          payload.tier = newTier;
-          tierChanges += 1;
-        }
-
-        if (GDDL_DIFFICULTIES.has(level.difficulty)) {
-          processed += 1;
-          status.textContent =
-            `Consultando GDDL ${processed}/${gddlTargets.length}: ${level.name || level.id}…`;
-          try {
-            const data = await lookupGddlLevel({
-              gdLevelId: String(level.gdLevelId || ""),
-              name: level.name || ""
-            });
-            const score = Number(data.gddlScore);
-            if (!Number.isFinite(score) || score <= 0) {
-              throw new Error("GDDL no devolvió un Score numérico.");
-            }
-            const expectedDifficulty = String(level.difficulty || "")
-              .toLowerCase()
-              .replace(/\s+demon$/, "");
-            const receivedDifficulty = String(data.gddlDifficulty || "")
-              .toLowerCase()
-              .replace(/\s+demon$/, "");
-            if (receivedDifficulty && receivedDifficulty !== expectedDifficulty) {
-              throw new Error(
-                `Dificultad GDDL distinta: ${data.gddlDifficulty || "desconocida"}.`
-              );
-            }
-
-            /*
-             * Rating es el Score real de GDDL. Se mantiene gddlRating y
-             * gddlData por compatibilidad con documentos ya existentes.
-             * Los campos de ranking quedan explícitamente anulados para
-             * evitar reutilizar posiciones incorrectas de versiones previas.
-             */
-            Object.assign(payload, {
-              gddlId: data.gddlId || null,
-              gddlScore: score,
-              gddlRating: score,
-              gddlPosition: null,
-              gddlRanking: null,
-              gddlPositionType: "rating",
-              gddlDifficulty: data.gddlDifficulty || "",
-              gddlData: data.gddlData || {
-                score,
-                rating: score,
-                positionType: "rating",
-                difficulty: data.gddlDifficulty || ""
-              }
-            });
-            gddlScoresFound += 1;
-          } catch (error) {
-            gddlFailures.push({
-              name: level.name || level.id,
-              message: error?.message || "Score no encontrado"
-            });
+      for (const level of gddlTargets) {
+        processed += 1;
+        status.textContent =
+          `Consultando GDDL ${processed}/${gddlTargets.length}: ${level.name || level.id}…`;
+        try {
+          const data = await lookupGddlLevel({
+            gdLevelId: String(level.gdLevelId || ""),
+            name: level.name || ""
+          });
+          const expectedDifficulty = String(level.difficulty || "")
+            .toLowerCase().replace(/\s+demon$/, "");
+          const receivedDifficulty = String(data.gddlDifficulty || "")
+            .toLowerCase().replace(/\s+demon$/, "");
+          if (receivedDifficulty && receivedDifficulty !== expectedDifficulty) {
+            throw new Error(
+              `Dificultad GDDL distinta: ${data.gddlDifficulty || "desconocida"}.`
+            );
           }
+          const score = Number(data.gddlScore);
+          const hasScore = Number.isFinite(score) && score > 0;
+          fetched.set(level.id, { data, score: hasScore ? score : null });
+          if (hasScore) gddlScoresFound += 1;
+          else gddlNoRating.push(level.name || level.id);
+        } catch (error) {
+          gddlFailures.push({
+            name: level.name || level.id,
+            message: error?.message || "consulta fallida"
+          });
         }
+      }
 
-        if (Object.keys(payload).length) {
-          changes.push({ id: level.id, data: payload });
+      const isExtreme = level =>
+        String(level?.difficulty || "").trim().toLowerCase() === "extreme demon";
+      const ratingFor = level => {
+        const current = fetched.get(level.id);
+        if (current?.score != null) return current.score;
+        const stored = Number(level.gddlRating ?? level.gddlScore);
+        return Number.isFinite(stored) && stored > 0 ? stored : null;
+      };
+      const extremeReferences = levels
+        .filter(isExtreme)
+        .map(level => ({
+          position: Number(level.aredlPosition),
+          tier: tierFromGddlRating(ratingFor(level)),
+        }))
+        .filter(item =>
+          Number.isFinite(item.position) && item.position > 0 &&
+          Number.isInteger(item.tier)
+        )
+        .sort((a, b) => a.position - b.position);
+
+      function fallbackExtremeTier(level) {
+        const position = Number(level.aredlPosition);
+        if (!Number.isFinite(position) || position <= 0 || !extremeReferences.length) {
+          return resolveTier(level, DEFAULT_TIER);
         }
+        return extremeReferences.reduce((closest, current) =>
+          Math.abs(current.position - position) < Math.abs(closest.position - position)
+            ? current : closest
+        ).tier;
+      }
+
+      const tieredLevels = levels.map(level => {
+        const rating = ratingFor(level);
+        const tier = rating != null
+          ? tierFromGddlRating(rating, resolveTier(level, DEFAULT_TIER))
+          : (isExtreme(level)
+            ? fallbackExtremeTier(level)
+            : resolveTier(level, DEFAULT_TIER));
+        return { ...level, tier };
+      });
+      const classicScores = calculateClassicScores(tieredLevels);
+
+      /*
+       * Sólo se escriben metadata GDDL, Tier y value. Nunca se modifica la
+       * posición AREDL/BufferList, video, records, miniaturas o auth.
+       */
+      for (const level of tieredLevels) {
+        const score = classicScores.get(level.id);
+        const previousValue = Number(level.value);
+        const payload = {
+          tier: score?.tier || level.tier,
+          value: score?.value ?? (Number.isFinite(previousValue) ? previousValue : 0)
+        };
+        if (Number(level.tier) !== Number(payload.tier)) tierChanges += 1;
+
+        const current = fetched.get(level.id);
+        if (current) {
+          const data = current.data;
+          Object.assign(payload, {
+            gddlId: data.gddlId || null,
+            gddlScore: current.score,
+            gddlRating: current.score,
+            gddlPosition: null,
+            gddlRanking: null,
+            gddlPositionType: "rating",
+            gddlDifficulty: data.gddlDifficulty || "",
+            gddlData: data.gddlData || {
+              score: current.score,
+              rating: current.score,
+              positionType: "rating",
+              difficulty: data.gddlDifficulty || ""
+            }
+          });
+        }
+        changes.push({ id: level.id, data: payload });
       }
 
       const CHUNK = 400;
@@ -2558,14 +2617,14 @@
       status.textContent =
         `✔ Listo: ${written} niveles actualizados · ` +
         `Tiers: ${tierChanges} · Scores GDDL: ${gddlScoresFound} · ` +
-        `GDDL sin Score/error: ${gddlFailures.length}.`;
+        `GDDL sin Rating: ${gddlNoRating.length} · errores: ${gddlFailures.length}.`;
       if (gddlFailures.length) {
         console.warn("[panel] updateAllTiers GDDL failures:", gddlFailures);
       }
       showToast(
         gddlFailures.length
-          ? `Tiers guardados; ${gddlFailures.length} Scores GDDL no encontrados.`
-          : `Tiers y ${gddlScoresFound} Scores GDDL actualizados.`
+          ? `Tiers y puntos guardados; ${gddlFailures.length} consultas GDDL fallaron.`
+          : `Tiers y puntos guardados; ${gddlScoresFound} Ratings GDDL actualizados.`
       );
     } catch (error) {
       console.error("[panel] updateAllTiers error:", error);
@@ -2574,7 +2633,7 @@
       showToast("Error al actualizar Tiers: " + (error.message || error.code || "desconocido"), true);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Actualizar Tiers + Scores GDDL";
+      btn.textContent = "Actualizar Tiers + Puntos GDDL";
     }
   }
 

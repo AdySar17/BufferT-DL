@@ -1150,7 +1150,8 @@
    import { computeLunas, isDemon, isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
    import {
      bestAcceptedDemonRecords,
-     bestAcceptedDemonRecordIds
+     bestAcceptedDemonRecordIds,
+     computeRecordPoints
    } from "/record-scoring.js";
   import { levelBackgroundUrl } from "/level-visuals.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
@@ -1393,10 +1394,8 @@
         }
         if (!isDemon(lvl)) return;
          if (!bestDemonRecordIds.has(d.id)) return;
-        const pct = Number(r.percent);
-        if (!Number.isFinite(pct) || pct <= 0) return;
-        const base = Number(lvl.value || 0);
-        const v = pct === 100 ? base : (base / 10);   // <100% otorga 1/10 de los puntos
+        const v = computeRecordPoints(r, lvl);
+        if (v <= 0) return;
         players.forEach(u => {
           if (!u) return;
           points.set(u, (points.get(u) || 0) + v);
@@ -1749,10 +1748,9 @@
       }
       if (!isDemon(lvl)) return;
        if (!bestDemonRecordIds.has(r.id)) return;
-      const pct = Number(r.percent);
-      if (!Number.isFinite(pct) || pct <= 0) return;
-      const base = Number(lvl.value || 0);
-      points += pct === 100 ? base : (base / 10);   // <100% otorga 1/10
+      const earned = computeRecordPoints(r, lvl);
+      if (earned <= 0) return;
+      points += earned;
       count++;                                      // cuenta como record igual
       if (pct === 100) {
         const d = (lvl.difficulty && diffCounts.hasOwnProperty(lvl.difficulty))
@@ -1945,16 +1943,17 @@
          Number(rec.percent) > 0 &&
          lvl.value
        ) {
-        const base   = Number(lvl.value);
-        const earned = Number(rec.percent) === 100 ? base : (base / 10);
+        const earned = computeRecordPoints(rec, lvl);
         const pts    = document.createElement("div");
-        pts.className   = "lvl-points";
-        pts.textContent = "+" + (Math.round(earned * 100) / 100);
-        aside.appendChild(pts);
-        const lab = document.createElement("div");
-        lab.className   = "lvl-points-label";
-        lab.textContent = "puntos";
-        aside.appendChild(lab);
+        if (earned > 0) {
+          pts.className   = "lvl-points";
+          pts.textContent = "+" + (Math.round(earned * 100) / 100);
+          aside.appendChild(pts);
+          const lab = document.createElement("div");
+          lab.className   = "lvl-points-label";
+          lab.textContent = "puntos";
+          aside.appendChild(lab);
+        }
       }
 
       const pct = document.createElement("div");

@@ -340,7 +340,7 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
   import { isDemon } from "/list-utils.js";
-  import { bestAcceptedDemonRecords } from "/record-scoring.js";
+  import { bestAcceptedDemonRecords, computeRecordPoints } from "/record-scoring.js";
 
   const code = (new URLSearchParams(location.search).get("code") || "").toLowerCase();
 
@@ -393,7 +393,8 @@
           if (!lvl) return;
            if (!bestDemonRecordIds.has(r.id)) return;
           const pct = Number(r.percent);
-          const pts = pct === 100 ? Number(lvl.value || 0) : Number(lvl.value || 0) / 10;
+          const pts = computeRecordPoints(r, lvl);
+          if (pts <= 0) return;
           const st  = playerStats.get(uid);
           st.points += pts;
           if (pct === 100) st.records100++;

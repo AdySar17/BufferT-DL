@@ -79,9 +79,14 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
   const tags = Array.isArray(tagRows)
     ? tagRows.map(tag => tagNames.get(Number(tag.TagID))).filter(Boolean)
     : [];
+  /*
+   * DefaultRating es un valor auxiliar de GDDL, no el Rating/Score actual.
+   * Si Rating no existe, el nivel debe seguir el fallback de dificultad
+   * definido por el sistema y no debemos inventar ni guardar un score.
+   */
   const rating = Number.isFinite(Number(detail.Rating))
     ? Number(detail.Rating)
-    : (Number.isFinite(Number(detail.DefaultRating)) ? Number(detail.DefaultRating) : null);
+    : null;
   return {
     gddlId: detail.ID != null ? String(detail.ID) : requestedId,
     /*

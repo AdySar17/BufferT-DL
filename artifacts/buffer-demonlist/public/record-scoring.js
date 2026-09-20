@@ -15,6 +15,23 @@ export function recordPlayers(record) {
   return [...new Set([record?.userId, record?.player2Id].filter(Boolean))];
 }
 
+/**
+ * Devuelve los puntos de un record individual. El valor del nivel ya es la
+ * completion (100%); un progreso parcial recibe exactamente su proporción.
+ * Nunca se suman varios documentos del mismo jugador+nivel: el llamador debe
+ * usar bestAcceptedDemonRecords antes de invocar esta función.
+ */
+export function computeRecordPoints(record, level) {
+  if (!isScorableDemonLevel(level)) return 0;
+  const percent = Number(record?.percent);
+  const base = Number(level?.value);
+  if (!Number.isFinite(percent) || percent <= 0 || !Number.isFinite(base) || base <= 0) {
+    return 0;
+  }
+  const clampedPercent = Math.min(100, Math.max(0, percent));
+  return Math.round(base * (clampedPercent / 100) * 1000000) / 1000000;
+}
+
 function recordTimestamp(record) {
   const values = [record?.acceptedAt, record?.updatedAt, record?.createdAt];
   for (const value of values) {

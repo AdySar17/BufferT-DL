@@ -425,7 +425,7 @@
     import { onAuthChange, db, isStaff, mountAuthUI } from "/auth.js";
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
     import { computeLunas, isDemon, isPemon } from "/list-utils.js";
-    import { bestAcceptedDemonRecords } from "/record-scoring.js";
+    import { bestAcceptedDemonRecords, computeRecordPoints } from "/record-scoring.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
@@ -540,10 +540,9 @@
           }
           if (!isDemon(lvl)) return;
           if (!bestDemonRecordIds.has(r.id)) return;
+          const earned = computeRecordPoints(r, lvl);
+          if (earned <= 0) return;
           const pct  = Number(r.percent);
-          if (!Number.isFinite(pct) || pct <= 0) return;
-          const base = Number(lvl.value || 0);
-          const earned = pct === 100 ? base : (base / 10);   // <100% → 1/10 puntos
           const dkey = (lvl.difficulty && [
             "Extreme Demon","Insane Demon","Hard Demon","Medium Demon","Easy Demon"
           ].includes(lvl.difficulty)) ? lvl.difficulty : "Extreme Demon";

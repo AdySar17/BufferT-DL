@@ -615,6 +615,7 @@
   import { db } from "/auth.js";
   import { difficultyImage, difficultyName } from "/difficulty.js";
   import { isDemon } from "/list-utils.js";
+  import { resolveTier, DEFAULT_TIER } from "/points.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
@@ -657,20 +658,11 @@
       const gid = (nivel.gdLevelId || "").toString().trim();
       lvlGdIdEl.textContent = gid || "—";
     }
-    /* Tier calculado automáticamente según la posición */
+    /* Tier persistido/calculado desde GDDL, no desde la posición de la lista. */
     const lvlTierEl = document.getElementById("lvlTier");
     if (lvlTierEl) {
-      const tierPos = Number(nivel.position);
-      let tier = "—";
-      if (Number.isFinite(tierPos) && tierPos > 0) {
-        if (tierPos <= 50)        tier = "Main List";
-        else if (tierPos <= 150)  tier = "Extended List";
-        else if (tierPos <= 300)  tier = "Advanced List";
-        else if (tierPos <= 450)  tier = "Contender List";
-        else if (tierPos <= 750)  tier = "Intermediate List";
-        else                      tier = "Beginner List";
-      }
-      lvlTierEl.textContent = tier;
+      const tier = resolveTier(nivel, DEFAULT_TIER);
+      lvlTierEl.textContent = tier ? `Tier ${tier}` : "—";
     }
 
     /* Dificultad: imagen (cabecera) + texto en stat-list.
