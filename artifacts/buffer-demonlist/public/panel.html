@@ -2320,33 +2320,16 @@
     return current;
   }
 
-  function commonApiLevelFields(level, data) {
-    const gdLevelId = String(data.gdLevelId || level.gdLevelId || "").trim();
-    const fields = {
-      name: data.name || level.name || "",
-      author: data.author || level.author || "",
-      creators: Array.isArray(data.creators) ? data.creators : (level.creators || []),
-      description: data.description || "",
-      tags: Array.isArray(data.tags) ? data.tags : [],
-      gdLevelId: gdLevelId,
-      background: refreshedBackground(level, gdLevelId)
-    };
-    fields.thumbnail = youtubeThumbnailFromVideo(level.video);
-    return fields;
-  }
-
   function apiFieldsForLevel(level, source, data) {
-    const fields = commonApiLevelFields(level, data);
     if (source === "aredl") {
       return {
-        ...fields,
         aredlId: data.aredlId || null,
         aredlPosition: Number.isFinite(Number(data.aredlPosition))
-          ? Number(data.aredlPosition) : null
+          ? Number(data.aredlPosition) : null,
+        externalLastFetchedAt: serverTimestamp()
       };
     }
     return {
-      ...fields,
       gddlId: data.gddlId || null,
       gddlScore: Number.isFinite(Number(data.gddlScore))
         ? Number(data.gddlScore) : null,
@@ -2361,7 +2344,8 @@
         ? Number(data.gddlDefaultRating) : null,
       gddlDifficulty: data.gddlDifficulty || "",
       gddlShowcase: data.gddlShowcase || "",
-      gddlData: data.gddlData || null
+      gddlData: data.gddlData || null,
+      externalLastFetchedAt: serverTimestamp()
     };
   }
 
@@ -2487,7 +2471,10 @@
        */
       for (const level of levels) {
         const payload = {};
-        const newTier = inferTierFromValue(level.value, DEFAULT_TIER);
+        const hasManualTier = level.manualOverrides?.tier === true;
+        const newTier = hasManualTier
+          ? (Number(level.tier) || DEFAULT_TIER)
+          : inferTierFromValue(level.value, DEFAULT_TIER);
         if (Number(level.tier) !== newTier) {
           payload.tier = newTier;
           tierChanges += 1;

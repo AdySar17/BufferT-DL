@@ -398,7 +398,11 @@
           st.points += pts;
           if (pct === 100) st.records100++;
         });
-        if (Number(r.percent) === 100 && countryProfiles.has(r.userId))
+        if (
+          Number(r.percent) === 100 &&
+          bestDemonRecordIds.has(r.id) &&
+          countryProfiles.has(r.userId)
+        )
           fullRecords.push(r);
       });
 

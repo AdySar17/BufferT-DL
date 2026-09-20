@@ -1319,6 +1319,7 @@
         glow: document.getElementById(`${prefix}-glow`).value.trim(),
         description: document.getElementById(`${prefix}-description`).value.trim(),
         difficulty: document.getElementById(`${prefix}-difficulty`).value,
+        tier: Number(document.getElementById(`${prefix}-tier`).value) || null,
         tags: getTags(prefix),
         is2P: document.getElementById(`${prefix}-is2P`).checked
       };
@@ -1906,8 +1907,9 @@
           document.getElementById(`${prefix}-name`).value = level.name || "";
         if (applyExternalField(prefix, "author", level.author || ""))
           document.getElementById(`${prefix}-author`).value = level.author || "";
-        if (applyExternalField(prefix, "creators", level.creators.join(", ")))
-          document.getElementById(`${prefix}-creators`).value = level.creators.join(", ");
+        const externalCreators = Array.isArray(level.creators) ? level.creators : [];
+        if (applyExternalField(prefix, "creators", externalCreators.join(", ")))
+          document.getElementById(`${prefix}-creators`).value = externalCreators.join(", ");
         if (applyExternalField(prefix, "description", level.description || ""))
           document.getElementById(`${prefix}-description`).value = level.description || "";
         /* La miniatura también es un campo manual: una miniatura editada
@@ -1963,6 +1965,8 @@
           document.getElementById(`${prefix}-gddl-id`).value = "";
           document.getElementById(`${prefix}-gddl-position`).value = "";
           _sourceMetadata[prefix] = null;
+          _autoFormValues[prefix] = {};
+          _externalLookupUsed[prefix] = false;
           setAredlStatus(prefix, "");
         }
       });
@@ -1974,6 +1978,8 @@
             document.getElementById(`${prefix}-gddl-id`).value = "";
             document.getElementById(`${prefix}-gddl-position`).value = "";
             _sourceMetadata[prefix] = null;
+            _autoFormValues[prefix] = {};
+            _externalLookupUsed[prefix] = false;
             setAredlStatus(prefix, "");
           }
         });
@@ -1983,6 +1989,22 @@
           }
         });
       });
+      if (prefix === "edit") {
+        const manualFields = [
+          "name", "author", "creators", "gdLevelId", "position",
+          "thumbnail", "background", "video", "glow", "description",
+          "difficulty", "tier", "is2P"
+        ];
+        manualFields.forEach(field => {
+          const element = document.getElementById(`edit-${field}`);
+          if (!element) return;
+          ["input", "change"].forEach(eventName => {
+            element.addEventListener(eventName, () => {
+              if (!aredlApplying) _manualOverrides.edit[field] = true;
+            });
+          });
+        });
+      }
       updateAredlButton(prefix);
     });
 
@@ -2037,9 +2059,7 @@
       const gdLevelId  = document.getElementById("inp-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("inp-position").value) || 0));
       const tier       = Number(document.getElementById("inp-tier").value) || DEFAULT_TIER;
-      const thumbnail  = youtubeThumbnailFromVideo(
-        document.getElementById("inp-video").value
-      );
+      const thumbnail  = document.getElementById("inp-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("inp-background").value.trim()
                       || gdBgUrl(gdLevelId);
@@ -2081,6 +2101,7 @@
           listType: DEMON_LIST_TYPE,
           thumbnail, background, video, glow, is2P,
           description, difficulty, minPercent, tags,
+           manualOverrides: {},
           rewards: _inpSelectedRewards,
           customIds: _inpCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
         };
@@ -2093,7 +2114,10 @@
         if (Number.isFinite(gddlPosition) && gddlPosition > 0) {
           _addPayload.gddlPosition = gddlPosition;
         }
-        if (_sourceMetadata.inp) _addPayload.gddlData = _sourceMetadata.inp;
+        if (_sourceMetadata.inp) {
+          _addPayload.gddlData = _sourceMetadata.inp;
+          Object.assign(_addPayload, externalMetadataPayload("inp"));
+        }
         const newRef   = await addDoc(collection(db, "levels"), _addPayload);
         placeholder.id = newRef.id;
 
@@ -2272,6 +2296,9 @@
 
     /* ========== ABRIR EDICIÓN ========== */
     window.abrirEdicion = function(nivel) {
+      _manualOverrides.edit = { ...(nivel.manualOverrides || {}) };
+      _autoFormValues.edit = {};
+      _externalLookupUsed.edit = false;
       document.getElementById("edit-id").value         = nivel.id;
       document.getElementById("edit-name").value       = nivel.name       || "";
       document.getElementById("edit-author").value     = nivel.author     || "";
@@ -2374,9 +2401,7 @@
       const gdLevelId  = document.getElementById("edit-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("edit-position").value) || 0));
       const tier       = Number(document.getElementById("edit-tier").value) || DEFAULT_TIER;
-      const thumbnail  = youtubeThumbnailFromVideo(
-        document.getElementById("edit-video").value
-      );
+      const thumbnail  = document.getElementById("edit-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("edit-background").value.trim()
                       || gdBgUrl(gdLevelId);
@@ -2395,8 +2420,6 @@
       const aredlPosition = Number(document.getElementById("edit-aredl-position").value);
       const gddlId = document.getElementById("edit-gddl-id").value.trim();
       const gddlPosition = Number(document.getElementById("edit-gddl-position").value);
-      const originalForOverrides = (await fetchAllLevels()).find(level => level.id === id) || null;
-      const manualOverrides = collectManualOverrides("edit", originalForOverrides);
 
       if (!name || !author) { alert("Nombre y host son obligatorios."); return; }
       if (!reqPos)           { alert("Debes indicar una posición (≥ 1)."); return; }
@@ -2406,6 +2429,7 @@
         /* Siempre trabajamos con la lista completa */
         const allLvls  = await fetchAllLevels();
         const original = allLvls.find(l => l.id === id);
+        const manualOverrides = collectManualOverrides("edit", original);
         const oldPos   = Number(original && original.position) || null;
         const positionChanged = oldPos !== reqPos;
 
@@ -2657,6 +2681,7 @@
         return;
       }
       tagState[scope].push(raw);
+      if (scope === "edit" && !aredlApplying) _manualOverrides.edit.tags = true;
       input.value = "";
       renderTagList(scope);
       input.focus();
@@ -2665,6 +2690,7 @@
 
     function removeTag(scope, idx) {
       tagState[scope].splice(idx, 1);
+      if (scope === "edit" && !aredlApplying) _manualOverrides.edit.tags = true;
       renderTagList(scope);
     }
     window.removeTag = removeTag;
