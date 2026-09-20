@@ -1738,7 +1738,12 @@
 
     /* ── HISTORIAL DE POSICIONES ────────────────────────────────── */
     async function logHistory(entries) {
-      await Promise.all(entries.map(e =>
+      const meaningfulEntries = entries.filter(e =>
+        e.oldPosition == null ||
+        e.newPosition == null ||
+        Number(e.oldPosition) !== Number(e.newPosition)
+      );
+      await Promise.all(meaningfulEntries.map(e =>
         addDoc(collection(db, "positionHistory"), {
           ...e,
           createdAt: serverTimestamp()
@@ -1748,6 +1753,11 @@
 
     /* ── CHANGELOG (solo NEW + movimientos manuales) ────────────── */
     async function logChangelog(type, levelId, levelName, newPosition, oldPosition) {
+      if (
+        oldPosition != null &&
+        newPosition != null &&
+        Number(oldPosition) === Number(newPosition)
+      ) return;
       try {
         await addDoc(collection(db, "changelog"), {
           type,

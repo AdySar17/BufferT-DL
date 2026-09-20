@@ -448,8 +448,9 @@
         <div style="padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:10px;">
           <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Actualizar toda la data</div>
           <div style="font-size:.78rem; color:rgba(230,230,230,.65); line-height:1.4; margin-bottom:9px;">
-            Consulta AREDL para Extreme y GDDL para las demás dificultades Demon.
-            Nunca modifica videos ni records.
+             Consulta AREDL para la posición de los Extreme y GDDL para su
+             Rating/Tier y para las demás dificultades Demon. Nunca modifica
+             videos ni records.
           </div>
           <button id="btnRefreshApiData" class="btn" style="width:100%; background:rgba(199,255,59,.14); color:#c7ff3b; border:1px solid rgba(199,255,59,.35);">
             Actualizar datos de todos los niveles
@@ -1225,15 +1226,30 @@
     $("alAredlLookup").disabled = true;
     setAlAredlStatus(`Consultando ${source === "aredl" ? "AREDL V2" : "GDDL"}…`);
     try {
-      const level = source === "aredl"
+      const aredlLevel = source === "aredl"
         ? await lookupAredlLevel({
             gdLevelId: $("alGdLevelId").value.trim(),
             name: $("alName").value.trim()
           })
-        : await lookupGddlLevel({
+        : null;
+      let gddlLevel = source === "gddl"
+        ? await lookupGddlLevel({
             gdLevelId: $("alGdLevelId").value.trim(),
             name: $("alName").value.trim()
+          })
+        : null;
+      if (source === "aredl") {
+        try {
+          gddlLevel = await lookupGddlLevel({
+            gdLevelId: aredlLevel?.gdLevelId || $("alGdLevelId").value.trim(),
+            name: aredlLevel?.name || $("alName").value.trim()
           });
+        } catch (error) {
+          console.warn("[panel] GDDL lookup for Extreme failed:", error);
+        }
+      }
+      const level = aredlLevel || gddlLevel;
+      const metadataLevel = gddlLevel || (source === "gddl" ? level : null);
       const snap = await getDocs(collection(db, "levels"));
       const existing = [];
       snap.forEach(item => {
@@ -1254,23 +1270,25 @@
       $("alName").value = level.name || "";
       $("alAuthor").value = level.author || "";
       $("alCreators").value = level.creators.join(", ");
-      $("alDescription").value = level.description || "";
-      $("alTags").value = level.tags.join(", ");
+      $("alDescription").value = metadataLevel?.description ?? level.description ?? "";
+      $("alTags").value = (metadataLevel?.tags || level.tags || []).join(", ");
       /* La miniatura sólo se deriva del video ya guardado en BufferList. */
       $("alThumbnail").value = youtubeThumbnailFromVideo($("alVideo").value);
       $("alGdLevelId").value = level.gdLevelId || $("alGdLevelId").value;
       $("alAredlId").value = level.aredlId || "";
       $("alAredlPosition").value = level.aredlPosition || "";
-      $("alGddlId").value = level.gddlId || "";
-      $("alGddlPosition").value = level.gddlPosition || "";
-      _alGddlData = level.gddlData || null;
+      $("alGddlId").value = metadataLevel?.gddlId || "";
+      $("alGddlPosition").value = metadataLevel?.gddlPosition || "";
+      _alGddlData = metadataLevel?.gddlData || null;
       if (suggestedPosition) $("alPosition").value = suggestedPosition;
       _alPrevGdId = $("alGdLevelId").value.trim();
       if (!$("alBackground").value.trim()) $("alBackground").value = gdBgUrl(_alPrevGdId);
       $("alPosition").dispatchEvent(new Event("input"));
       _alAredlApplying = false;
       setAlAredlStatus(
-        `${source === "aredl" ? aredlStatusText(level) : gddlStatusText(level)}${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
+        `${source === "aredl" ? aredlStatusText(level) : gddlStatusText(level)}${
+          metadataLevel && source === "aredl" ? ` · ${gddlStatusText(metadataLevel)}` : ""
+        }${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
       );
     } catch (error) {
       _alAredlApplying = false;
@@ -1584,7 +1602,14 @@
       if (Number.isFinite(gddlPosition) && gddlPosition > 0) {
         levelDoc.gddlPosition = gddlPosition;
       }
-      if (_alGddlData) levelDoc.gddlData = _alGddlData;
+      if (_alGddlData) {
+        const gddlRating = Number(_alGddlData.rating ?? _alGddlData.score);
+        const hasGddlRating = Number.isFinite(gddlRating) && gddlRating > 0;
+        levelDoc.gddlData = _alGddlData;
+        levelDoc.gddlRating = hasGddlRating ? gddlRating : null;
+        levelDoc.gddlScore = hasGddlRating ? gddlRating : null;
+        levelDoc.gddlTier = hasGddlRating ? tierFromGddlRating(gddlRating) : null;
+      }
       const newRef = await addDoc(collection(db, "levels"), levelDoc);
       placeholder.id = newRef.id;
 
@@ -2353,33 +2378,43 @@
     return current;
   }
 
-  function apiFieldsForLevel(level, source, data) {
-    if (source === "aredl") {
-      return {
-        aredlId: data.aredlId || null,
-        aredlPosition: Number.isFinite(Number(data.aredlPosition))
-          ? Number(data.aredlPosition) : null,
-        externalLastFetchedAt: serverTimestamp()
-      };
-    }
+  function gddlFields(data) {
+    const rating = Number(data.gddlRating ?? data.gddlScore);
+    const hasRating = Number.isFinite(rating) && rating > 0;
+    const defaultRating = Number(data.gddlDefaultRating);
+    const hasDefaultRating = Number.isFinite(defaultRating) && defaultRating > 0;
     return {
       gddlId: data.gddlId || null,
-      gddlScore: Number.isFinite(Number(data.gddlScore))
-        ? Number(data.gddlScore) : null,
+      gddlScore: hasRating ? rating : null,
       gddlPosition: Number.isFinite(Number(data.gddlPosition))
         ? Number(data.gddlPosition) : null,
       gddlRanking: Number.isFinite(Number(data.gddlRanking))
         ? Number(data.gddlRanking) : null,
       gddlPositionType: data.gddlPositionType || "rating",
-      gddlRating: Number.isFinite(Number(data.gddlRating))
-        ? Number(data.gddlRating) : null,
-      gddlDefaultRating: Number.isFinite(Number(data.gddlDefaultRating))
-        ? Number(data.gddlDefaultRating) : null,
+      gddlRating: hasRating ? rating : null,
+      gddlTier: hasRating ? tierFromGddlRating(rating) : null,
+      gddlDefaultRating: hasDefaultRating ? defaultRating : null,
       gddlDifficulty: data.gddlDifficulty || "",
       gddlShowcase: data.gddlShowcase || "",
       gddlData: data.gddlData || null,
       externalLastFetchedAt: serverTimestamp()
     };
+  }
+
+  function apiFieldsForLevel(level, source, data, extremeGddlData = undefined) {
+    if (source === "aredl") {
+      const payload = {
+        aredlId: data.aredlId || null,
+        aredlPosition: Number.isFinite(Number(data.aredlPosition))
+          ? Number(data.aredlPosition) : null,
+        externalLastFetchedAt: serverTimestamp()
+      };
+      if (extremeGddlData !== undefined) {
+        Object.assign(payload, gddlFields(extremeGddlData));
+      }
+      return payload;
+    }
+    return gddlFields(data);
   }
 
   async function refreshAllApiData() {
@@ -2421,9 +2456,20 @@
                 gdLevelId: String(level.gdLevelId || ""),
                 name: level.name || ""
               });
+          let extremeGddlData;
+          if (source === "aredl") {
+            try {
+              extremeGddlData = await lookupGddlLevel({
+                gdLevelId: String(data.gdLevelId || level.gdLevelId || ""),
+                name: data.name || level.name || ""
+              });
+            } catch (gddlError) {
+              console.warn("[panel] refresh GDDL lookup failed:", gddlError);
+            }
+          }
           updates.push({
             id: level.id,
-            data: apiFieldsForLevel(level, source, data)
+            data: apiFieldsForLevel(level, source, data, extremeGddlData)
           });
         } catch (error) {
           failures.push({

@@ -418,12 +418,14 @@
           <!-- Cuadro de TIER (sustituye a la antigua carita de dificultad).
                El valor real se configurará por nivel más adelante; por ahora
                siempre muestra "—". -->
-          <div class="stat-tier-box" title="Tier del nivel">
-            <div class="stat-tier-label" data-i18n="lv_tier">Tier</div>
+          <div class="stat-tier-box" title="Tier de la lista">
+            <div class="stat-tier-label">Tier de Lista</div>
             <div class="stat-tier-value" id="lvlTier">—</div>
           </div>
           <div class="stat-list">
             <div class="stat-item"><span data-i18n="lv_list_pts">Puntos de Lista:</span> <span class="stat-val" id="lvlPoints">—</span></div>
+            <div class="stat-item"><span>GDDL Rating:</span> <span class="stat-val" id="lvlGddlRating">—</span></div>
+            <div class="stat-item"><span>GDDL Tier:</span> <span class="stat-val" id="lvlGddlTier">—</span></div>
             <div class="stat-item"><span data-i18n="lv_host_label">Host:</span> <span class="stat-val" id="lvlAuthor">—</span></div>
             <div class="stat-item"><span data-i18n="lv_difficulty_label">Dificultad:</span> <span class="stat-val" id="lvlDifficulty">Extreme Demon</span></div>
             <div class="stat-item"><span data-i18n="lv_id_label">ID:</span> <span class="stat-val" id="lvlGdId">—</span></div>
@@ -615,7 +617,7 @@
   import { db } from "/auth.js";
   import { difficultyImage, difficultyName } from "/difficulty.js";
   import { isDemon } from "/list-utils.js";
-  import { resolveTier, DEFAULT_TIER, formatPoints } from "/points.js";
+  import { resolveTier, DEFAULT_TIER, formatPoints, tierFromGddlRating } from "/points.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
@@ -664,6 +666,24 @@
     if (lvlTierEl) {
       const tier = resolveTier(nivel, DEFAULT_TIER);
       lvlTierEl.textContent = tier ? `Tier ${tier}` : "—";
+    }
+    const lvlGddlRatingEl = document.getElementById("lvlGddlRating");
+    const lvlGddlTierEl = document.getElementById("lvlGddlTier");
+    const gddlRating = Number(
+      nivel.gddlRating ??
+      nivel.gddlScore ??
+      nivel.gddlData?.rating ??
+      nivel.gddlData?.score
+    );
+    const hasGddlRating = Number.isFinite(gddlRating) && gddlRating > 0;
+    if (lvlGddlRatingEl) {
+      lvlGddlRatingEl.textContent = hasGddlRating ? gddlRating.toFixed(2) : "—";
+    }
+    if (lvlGddlTierEl) {
+      const gddlTier = hasGddlRating
+        ? (Number(nivel.gddlTier) || tierFromGddlRating(gddlRating))
+        : null;
+      lvlGddlTierEl.textContent = gddlTier ? `Tier ${gddlTier}` : "—";
     }
 
     /* Dificultad: imagen (cabecera) + texto en stat-list.
@@ -718,6 +738,9 @@
     tagsEl.innerHTML = "";
     let tags = nivel.tags;
     if (typeof tags === "string") tags = tags.split(",").map(s => s.trim()).filter(Boolean);
+    if (!Array.isArray(tags) || !tags.length) {
+      tags = Array.isArray(nivel.gddlData?.tags) ? nivel.gddlData.tags : [];
+    }
     if (Array.isArray(tags)) {
       tags.forEach(t => {
         const span = document.createElement("span");
@@ -728,7 +751,7 @@
     }
 
     /* Descripción */
-    const desc = (nivel.description || "").trim();
+    const desc = (nivel.description || nivel.gddlData?.description || "").trim();
     const descEl = document.getElementById("lvlDesc");
     if (desc) {
       descEl.textContent = desc;

@@ -9,11 +9,11 @@ The official GDDL API is documented through the Scalar OpenAPI registry and expo
 
 **How to apply:** Keep the proxy limited to the known read-only levels and tags paths; never turn it into a generic URL forwarder or store GDDL credentials.
 
-For level ordering, use the detailed response field `Rating` as GDDL's numeric Score. `DefaultRating` is only a fallback when `Rating` is null; `DifficultyIndex`, `AREDLPosition`, and other rank-like fields are not BufferList positions.
+For level ordering and display, use only the detailed response field `Rating` as GDDL's numeric Score. A missing `Rating` remains null; never substitute `DefaultRating`, `DifficultyIndex`, `AREDLPosition`, or another rank-like field.
 
 **Why:** GDDL's detailed schema identifies `Rating` as the community score, while the other indexes represent different concepts and can incorrectly place a level at the top.
 
-**How to apply:** Normalize the GDDL difficulty and compare `Rating` only with existing BufferList levels of that same difficulty. Keep the resulting BufferList position as an editable suggestion.
+**How to apply:** Normalize the GDDL difficulty and compare a positive `Rating` only with existing BufferList levels of that same difficulty. Keep the resulting BufferList position as an editable suggestion, and derive GDDL Tier by nearest-integer rounding only when Rating exists.
 
 Vercel production did not reliably populate the catch-all `req.query.path` for `/api/gddl/[...path].js`; explicit functions for `/tags`, `/levels`, `/levels/{id}`, and the nested tags/packs routes are the reliable deployment shape.
 

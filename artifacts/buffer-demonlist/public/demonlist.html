@@ -1257,7 +1257,7 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-    import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, TIERS, formatPoints } from "/points.js";
+     import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, TIERS, formatPoints, tierFromGddlRating } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
     import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
     import { youtubeThumbnailFromVideo } from "/video-utils.js";
@@ -1291,6 +1291,7 @@
     const _manualOverrides = { inp: {}, edit: {} };
     const _autoFormValues = { inp: {}, edit: {} };
     const _externalLookupUsed = { inp: false, edit: false };
+    const _gddlLookupUsed = { inp: false, edit: false };
 
     function populateTierSelects() {
       ["inp-tier", "edit-tier"].forEach(id => {
@@ -1362,10 +1363,12 @@
     function externalMetadataPayload(prefix) {
       const metadata = _sourceMetadata[prefix] || {};
       const payload = {};
-      const rating = Number(metadata.rating ?? metadata.score);
-      if (Number.isFinite(rating)) {
-        payload.gddlRating = rating;
-        payload.gddlScore = rating;
+      if (_gddlLookupUsed[prefix]) {
+        const rating = Number(metadata.rating ?? metadata.score);
+        const hasRating = Number.isFinite(rating) && rating > 0;
+        payload.gddlRating = hasRating ? rating : null;
+        payload.gddlScore = hasRating ? rating : null;
+        payload.gddlTier = hasRating ? tierFromGddlRating(rating) : null;
       }
       if (metadata.difficulty) payload.gddlDifficulty = String(metadata.difficulty);
       if (_externalLookupUsed[prefix]) {
@@ -1817,7 +1820,12 @@
 
     /* ── HISTORIAL DE POSICIONES ────────────────────────────────── */
     async function logHistory(entries) {
-      await Promise.all(entries.map(e =>
+      const meaningfulEntries = entries.filter(e =>
+        e.oldPosition == null ||
+        e.newPosition == null ||
+        Number(e.oldPosition) !== Number(e.newPosition)
+      );
+      await Promise.all(meaningfulEntries.map(e =>
         addDoc(collection(db, "positionHistory"), {
           ...e,
           createdAt: serverTimestamp()
@@ -1827,6 +1835,11 @@
 
     /* ── CHANGELOG (solo NEW + movimientos manuales) ────────────── */
     async function logChangelog(type, levelId, levelName, newPosition, oldPosition) {
+      if (
+        oldPosition != null &&
+        newPosition != null &&
+        Number(oldPosition) === Number(newPosition)
+      ) return;
       try {
         await addDoc(collection(db, "changelog"), {
           type,
@@ -1886,7 +1899,9 @@
       button.disabled = !enabled;
       button.style.opacity = enabled ? "1" : ".4";
       button.title = enabled
-        ? `Consultar datos actuales en ${source === "aredl" ? "AREDL V2" : "GDDL"}`
+        ? `Consultar datos actuales en ${
+            source === "aredl" ? "AREDL V2 + GDDL" : "GDDL"
+          }`
         : "Disponible para Demon y dificultad compatible";
     }
 
@@ -1904,9 +1919,25 @@
       setAredlStatus(prefix, `Consultando ${source === "aredl" ? "AREDL V2" : "GDDL"}…`);
 
       try {
-        const level = source === "aredl"
-          ? await lookupAredlLevel({ gdLevelId, name })
-          : await lookupGddlLevel({ gdLevelId, name });
+      const aredlLevel = source === "aredl"
+        ? await lookupAredlLevel({ gdLevelId, name })
+        : null;
+      let gddlLevel = source === "gddl"
+        ? await lookupGddlLevel({ gdLevelId, name })
+        : null;
+      if (source === "aredl") {
+        try {
+          gddlLevel = await lookupGddlLevel({
+            gdLevelId: aredlLevel?.gdLevelId || gdLevelId,
+            name: aredlLevel?.name || name
+          });
+        } catch (error) {
+          /* AREDL sigue siendo válido aunque GDDL todavía no tenga ficha. */
+          console.warn("[demonlist] GDDL lookup for Extreme failed:", error);
+        }
+      }
+      const level = aredlLevel || gddlLevel;
+      const metadataLevel = gddlLevel || (source === "gddl" ? level : null);
         const allLevels = await fetchAllLevels();
         const existing = allLevels.filter(item =>
           item.id !== excludeId &&
@@ -1927,8 +1958,9 @@
         const externalCreators = Array.isArray(level.creators) ? level.creators : [];
         if (applyExternalField(prefix, "creators", externalCreators.join(", ")))
           document.getElementById(`${prefix}-creators`).value = externalCreators.join(", ");
-        if (applyExternalField(prefix, "description", level.description || ""))
-          document.getElementById(`${prefix}-description`).value = level.description || "";
+        const metadataDescription = metadataLevel?.description ?? level.description ?? "";
+        if (applyExternalField(prefix, "description", metadataDescription))
+          document.getElementById(`${prefix}-description`).value = metadataDescription;
         /* La miniatura también es un campo manual: una miniatura editada
            por Staff nunca vuelve a ser reemplazada por el lookup. */
         const autoThumbnail = youtubeThumbnailFromVideo(
@@ -1942,12 +1974,16 @@
           document.getElementById(`${prefix}-gdLevelId`).value = level.gdLevelId || gdLevelId;
         document.getElementById(`${prefix}-aredl-id`).value = level.aredlId || "";
         document.getElementById(`${prefix}-aredl-position`).value = level.aredlPosition || "";
-        document.getElementById(`${prefix}-gddl-id`).value = level.gddlId || "";
-        document.getElementById(`${prefix}-gddl-position`).value = level.gddlPosition || "";
-        _sourceMetadata[prefix] = level.gddlData || null;
+        if (metadataLevel) {
+          document.getElementById(`${prefix}-gddl-id`).value = metadataLevel.gddlId || "";
+          document.getElementById(`${prefix}-gddl-position`).value = metadataLevel.gddlPosition || "";
+          _sourceMetadata[prefix] = metadataLevel.gddlData || null;
+          _gddlLookupUsed[prefix] = true;
+        }
         _externalLookupUsed[prefix] = true;
-        if (applyExternalField(prefix, "tags", level.tags || []))
-          setTags(prefix, level.tags);
+        const metadataTags = metadataLevel?.tags || [];
+        if (applyExternalField(prefix, "tags", metadataTags))
+          setTags(prefix, metadataTags);
         if (suggestedPosition && applyExternalField(prefix, "position", suggestedPosition)) {
           document.getElementById(`${prefix}-position`).value = suggestedPosition;
           document.getElementById(`${prefix}-position`).dispatchEvent(new Event("input"));
@@ -1955,7 +1991,9 @@
         aredlApplying = false;
         setAredlStatus(
           prefix,
-          `${source === "aredl" ? aredlStatusText(level) : gddlStatusText(level)}${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
+           `${source === "aredl" ? aredlStatusText(level) : gddlStatusText(level)}${
+             metadataLevel && source === "aredl" ? ` · ${gddlStatusText(metadataLevel)}` : ""
+           }${suggestedPosition ? ` · posición sugerida #${suggestedPosition}` : ""}`
         );
       } catch (error) {
         aredlApplying = false;
@@ -1982,6 +2020,7 @@
           document.getElementById(`${prefix}-gddl-id`).value = "";
           document.getElementById(`${prefix}-gddl-position`).value = "";
           _sourceMetadata[prefix] = null;
+            _gddlLookupUsed[prefix] = false;
           _autoFormValues[prefix] = {};
           _externalLookupUsed[prefix] = false;
           setAredlStatus(prefix, "");
@@ -1995,6 +2034,7 @@
             document.getElementById(`${prefix}-gddl-id`).value = "";
             document.getElementById(`${prefix}-gddl-position`).value = "";
             _sourceMetadata[prefix] = null;
+            _gddlLookupUsed[prefix] = false;
             _autoFormValues[prefix] = {};
             _externalLookupUsed[prefix] = false;
             setAredlStatus(prefix, "");
@@ -2316,6 +2356,7 @@
       _manualOverrides.edit = { ...(nivel.manualOverrides || {}) };
       _autoFormValues.edit = {};
       _externalLookupUsed.edit = false;
+      _gddlLookupUsed.edit = false;
       document.getElementById("edit-id").value         = nivel.id;
       document.getElementById("edit-name").value       = nivel.name       || "";
       document.getElementById("edit-author").value     = nivel.author     || "";
@@ -2465,7 +2506,7 @@
             gddlId,
             gddlPosition: Number.isFinite(gddlPosition) && gddlPosition > 0
               ? gddlPosition : null,
-            gddlData: _sourceMetadata.edit,
+            ...(_gddlLookupUsed.edit ? { gddlData: _sourceMetadata.edit } : {}),
             ...externalMetadataPayload("edit"),
             manualOverrides,
             rewards: _editSelectedRewards,
@@ -2501,7 +2542,7 @@
           gddlId,
           gddlPosition: Number.isFinite(gddlPosition) && gddlPosition > 0
             ? gddlPosition : null,
-          gddlData: _sourceMetadata.edit,
+          ...(_gddlLookupUsed.edit ? { gddlData: _sourceMetadata.edit } : {}),
           ...externalMetadataPayload("edit"),
           manualOverrides,
           rewards: _editSelectedRewards,

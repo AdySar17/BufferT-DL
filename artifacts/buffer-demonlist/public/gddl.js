@@ -84,8 +84,19 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
    * Si Rating no existe, el nivel debe seguir el fallback de dificultad
    * definido por el sistema y no debemos inventar ni guardar un score.
    */
-  const rating = Number.isFinite(Number(detail.Rating))
-    ? Number(detail.Rating)
+  const ratingValue = Number(detail.Rating);
+  const rating = detail.Rating != null &&
+    String(detail.Rating).trim() !== "" &&
+    Number.isFinite(ratingValue) &&
+    ratingValue > 0
+    ? ratingValue
+    : null;
+  const defaultRatingValue = Number(detail.DefaultRating);
+  const defaultRating = detail.DefaultRating != null &&
+    String(detail.DefaultRating).trim() !== "" &&
+    Number.isFinite(defaultRatingValue) &&
+    defaultRatingValue > 0
+    ? defaultRatingValue
     : null;
   return {
     gddlId: detail.ID != null ? String(detail.ID) : requestedId,
@@ -99,8 +110,7 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
     gddlRanking: null,
     gddlPositionType: "rating",
     gddlRating: rating,
-    gddlDefaultRating: Number.isFinite(Number(detail.DefaultRating))
-      ? Number(detail.DefaultRating) : null,
+    gddlDefaultRating: defaultRating,
     gddlDifficulty: detail.Meta?.Difficulty || "",
     gddlShowcase: detail.Showcase || "",
     gdLevelId: detail.Meta?.ID != null ? String(detail.Meta.ID) : requestedId,
@@ -114,7 +124,7 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
       score: rating,
       rating,
       positionType: "rating",
-      defaultRating: Number.isFinite(Number(detail.DefaultRating)) ? Number(detail.DefaultRating) : null,
+       defaultRating,
       enjoyment: detail.Enjoyment ?? null,
       deviation: detail.Deviation ?? null,
       ratingCount: detail.RatingCount ?? 0,
@@ -123,6 +133,7 @@ export async function lookupGddlLevel({ gdLevelId = "", name = "" } = {}) {
       popularity: detail.Popularity ?? null,
       difficulty: detail.Meta?.Difficulty || "",
       rarity: detail.Meta?.Rarity ?? null,
+       description: detail.Meta?.Description || "",
       isTwoPlayer: !!detail.Meta?.IsTwoPlayer,
       showcase: detail.Showcase || "",
       song: detail.Meta?.Song ? {
