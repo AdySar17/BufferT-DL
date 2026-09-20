@@ -425,7 +425,7 @@
     import { onAuthChange, db, isStaff, mountAuthUI } from "/auth.js";
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
     import { computeLunas, isDemon, isPemon } from "/list-utils.js";
-    import { bestAcceptedDemonRecords, computeRecordPoints } from "/record-scoring.js";
+    import { aggregatePlayerStats } from "/record-scoring.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
@@ -506,63 +506,22 @@
           const level = d.data();
           if (isDemon(level) || isPemon(level)) levelsCache.set(d.id, level);
         });
-        const bestDemonRecordIds = new Set(
-          bestAcceptedDemonRecords(records, levelsCache).map(item => item.record.id)
-        );
-
-        /* 3) Agregar por usuario */
+        /* 3) Una única fuente para puntos, completions, Hardest y Lunas. */
+        const aggregate = aggregatePlayerStats(records, levelsCache);
         const map = new Map();
-        function bump(uid) {
-          if (!uid) return null;
-          if (!map.has(uid)) {
-            map.set(uid, {
-              uid,
-               points: 0, lunas: 0, total: 0,
-              "Extreme Demon": 0, "Insane Demon": 0,
-              "Hard Demon": 0, "Medium Demon": 0, "Easy Demon": 0
-            });
-          }
-          return map.get(uid);
-        }
-        records.forEach(r => {
-          const lvl = levelsCache.get(r.levelId);
-          if (!lvl) return;
-          const players = [r.userId, r.player2Id].filter(Boolean);
-          if (isPemon(lvl)) {
-            const time = Number(r.timeMs);
-            const levelLunas = computeLunas(lvl.position) || Number(lvl.value) || 0;
-            if (!Number.isFinite(time) || time <= 0 || levelLunas <= 0) return;
-            players.forEach(uid => {
-              const u = bump(uid);
-              u.lunas += levelLunas;
-            });
-            return;
-          }
-          if (!isDemon(lvl)) return;
-          if (!bestDemonRecordIds.has(r.id)) return;
-          const earned = computeRecordPoints(r, lvl);
-          if (earned <= 0) return;
-          const pct  = Number(r.percent);
-          const dkey = (lvl.difficulty && [
-            "Extreme Demon","Insane Demon","Hard Demon","Medium Demon","Easy Demon"
-          ].includes(lvl.difficulty)) ? lvl.difficulty : "Extreme Demon";
-          players.forEach(uid => {
-            if (!uid) return;
-            const u = bump(uid);
-            u.points += earned;
-            u.total  += 1;
-            if (pct === 100) {
-              u[dkey] += 1;
-              /* Rastrear el nivel más difícil completado al 100%
-                 (posición más baja = más difícil en la demon list).
-                 Guardamos el bannerId del rewards[0] de ese nivel. */
-              const lvlPos = Number(lvl.position) || Infinity;
-              const lvlBanner = (Array.isArray(lvl.rewards) && lvl.rewards.length) ? lvl.rewards[0] : null;
-              if (lvlBanner && lvlPos < (u._hardestPos || Infinity)) {
-                u._hardestPos    = lvlPos;
-                u._hardestBanner = lvlBanner;
-              }
-            }
+        aggregate.players.forEach((stats, uid) => {
+          map.set(uid, {
+            uid,
+            points: stats.points,
+            lunas: stats.lunas,
+            total: stats.records,
+            "Extreme Demon": stats["Extreme Demon"],
+            "Insane Demon": stats["Insane Demon"],
+            "Hard Demon": stats["Hard Demon"],
+            "Medium Demon": stats["Medium Demon"],
+            "Easy Demon": stats["Easy Demon"],
+            _hardestPos: stats.hardestPos,
+            _hardestBanner: stats.hardest?.rewards?.[0] || null
           });
         });
 
@@ -573,7 +532,21 @@
         profSnap.forEach(ps => {
           const uid = ps.id;
           const d   = ps.data() || {};
-          if (!map.has(uid)) bump(uid);          // crea fila vacía (todos a 0)
+          if (!map.has(uid)) {
+            map.set(uid, {
+              uid,
+              points: 0,
+              lunas: 0,
+              total: 0,
+              "Extreme Demon": 0,
+              "Insane Demon": 0,
+              "Hard Demon": 0,
+              "Medium Demon": 0,
+              "Easy Demon": 0,
+              _hardestPos: Infinity,
+              _hardestBanner: null
+            });
+          }
           const u = map.get(uid);
           u.name     = d.name    || "Sin nombre";
           u.country  = (d.country  || "").trim().toLowerCase();

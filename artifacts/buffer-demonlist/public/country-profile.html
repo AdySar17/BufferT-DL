@@ -340,7 +340,7 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
   import { isDemon } from "/list-utils.js";
-  import { bestAcceptedDemonRecords, computeRecordPoints } from "/record-scoring.js";
+  import { aggregatePlayerStats, bestAcceptedDemonRecords } from "/record-scoring.js";
 
   const code = (new URLSearchParams(location.search).get("code") || "").toLowerCase();
 
@@ -370,7 +370,7 @@
 
       const recsSnap = await getDocs(collection(db, "records"));
       const allRecs  = recsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(r => r.status === "Accepted" && Number(r.percent) > 0);
+        .filter(r => r.status === "Accepted");
 
       const lvlSnap = await getDocs(collection(db, "levels"));
       const levelsMap = new Map();
@@ -378,33 +378,23 @@
         const level = { id: d.id, ...d.data() };
         if (isDemon(level)) levelsMap.set(d.id, level);
       });
-      const bestDemonRecordIds = new Set(
-        bestAcceptedDemonRecords(allRecs, levelsMap).map(item => item.record.id)
-      );
-
+      const aggregate = aggregatePlayerStats(allRecs, levelsMap).players;
+      const bestDemonRecords = bestAcceptedDemonRecords(allRecs, levelsMap);
       const playerStats = new Map();
-      countryProfiles.forEach((_, uid) => playerStats.set(uid, { points: 0, records100: 0 }));
+      countryProfiles.forEach((_, uid) => {
+        const stats = aggregate.get(uid);
+        playerStats.set(uid, {
+          points: stats?.points || 0,
+          records100: stats?.completions || 0
+        });
+      });
       const fullRecords = [];
 
-      allRecs.forEach(r => {
-        [r.userId, r.player2Id].filter(Boolean).forEach(uid => {
-          if (!countryProfiles.has(uid)) return;
-          const lvl = levelsMap.get(r.levelId);
-          if (!lvl) return;
-           if (!bestDemonRecordIds.has(r.id)) return;
-          const pct = Number(r.percent);
-          const pts = computeRecordPoints(r, lvl);
-          if (pts <= 0) return;
-          const st  = playerStats.get(uid);
-          st.points += pts;
-          if (pct === 100) st.records100++;
-        });
-        if (
-          Number(r.percent) === 100 &&
-          bestDemonRecordIds.has(r.id) &&
-          countryProfiles.has(r.userId)
-        )
-          fullRecords.push(r);
+      bestDemonRecords.forEach(item => {
+        if (Number(item.record.percent) === 100 &&
+            countryProfiles.has(item.uid)) {
+          fullRecords.push({ ...item.record, _statUid: item.uid });
+        }
       });
 
       let totalPts = 0, totalRecs = 0;

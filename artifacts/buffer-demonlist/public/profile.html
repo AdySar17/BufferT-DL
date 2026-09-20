@@ -1149,8 +1149,9 @@
   import { DIFFICULTY_IMAGES } from "/difficulty.js";
    import { computeLunas, isDemon, isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
    import {
+    aggregatePlayerStats,
+    buildScoredLevelMap,
      bestAcceptedDemonRecords,
-     bestAcceptedDemonRecordIds,
      computeRecordPoints
    } from "/record-scoring.js";
   import { levelBackgroundUrl } from "/level-visuals.js";
@@ -1369,50 +1370,32 @@
       ]);
       const lvlMap = new Map();
       lvlSnap.forEach(d => lvlMap.set(d.id, d.data()));
+      const records = recsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const aggregate = aggregatePlayerStats(records, lvlMap).players;
 
-       const points = new Map();   // uid -> total classic points
-      const lunas = new Map();    // uid -> total Pemon Lunas
-       const bestDemonRecords = bestAcceptedDemonRecords(
-         recsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-         lvlMap
-       );
-       const bestDemonRecordIds = new Set(
-         bestDemonRecords.map(item => item.record.id)
-       );
-      recsSnap.forEach(d => {
-        const r = d.data();
-        if (r.status !== "Accepted") return;
-        const lvl = lvlMap.get(r.levelId);
-        if (!lvl) return;
-        const players = [r.userId, r.player2Id].filter(Boolean);
-        if (isPemon(lvl)) {
-          const time = Number(r.timeMs);
-          const levelLunas = computeLunas(lvl.position) || Number(lvl.value) || 0;
-          if (!Number.isFinite(time) || time <= 0 || levelLunas <= 0) return;
-          players.forEach(u => lunas.set(u, (lunas.get(u) || 0) + levelLunas));
-          return;
-        }
-        if (!isDemon(lvl)) return;
-         if (!bestDemonRecordIds.has(d.id)) return;
-        const v = computeRecordPoints(r, lvl);
-        if (v <= 0) return;
-        players.forEach(u => {
-          if (!u) return;
-          points.set(u, (points.get(u) || 0) + v);
-        });
-      });
-
-      const rankOf = (map) => {
-        const mine = map.get(uid) || 0;
+      const rankOf = (field) => {
+        const mine = Number(aggregate.get(uid)?.[field] || 0);
         if (mine <= 0) return "—";
-        const ranked = [...map.entries()]
-          .filter(([, v]) => v > 0)
-          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-        const index = ranked.findIndex(([userId]) => userId === uid);
-        return index < 0 ? "—" : `#${index + 1}`;
+        const ranked = [...aggregate.entries()]
+          .filter(([, stats]) => Number(stats[field] || 0) > 0)
+          .sort((a, b) =>
+            Number(b[1][field] || 0) - Number(a[1][field] || 0) ||
+            a[0].localeCompare(b[0])
+          );
+        let lastValue = null;
+        let currentRank = 0;
+        for (let index = 0; index < ranked.length; index += 1) {
+          const value = Number(ranked[index][1][field] || 0);
+          if (value !== lastValue) {
+            currentRank = index + 1;
+            lastValue = value;
+          }
+          if (ranked[index][0] === uid) return `#${currentRank}`;
+        }
+        return "—";
       };
-      if (classicEl) classicEl.textContent = rankOf(points);
-      if (platEl) platEl.textContent = rankOf(lunas);
+      if (classicEl) classicEl.textContent = rankOf("points");
+      if (platEl) platEl.textContent = rankOf("lunas");
     } catch (e) {
       console.warn("[profile] loadRankings error:", e);
       if (classicEl) classicEl.textContent = "—";
@@ -1678,6 +1661,14 @@
         const level = levelsCache.get(r.levelId);
         return isNewLevelRecord(r) || (level && (isDemon(level) || isPemon(level)));
       });
+      const allLevelsSnap = await getDocs(collection(db, "levels"));
+      const allLevels = new Map();
+      allLevelsSnap.forEach(docSnap => {
+        allLevels.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+      });
+      const scoredLevels = buildScoredLevelMap(allLevels);
+      levelsCache.clear();
+      scoredLevels.forEach((level, id) => levelsCache.set(id, level));
 
       /* Cargar profiles del compañero (player1 si soy player2, o viceversa) */
       const otherIds = new Set();
@@ -1714,59 +1705,34 @@
   }
 
   function recomputeStats(uid) {
-    let points = 0, count = 0, lunas = 0;
-    const diffCounts = {
-      "Extreme Demon": 0, "Insane Demon": 0, "Hard Demon": 0,
-      "Medium Demon": 0, "Easy Demon": 0
+    const stats = aggregatePlayerStats(myRecords, levelsCache).players.get(uid) || {
+      points: 0,
+      records: 0,
+      lunas: 0,
+      "Extreme Demon": 0,
+      "Insane Demon": 0,
+      "Hard Demon": 0,
+      "Medium Demon": 0,
+      "Easy Demon": 0,
+      hardest: null,
+      hardestPos: Infinity,
+      platformerHardest: null,
+      platformerHardestPos: Infinity
     };
-    let hardestLvl = null;       // nivel con menor `position` completado al 100%
-    let hardestPos = Infinity;
-    let platformerHardestLvl = null;
-    let platformerHardestPos = Infinity;
-     const bestDemonRecords = bestAcceptedDemonRecords(myRecords, levelsCache)
-       .filter(item => item.uid === uid);
-     const bestDemonRecordIds = new Set(
-       bestDemonRecords.map(item => item.record.id)
-     );
-
-     myRecords.forEach(r => {
-      if (r.status !== "Accepted") return;
-      const lvl = levelsCache.get(r.levelId);
-      if (!lvl) return;
-      if (isPemon(lvl)) {
-        const time = Number(r.timeMs);
-        const levelLunas = computeLunas(lvl.position) || Number(lvl.value) || 0;
-        if (Number.isFinite(time) && time > 0 && levelLunas > 0) {
-          lunas += levelLunas;
-          const pos = Number(lvl.position);
-          if (Number.isFinite(pos) && pos > 0 && pos < platformerHardestPos) {
-            platformerHardestPos = pos;
-            platformerHardestLvl = lvl;
-          }
-        }
-        return;
-      }
-      if (!isDemon(lvl)) return;
-       if (!bestDemonRecordIds.has(r.id)) return;
-      const earned = computeRecordPoints(r, lvl);
-      if (earned <= 0) return;
-      points += earned;
-      count++;                                      // cuenta como record igual
-      if (pct === 100) {
-        const d = (lvl.difficulty && diffCounts.hasOwnProperty(lvl.difficulty))
-          ? lvl.difficulty
-          : "Extreme Demon";
-        diffCounts[d]++;
-        const pos = Number(lvl.position);
-        if (Number.isFinite(pos) && pos > 0 && pos < hardestPos) {
-          hardestPos = pos;
-          hardestLvl = lvl;
-        }
-      }
-    });
-    $("pPoints").textContent  = Math.round(points * 100) / 100;
-    $("pRecords").textContent = count;
-    $("pLunas").textContent = Math.round(lunas * 100) / 100;
+    const hardestLvl = stats.hardest;
+    const platformerHardestLvl = stats.platformerHardest;
+    const hardestPos = stats.hardestPos;
+    const platformerHardestPos = stats.platformerHardestPos;
+    const diffCounts = {
+      "Extreme Demon": stats["Extreme Demon"],
+      "Insane Demon": stats["Insane Demon"],
+      "Hard Demon": stats["Hard Demon"],
+      "Medium Demon": stats["Medium Demon"],
+      "Easy Demon": stats["Easy Demon"]
+    };
+    $("pPoints").textContent  = stats.points;
+    $("pRecords").textContent = stats.records;
+    $("pLunas").textContent = stats.lunas;
     const phEl = $("pPlatformerHardest");
     if (phEl) {
       if (platformerHardestLvl) {
@@ -1810,8 +1776,12 @@
     const list = $("recordsList");
     list.innerHTML = "";
 
-     const isViewerOwner = !!(currentUser && currentUser.uid === targetUid);
-     const scoredDemonRecordIds = bestAcceptedDemonRecordIds(myRecords, levelsCache);
+    const isViewerOwner = !!(currentUser && currentUser.uid === targetUid);
+    const scoredDemonRecordIds = new Set(
+      bestAcceptedDemonRecords(myRecords, levelsCache)
+        .filter(item => item.uid === targetUid)
+        .map(item => item.record.id)
+    );
     /* Default y Booster NO pueden ver records Pendientes ni Rechazados
        de otros perfiles. Solo Mod/Admin/Owner ven todo en perfiles ajenos.
        En el propio perfil siempre se ve todo. */
@@ -1941,7 +1911,6 @@
          isDemon(lvl) &&
          scoredDemonRecordIds.has(rec.id) &&
          Number(rec.percent) > 0 &&
-         lvl.value
        ) {
         const earned = computeRecordPoints(rec, lvl);
         const pts    = document.createElement("div");
