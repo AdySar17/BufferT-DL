@@ -1257,7 +1257,7 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-    import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, TIERS } from "/points.js";
+    import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, TIERS, formatPoints } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
     import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
     import { youtubeThumbnailFromVideo } from "/video-utils.js";
@@ -1547,7 +1547,7 @@
           `}
           <div class="level-info">
             <div class="level-title">#${pos} - ${nivel.name}</div>
-            <div class="level-author">By ${nivel.author} · ${nivel.value || "—"} pts · Tier ${resolveTier(nivel)}</div>
+            <div class="level-author">By ${nivel.author} · ${nivel.value != null ? formatPoints(nivel.value) : "—"} pts · Tier ${resolveTier(nivel)}</div>
             <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
             ${options.searchResult ? `<button type="button" class="list-jump-button">VER EN LISTA</button>` : ""}
           </div>

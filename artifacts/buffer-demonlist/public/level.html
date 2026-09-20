@@ -615,7 +615,7 @@
   import { db } from "/auth.js";
   import { difficultyImage, difficultyName } from "/difficulty.js";
   import { isDemon } from "/list-utils.js";
-  import { resolveTier, DEFAULT_TIER } from "/points.js";
+  import { resolveTier, DEFAULT_TIER, formatPoints } from "/points.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
@@ -650,7 +650,8 @@
     /* Título: "#85 - Komodo" en vez de "85 - Komodo" */
     document.getElementById("lvlName").textContent      = (nivel.position ? `#${nivel.position} - ` : "") + (nivel.name || "Sin nombre");
     document.getElementById("lvlSub").textContent       = `By ${nivel.author || "Desconocido"}`;
-    document.getElementById("lvlPoints").textContent    = nivel.value  ? `${nivel.value}` : "—";
+    document.getElementById("lvlPoints").textContent    =
+      nivel.value != null && isDemon(nivel) ? formatPoints(nivel.value) : (nivel.value ?? "—");
     document.getElementById("lvlAuthor").textContent    = nivel.author || "—";
     /* ID de Geometry Dash del nivel (si existe) */
     const lvlGdIdEl = document.getElementById("lvlGdId");

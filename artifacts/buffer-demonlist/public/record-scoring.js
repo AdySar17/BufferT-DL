@@ -29,7 +29,7 @@ export function computeRecordPoints(record, level) {
     return 0;
   }
   const clampedPercent = Math.min(100, Math.max(0, percent));
-  return Math.round(base * (clampedPercent / 100) * 1000000) / 1000000;
+  return Math.round(base * (clampedPercent / 100) * 100) / 100;
 }
 
 function recordTimestamp(record) {

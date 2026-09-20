@@ -80,9 +80,14 @@ export function tierFromGddlRating(rating, fallback = null) {
   return Math.min(TIERS.length, Math.max(1, Math.round(value)));
 }
 
-function round6(value) {
+function round2(value) {
   if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.round(value * 1000000) / 1000000;
+  return Math.round(value * 100) / 100;
+}
+
+export function formatPoints(value) {
+  const points = Number(value);
+  return Number.isFinite(points) ? points.toFixed(2) : "—";
 }
 
 /**
@@ -95,7 +100,7 @@ export function computeTierPoints(tier, tierPosition = 1, tierCount = 1) {
   const rank = Math.min(count, Math.max(1, Math.floor(Number(tierPosition) || 1)));
   const progress = count === 1 ? 0 : (rank - 1) / (count - 1);
   const curvedProgress = Math.pow(progress, definition.curve);
-  return round6(
+  return round2(
     definition.max - (definition.max - definition.min) * curvedProgress
   );
 }
