@@ -467,6 +467,18 @@
           </button>
           <div id="tiersStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
+        <div style="grid-column:1/-1; padding:12px; border:1px solid rgba(255,190,70,.28); border-radius:10px; background:rgba(255,190,70,.035);">
+          <div style="font-weight:700; color:#ffd27a; margin-bottom:4px;">Reconstrucción de emergencia</div>
+          <div style="font-size:.78rem; color:rgba(230,230,230,.68); line-height:1.4; margin-bottom:9px;">
+            Recorre todos los records y niveles para reconstruir puntos, completions,
+            dificultades, Hardest y rankings. No modifica records, porcentajes,
+            vídeos, jugadores, fechas ni verificaciones.
+          </div>
+          <button id="btnRebuildAllRecordData" class="btn" style="width:100%; background:rgba(255,190,70,.14); color:#ffd27a; border:1px solid rgba(255,190,70,.45);">
+            ACTUALIZAR DATA COMPLETA DE TODOS LOS RECORDS
+          </button>
+          <div id="rebuildRecordDataStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -724,7 +736,13 @@
   } from "/list-utils.js";
   import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
   import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
-  import { computeRecordPoints } from "/record-scoring.js";
+  import {
+    aggregatePlayerStats,
+    bestAcceptedDemonRecords,
+    bestAcceptedPemonRecords,
+    buildScoredLevelMap,
+    computeRecordPoints
+  } from "/record-scoring.js";
   import { youtubeThumbnailFromVideo } from "/video-utils.js";
   import { gdBgUrl } from "/level-visuals.js";
 
@@ -2515,6 +2533,156 @@
 
   $("btnRefreshApiData").addEventListener("click", refreshAllApiData);
   $("btnUpdateTiers").addEventListener("click", updateAllTiers);
+
+  /* ============================================================
+   *   RECONSTRUCCIÓN DE EMERGENCIA DE DATA DERIVADA DE RECORDS
+   *   ----------------------------------------------------------
+   *   Esta herramienta no forma parte del flujo normal. Lee las
+   *   colecciones una sola vez, calcula todo en memoria con el mismo
+   *   motor usado por Profile/Leaderboards y sólo sincroniza los
+   *   campos de resumen existentes en profiles.
+   *
+   *   Nunca escribe en records ni en levels.
+   * ============================================================ */
+  async function rebuildAllRecordData() {
+    if (!isOwner()) {
+      showToast("Sólo el Owner puede ejecutar esta acción.", true);
+      return;
+    }
+
+    const btn = $("btnRebuildAllRecordData");
+    const status = $("rebuildRecordDataStatus");
+    if (!confirm(
+      "¿Reconstruir toda la data derivada de TODOS los records?\n\n" +
+      "Se leerán records, niveles y perfiles. Sólo se actualizarán los " +
+      "campos de resumen existentes points y recordsCount en profiles. " +
+      "No se modificará ningún record ni nivel."
+    )) return;
+
+    btn.disabled = true;
+    btn.textContent = "RECONSTRUYENDO DATA…";
+    status.style.color = "rgba(230,230,230,0.75)";
+    status.textContent = "Leyendo records, niveles y perfiles…";
+
+    try {
+      const [recordsSnap, levelsSnap, profilesSnap] = await Promise.all([
+        getDocs(collection(db, "records")),
+        getDocs(collection(db, "levels")),
+        getDocs(collection(db, "profiles"))
+      ]);
+
+      const records = recordsSnap.docs.map(item => ({
+        id: item.id,
+        ...item.data()
+      }));
+      const rawLevels = new Map();
+      levelsSnap.forEach(item => {
+        rawLevels.set(item.id, { id: item.id, ...item.data() });
+      });
+      const scoredLevels = buildScoredLevelMap(rawLevels);
+
+      status.textContent =
+        `Calculando ${records.length} records y ${scoredLevels.size} niveles…`;
+      const aggregate = aggregatePlayerStats(records, scoredLevels).players;
+      const bestClassic = bestAcceptedDemonRecords(records, scoredLevels);
+      const bestPlatformer = bestAcceptedPemonRecords(records, scoredLevels);
+
+      /*
+       * El ranking se calcula ahora para validar/reconstruir la misma
+       * posición global que usa Leaderboards. No se guarda una posición
+       * redundante: Leaderboards la recalcula desde estos datos.
+       */
+      const rankOf = (field) => {
+        const ranked = [...aggregate.entries()]
+          .filter(([, stats]) => Number(stats[field] || 0) > 0)
+          .sort((a, b) =>
+            Number(b[1][field] || 0) - Number(a[1][field] || 0) ||
+            a[0].localeCompare(b[0])
+          );
+        const result = new Map();
+        let lastValue = null;
+        let currentRank = 0;
+        ranked.forEach(([uid, stats], index) => {
+          const value = Number(stats[field] || 0);
+          if (value !== lastValue) {
+            currentRank = index + 1;
+            lastValue = value;
+          }
+          result.set(uid, currentRank);
+        });
+        return result;
+      };
+      const classicRanks = rankOf("points");
+      const platformerRanks = rankOf("lunas");
+
+      const profileUpdates = profilesSnap.docs.map(profileDoc => {
+        const stats = aggregate.get(profileDoc.id);
+        return {
+          id: profileDoc.id,
+          points: Math.round(Number(stats?.points || 0) * 100) / 100,
+          recordsCount: Number(stats?.records || 0),
+          classicRank: classicRanks.get(profileDoc.id) || null,
+          platformerRank: platformerRanks.get(profileDoc.id) || null
+        };
+      });
+
+      status.textContent =
+        `Calculado: ${bestClassic.length} records Classic y ` +
+        `${bestPlatformer.length} records Pemon. Sincronizando perfiles…`;
+
+      /*
+       * Sólo se escriben los dos campos de resumen que ya existen en
+       * profiles. Los ranks y el resto de estadísticas permanecen derivados
+       * en memoria para no ampliar la estructura de Firestore.
+       */
+      const CHUNK = 400;
+      let written = 0;
+      for (let index = 0; index < profileUpdates.length; index += CHUNK) {
+        const batch = writeBatch(db);
+        const chunk = profileUpdates.slice(index, index + CHUNK);
+        chunk.forEach(item => {
+          batch.update(doc(db, "profiles", item.id), {
+            points: item.points,
+            recordsCount: item.recordsCount
+          });
+        });
+        await batch.commit();
+        written += chunk.length;
+        status.textContent = `Perfiles sincronizados: ${written}/${profileUpdates.length}…`;
+      }
+
+      const playersWithPoints = [...aggregate.values()]
+        .filter(stats => Number(stats.points || 0) > 0).length;
+      const playersWithCompletions = [...aggregate.values()]
+        .filter(stats => Number(stats.completions || 0) > 0).length;
+      status.style.color = "#7fff3b";
+      status.textContent =
+        `✔ Reconstrucción lista: ${records.length} records, ` +
+        `${playersWithPoints} jugadores con puntos, ` +
+        `${playersWithCompletions} con completions, ` +
+        `${written} perfiles sincronizados. Rankings recalculados en memoria.`;
+      showToast("Data completa de records reconstruida.");
+      console.log("[panel] rebuildAllRecordData", {
+        records: records.length,
+        levels: scoredLevels.size,
+        bestClassic: bestClassic.length,
+        bestPlatformer: bestPlatformer.length,
+        profiles: written,
+        classicRanks: classicRanks.size,
+        platformerRanks: platformerRanks.size
+      });
+    } catch (error) {
+      console.error("[panel] rebuildAllRecordData error:", error);
+      status.style.color = "#ff7a7a";
+      status.textContent = "Error: " + (error.message || error.code || "desconocido");
+      showToast("Error al reconstruir la data: " + (error.message || error.code || "desconocido"), true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "ACTUALIZAR DATA COMPLETA DE TODOS LOS RECORDS";
+    }
+  }
+
+  $("btnRebuildAllRecordData").addEventListener("click", rebuildAllRecordData);
 
   /* ============================================================
    *   PANEL DE RECLAMOS — Mis reclamos activos (y todos para Admin/Owner)

@@ -2,14 +2,14 @@ import { computeLunas, isDemon, isPemon } from "/list-utils.js";
 import { calculateClassicScores } from "/points.js";
 
 /**
- * Un nivel Classic solo genera puntos mientras pertenece al Main List.
- * Los records no se borran ni se ocultan; esta regla solo determina si
- * participan en los cálculos de puntos.
+ * Cualquier nivel Classic con un valor de puntos válido puede puntuar.
+ * La posición sólo participa en la curva de 39 Tiers; no limita el cálculo
+ * al Main List. Los records no se borran ni se ocultan.
  */
 export function isScorableDemonLevel(level) {
   if (!level || !isDemon(level)) return false;
-  const position = Number(level.position);
-  return Number.isFinite(position) && position >= 1 && position <= 50;
+  const value = Number(level.value);
+  return Number.isFinite(value) && value > 0;
 }
 
 /**
@@ -88,8 +88,9 @@ function isBetterDemonRecord(candidate, current) {
  * Devuelve un único record aceptado por jugador+nivel.
  * El porcentaje más alto gana; si empata, gana el más reciente.
  *
- * Los records de niveles fuera del Main List se excluyen del resultado,
- * pero permanecen intactos en Firestore y siguen disponibles para el perfil.
+ * Los records de niveles fuera del Main List también participan cuando el
+ * nivel tiene puntos válidos. El mejor porcentaje gana; un 100% reemplaza
+ * cualquier progreso anterior del mismo jugador y nivel.
  */
 export function bestAcceptedDemonRecords(records, levelsById) {
   const scoredLevels = buildScoredLevelMap(levelsById);
@@ -101,7 +102,7 @@ export function bestAcceptedDemonRecords(records, levelsById) {
     if (!isScorableDemonLevel(level)) continue;
 
     const percent = Number(record.percent);
-    if (!Number.isFinite(percent) || percent <= 0) continue;
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 100) continue;
 
     for (const uid of recordPlayers(record)) {
       const key = `${uid}::${record.levelId}`;
