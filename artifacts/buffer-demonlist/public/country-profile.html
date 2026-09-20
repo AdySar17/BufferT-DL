@@ -340,6 +340,7 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
   import { isDemon } from "/list-utils.js";
+  import { bestAcceptedDemonRecords } from "/record-scoring.js";
 
   const code = (new URLSearchParams(location.search).get("code") || "").toLowerCase();
 
@@ -377,6 +378,9 @@
         const level = { id: d.id, ...d.data() };
         if (isDemon(level)) levelsMap.set(d.id, level);
       });
+      const bestDemonRecordIds = new Set(
+        bestAcceptedDemonRecords(allRecs, levelsMap).map(item => item.record.id)
+      );
 
       const playerStats = new Map();
       countryProfiles.forEach((_, uid) => playerStats.set(uid, { points: 0, records100: 0 }));
@@ -387,6 +391,7 @@
           if (!countryProfiles.has(uid)) return;
           const lvl = levelsMap.get(r.levelId);
           if (!lvl) return;
+           if (!bestDemonRecordIds.has(r.id)) return;
           const pct = Number(r.percent);
           const pts = pct === 100 ? Number(lvl.value || 0) : Number(lvl.value || 0) / 10;
           const st  = playerStats.get(uid);

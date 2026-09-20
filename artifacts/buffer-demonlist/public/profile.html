@@ -1147,7 +1147,13 @@
 <script type="module">
   import { db, onAuthChange, refreshProfile } from "/auth.js";
   import { DIFFICULTY_IMAGES } from "/difficulty.js";
-  import { computeLunas, isDemon, isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
+   import { computeLunas, isDemon, isPemon, PEMON_LIST_TYPE } from "/list-utils.js";
+   import {
+     bestAcceptedDemonRecords,
+     bestAcceptedDemonRecordIds,
+     recordPlayers,
+     isScorableDemonLevel
+   } from "/record-scoring.js";
   import { levelBackgroundUrl } from "/level-visuals.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
            collection, query, where, getDocs }
@@ -1365,8 +1371,15 @@
       const lvlMap = new Map();
       lvlSnap.forEach(d => lvlMap.set(d.id, d.data()));
 
-      const points = new Map();   // uid -> total classic points
+       const points = new Map();   // uid -> total classic points
       const lunas = new Map();    // uid -> total Pemon Lunas
+       const bestDemonRecords = bestAcceptedDemonRecords(
+         recsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+         lvlMap
+       );
+       const bestDemonRecordIds = new Set(
+         bestDemonRecords.map(item => item.record.id)
+       );
       recsSnap.forEach(d => {
         const r = d.data();
         if (r.status !== "Accepted") return;
@@ -1381,6 +1394,7 @@
           return;
         }
         if (!isDemon(lvl)) return;
+         if (!bestDemonRecordIds.has(d.id)) return;
         const pct = Number(r.percent);
         if (!Number.isFinite(pct) || pct <= 0) return;
         const base = Number(lvl.value || 0);
@@ -1712,7 +1726,13 @@
     let hardestPos = Infinity;
     let platformerHardestLvl = null;
     let platformerHardestPos = Infinity;
-    myRecords.forEach(r => {
+     const bestDemonRecords = bestAcceptedDemonRecords(myRecords, levelsCache)
+       .filter(item => item.uid === uid);
+     const bestDemonRecordIds = new Set(
+       bestDemonRecords.map(item => item.record.id)
+     );
+
+     myRecords.forEach(r => {
       if (r.status !== "Accepted") return;
       const lvl = levelsCache.get(r.levelId);
       if (!lvl) return;
@@ -1730,6 +1750,7 @@
         return;
       }
       if (!isDemon(lvl)) return;
+       if (!bestDemonRecordIds.has(r.id)) return;
       const pct = Number(r.percent);
       if (!Number.isFinite(pct) || pct <= 0) return;
       const base = Number(lvl.value || 0);
@@ -1793,7 +1814,8 @@
     const list = $("recordsList");
     list.innerHTML = "";
 
-    const isViewerOwner = !!(currentUser && currentUser.uid === targetUid);
+     const isViewerOwner = !!(currentUser && currentUser.uid === targetUid);
+     const scoredDemonRecordIds = bestAcceptedDemonRecordIds(myRecords, levelsCache);
     /* Default y Booster NO pueden ver records Pendientes ni Rechazados
        de otros perfiles. Solo Mod/Admin/Owner ven todo en perfiles ajenos.
        En el propio perfil siempre se ve todo. */
@@ -1918,7 +1940,13 @@
       const aside = document.createElement("div");
       aside.className = "lvl-aside";
 
-      if (rec.status === "Accepted" && Number(rec.percent) > 0 && lvl.value) {
+       if (
+         rec.status === "Accepted" &&
+         isDemon(lvl) &&
+         scoredDemonRecordIds.has(rec.id) &&
+         Number(rec.percent) > 0 &&
+         lvl.value
+       ) {
         const base   = Number(lvl.value);
         const earned = Number(rec.percent) === 100 ? base : (base / 10);
         const pts    = document.createElement("div");

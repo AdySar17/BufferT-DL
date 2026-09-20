@@ -425,6 +425,7 @@
     import { onAuthChange, db, isStaff, mountAuthUI } from "/auth.js";
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
     import { computeLunas, isDemon, isPemon } from "/list-utils.js";
+    import { bestAcceptedDemonRecords } from "/record-scoring.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
@@ -505,6 +506,9 @@
           const level = d.data();
           if (isDemon(level) || isPemon(level)) levelsCache.set(d.id, level);
         });
+        const bestDemonRecordIds = new Set(
+          bestAcceptedDemonRecords(records, levelsCache).map(item => item.record.id)
+        );
 
         /* 3) Agregar por usuario */
         const map = new Map();
@@ -535,6 +539,7 @@
             return;
           }
           if (!isDemon(lvl)) return;
+          if (!bestDemonRecordIds.has(r.id)) return;
           const pct  = Number(r.percent);
           if (!Number.isFinite(pct) || pct <= 0) return;
           const base = Number(lvl.value || 0);

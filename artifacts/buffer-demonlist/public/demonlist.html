@@ -1288,6 +1288,73 @@
     let _editSelectedRewards = [];
     let _inpSelectedRewards  = [];
     const _sourceMetadata = { inp: null, edit: null };
+    const _manualOverrides = { inp: {}, edit: {} };
+    const _autoFormValues = { inp: {}, edit: {} };
+    const _externalLookupUsed = { inp: false, edit: false };
+
+    function applyExternalField(prefix, field, value) {
+      if (_manualOverrides[prefix]?.[field]) return false;
+      _autoFormValues[prefix][field] = value;
+      return true;
+    }
+
+    function sameManualValue(a, b) {
+      if (Array.isArray(a) || Array.isArray(b)) {
+        return JSON.stringify(a || []) === JSON.stringify(b || []);
+      }
+      return String(a ?? "") === String(b ?? "");
+    }
+
+    function collectManualOverrides(prefix, original) {
+      const current = {
+        name: document.getElementById(`${prefix}-name`).value.trim(),
+        author: document.getElementById(`${prefix}-author`).value.trim(),
+        creators: document.getElementById(`${prefix}-creators`).value
+          .split(",").map(s => s.trim()).filter(Boolean),
+        gdLevelId: document.getElementById(`${prefix}-gdLevelId`).value.trim(),
+        position: Number(document.getElementById(`${prefix}-position`).value) || null,
+        thumbnail: document.getElementById(`${prefix}-thumbnail`).value.trim(),
+        background: document.getElementById(`${prefix}-background`).value.trim(),
+        video: document.getElementById(`${prefix}-video`).value.trim(),
+        glow: document.getElementById(`${prefix}-glow`).value.trim(),
+        description: document.getElementById(`${prefix}-description`).value.trim(),
+        difficulty: document.getElementById(`${prefix}-difficulty`).value,
+        tags: getTags(prefix),
+        is2P: document.getElementById(`${prefix}-is2P`).checked
+      };
+      const previous = { ...(original?.manualOverrides || {}) };
+      const auto = _autoFormValues[prefix] || {};
+      const fields = Object.keys(current);
+      fields.forEach(field => {
+        if (Object.prototype.hasOwnProperty.call(auto, field)) {
+          if (sameManualValue(current[field], auto[field])) {
+            delete previous[field];
+          } else {
+            previous[field] = true;
+          }
+          return;
+        }
+        if (original && !sameManualValue(current[field], original[field])) {
+          previous[field] = true;
+        }
+      });
+      return previous;
+    }
+
+    function externalMetadataPayload(prefix) {
+      const metadata = _sourceMetadata[prefix] || {};
+      const payload = {};
+      const rating = Number(metadata.rating ?? metadata.score);
+      if (Number.isFinite(rating)) {
+        payload.gddlRating = rating;
+        payload.gddlScore = rating;
+      }
+      if (metadata.difficulty) payload.gddlDifficulty = String(metadata.difficulty);
+      if (_externalLookupUsed[prefix]) {
+        payload.externalLastFetchedAt = serverTimestamp();
+      }
+      return payload;
+    }
 
     /* ===== Custom IDs state ===== */
     let _inpCustomIds  = [];
@@ -1835,22 +1902,34 @@
         if (requestNumber !== aredlRequestNumber) return;
 
         aredlApplying = true;
-        document.getElementById(`${prefix}-name`).value = level.name || "";
-        document.getElementById(`${prefix}-author`).value = level.author || "";
-        document.getElementById(`${prefix}-creators`).value = level.creators.join(", ");
-        document.getElementById(`${prefix}-description`).value = level.description || "";
-        /* La miniatura sólo se deriva del video guardado en BufferList. */
-        document.getElementById(`${prefix}-thumbnail`).value =
-          youtubeThumbnailFromVideo(document.getElementById(`${prefix}-video`).value);
-        document.getElementById(`${prefix}-is2P`).checked = !!level.twoPlayer;
-        document.getElementById(`${prefix}-gdLevelId`).value = level.gdLevelId || gdLevelId;
+        if (applyExternalField(prefix, "name", level.name || ""))
+          document.getElementById(`${prefix}-name`).value = level.name || "";
+        if (applyExternalField(prefix, "author", level.author || ""))
+          document.getElementById(`${prefix}-author`).value = level.author || "";
+        if (applyExternalField(prefix, "creators", level.creators.join(", ")))
+          document.getElementById(`${prefix}-creators`).value = level.creators.join(", ");
+        if (applyExternalField(prefix, "description", level.description || ""))
+          document.getElementById(`${prefix}-description`).value = level.description || "";
+        /* La miniatura también es un campo manual: una miniatura editada
+           por Staff nunca vuelve a ser reemplazada por el lookup. */
+        const autoThumbnail = youtubeThumbnailFromVideo(
+          document.getElementById(`${prefix}-video`).value
+        );
+        if (applyExternalField(prefix, "thumbnail", autoThumbnail))
+          document.getElementById(`${prefix}-thumbnail`).value = autoThumbnail;
+        if (applyExternalField(prefix, "is2P", !!level.twoPlayer))
+          document.getElementById(`${prefix}-is2P`).checked = !!level.twoPlayer;
+        if (applyExternalField(prefix, "gdLevelId", level.gdLevelId || gdLevelId))
+          document.getElementById(`${prefix}-gdLevelId`).value = level.gdLevelId || gdLevelId;
         document.getElementById(`${prefix}-aredl-id`).value = level.aredlId || "";
         document.getElementById(`${prefix}-aredl-position`).value = level.aredlPosition || "";
         document.getElementById(`${prefix}-gddl-id`).value = level.gddlId || "";
         document.getElementById(`${prefix}-gddl-position`).value = level.gddlPosition || "";
         _sourceMetadata[prefix] = level.gddlData || null;
-        setTags(prefix, level.tags);
-        if (suggestedPosition) {
+        _externalLookupUsed[prefix] = true;
+        if (applyExternalField(prefix, "tags", level.tags || []))
+          setTags(prefix, level.tags);
+        if (suggestedPosition && applyExternalField(prefix, "position", suggestedPosition)) {
           document.getElementById(`${prefix}-position`).value = suggestedPosition;
           document.getElementById(`${prefix}-position`).dispatchEvent(new Event("input"));
         }
@@ -2316,6 +2395,8 @@
       const aredlPosition = Number(document.getElementById("edit-aredl-position").value);
       const gddlId = document.getElementById("edit-gddl-id").value.trim();
       const gddlPosition = Number(document.getElementById("edit-gddl-position").value);
+      const originalForOverrides = (await fetchAllLevels()).find(level => level.id === id) || null;
+      const manualOverrides = collectManualOverrides("edit", originalForOverrides);
 
       if (!name || !author) { alert("Nombre y host son obligatorios."); return; }
       if (!reqPos)           { alert("Debes indicar una posición (≥ 1)."); return; }
@@ -2344,6 +2425,8 @@
             gddlPosition: Number.isFinite(gddlPosition) && gddlPosition > 0
               ? gddlPosition : null,
             gddlData: _sourceMetadata.edit,
+            ...externalMetadataPayload("edit"),
+            manualOverrides,
             rewards: _editSelectedRewards,
             customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status }))
           };
@@ -2378,6 +2461,8 @@
           gddlPosition: Number.isFinite(gddlPosition) && gddlPosition > 0
             ? gddlPosition : null,
           gddlData: _sourceMetadata.edit,
+          ...externalMetadataPayload("edit"),
+          manualOverrides,
           rewards: _editSelectedRewards,
           customIds: _editCustomIds.map(c => ({ id: c.id, por: c.por, status: c.status })),
           position: insertAt, value: newValue

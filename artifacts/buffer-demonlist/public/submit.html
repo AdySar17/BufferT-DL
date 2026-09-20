@@ -737,7 +737,7 @@
       getNewLevelType
     } from "/list-utils.js";
     import {
-      collection, getDocs, getDoc, doc, addDoc, query, where, limit,
+      collection, getDocs, getDoc, doc, addDoc, updateDoc, query, where, limit,
       orderBy, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -1477,21 +1477,24 @@
           }
         }
       } else {
-        /* Para nivel existente: mismo userId+levelId+percent ya pendiente o aceptado */
+        /* Para nivel existente: conservar un único resultado puntuable por
+         * jugador+nivel. Un progreso menor que el mejor ya existente no se
+         * acepta como otro record; un progreso mayor puede reemplazarlo.
+         * Los docs anteriores se conservan para historial y se marcan después
+         * de crear el nuevo record. */
         try {
           const dupSnap = await getDocs(query(
             collection(db, "records"),
             where("userId", "==", submitterUid),
             where("levelId", "==", levelId),
-            limit(20)
+            limit(50)
           ));
-          const dup = dupSnap.docs.find(d => {
-            const dd = d.data();
-            const sameResult = isPemonRecord
-              ? Number(dd.timeMs) === timeMs
-              : Number(dd.percent) === percent;
-            return sameResult && dd.status !== "Rejected";
-          });
+          const existing = dupSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(dd => dd.status !== "Rejected");
+          const dup = existing.find(dd => isPemonRecord
+            ? Number(dd.timeMs) === timeMs
+            : Number(dd.percent) === percent);
           if (dup) {
             showMsg(
               isPemonRecord
@@ -1501,8 +1504,26 @@
             );
             return;
           }
+          if (!isPemonRecord) {
+            const bestExistingPercent = Math.max(
+              0,
+              ...existing.map(dd => Number(dd.percent)).filter(Number.isFinite)
+            );
+            if (bestExistingPercent > percent) {
+              showMsg(
+                `Ya tienes un récord mejor (${bestExistingPercent}%) para este nivel. ` +
+                "Solo puedes enviar un porcentaje superior.",
+                "err"
+              );
+              return;
+            }
+          }
+          window.__recordsBeingReplaced = existing
+            .filter(dd => !isPemonRecord && Number(dd.percent) < percent)
+            .map(dd => dd.id);
         } catch (err) {
           console.warn("[submit] dup check skipped:", err);
+          window.__recordsBeingReplaced = [];
         }
       }
 
@@ -1541,6 +1562,18 @@
             : activeListType
         };
         const ref = await addDoc(collection(db, "records"), payload);
+        const replacedIds = Array.isArray(window.__recordsBeingReplaced)
+          ? window.__recordsBeingReplaced
+          : [];
+        if (replacedIds.length) {
+          await Promise.all(replacedIds.map(oldId =>
+            updateDoc(doc(db, "records", oldId), {
+              supersededBy: ref.id,
+              supersededAt: serverTimestamp()
+            })
+          ));
+        }
+        window.__recordsBeingReplaced = [];
         console.log("[submit] OK record id =", ref.id, "newClaim=", isNewClaim);
         showMsg(
           isNewClaim
