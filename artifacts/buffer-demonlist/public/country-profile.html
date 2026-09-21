@@ -340,7 +340,7 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
   import { isDemon } from "/list-utils.js";
-  import { aggregatePlayerStats, bestAcceptedDemonRecords } from "/record-scoring.js";
+    import { aggregatePlayerStats, bestAcceptedDemonRecords, isAcceptedRecord } from "/record-scoring.js";
 
   const code = (new URLSearchParams(location.search).get("code") || "").toLowerCase();
 
@@ -370,7 +370,7 @@
 
       const recsSnap = await getDocs(collection(db, "records"));
       const allRecs  = recsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(r => r.status === "Accepted");
+        .filter(isAcceptedRecord);
 
       const lvlSnap = await getDocs(collection(db, "levels"));
       const levelsMap = new Map();

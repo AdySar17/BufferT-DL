@@ -1,14 +1,15 @@
 import { computeLunas, isDemon, isPemon } from "/list-utils.js";
-import { calculateClassicScores } from "/points.js";
+import { calculateClassicScores, computeGlobalPoints } from "/points.js";
 
 /**
- * Cualquier nivel Classic con un valor de puntos válido puede puntuar.
- * La posición sólo participa en la curva de 39 Tiers; no limita el cálculo
- * al Main List. Los records no se borran ni se ocultan.
+ * Cualquier nivel Classic con una posición válida tiene puntos globales.
+ * El valor almacenado puede estar desactualizado hasta que Owner ejecute la
+ * sincronización; nunca se usa como fuente de verdad para puntuar Records.
+ * Los Records fuera de Main List siguen siendo puntuables.
  */
 export function isScorableDemonLevel(level) {
   if (!level || !isDemon(level)) return false;
-  const value = Number(level.value);
+  const value = computeGlobalPoints(level.position);
   return Number.isFinite(value) && value > 0;
 }
 
@@ -47,6 +48,15 @@ export function recordPlayers(record) {
   return [...new Set([record?.userId, record?.player2Id].filter(Boolean))];
 }
 
+/*
+ * Los Records actuales usan status="Accepted". Los documentos legacy que no
+ * tenían status son aceptados por compatibilidad con level.html; Pending y
+ * Rejected nunca entran al agregado.
+ */
+export function isAcceptedRecord(record) {
+  return record?.status == null || record.status === "Accepted";
+}
+
 /**
  * Devuelve los puntos de un record individual. El valor del nivel ya es la
  * completion (100%); un progreso parcial recibe exactamente su proporción.
@@ -56,7 +66,7 @@ export function recordPlayers(record) {
 export function computeRecordPoints(record, level) {
   if (!isScorableDemonLevel(level)) return 0;
   const percent = Number(record?.percent);
-  const base = Number(level?.value);
+  const base = computeGlobalPoints(level?.position);
   if (!Number.isFinite(percent) || percent <= 0 || !Number.isFinite(base) || base <= 0) {
     return 0;
   }
@@ -97,7 +107,7 @@ export function bestAcceptedDemonRecords(records, levelsById) {
   const best = new Map();
 
   for (const record of records || []) {
-    if (record?.status !== "Accepted") continue;
+    if (!isAcceptedRecord(record)) continue;
     const level = scoredLevels.get(record.levelId);
     if (!isScorableDemonLevel(level)) continue;
 
@@ -125,7 +135,7 @@ export function bestAcceptedPemonRecords(records, levelsById) {
   const scoredLevels = buildScoredLevelMap(levelsById);
   const best = new Map();
   for (const record of records || []) {
-    if (record?.status !== "Accepted") continue;
+    if (!isAcceptedRecord(record)) continue;
     const level = scoredLevels.get(record.levelId);
     const timeMs = Number(record.timeMs);
     if (!isPemon(level) || !Number.isFinite(timeMs) || timeMs <= 0) continue;

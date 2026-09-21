@@ -1152,7 +1152,8 @@
     aggregatePlayerStats,
     buildScoredLevelMap,
      bestAcceptedDemonRecords,
-     computeRecordPoints
+     computeRecordPoints,
+     isAcceptedRecord
    } from "/record-scoring.js";
   import { levelBackgroundUrl } from "/level-visuals.js";
   import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
@@ -1801,7 +1802,7 @@
     const isViewerStaff = ["Mod", "Admin", "Owner"].includes(currentUserRole);
     const allVisibleRecords = (isViewerOwner || isViewerStaff)
       ? myRecords
-      : myRecords.filter(r => r.status === "Accepted");
+      : myRecords.filter(isAcceptedRecord);
     renderPlatformRecords(allVisibleRecords.filter(r => {
       const lvl = levelsCache.get(r.levelId);
       return (lvl && isPemon(lvl)) || isNewPemonRecord(r);
@@ -1920,7 +1921,7 @@
       aside.className = "lvl-aside";
 
        const hasScoredDemonRecord =
-         rec.status === "Accepted" &&
+         isAcceptedRecord(rec) &&
          isDemon(lvl) &&
          scoredDemonRecordIds.has(rec.id) &&
          Number(rec.percent) > 0;
@@ -1951,7 +1952,7 @@
       const left = document.createElement("div");
       left.className = "lvl-actions";
       const badge = document.createElement("span");
-      const stKey = (rec.status || "Pending").toLowerCase();
+      const stKey = (isAcceptedRecord(rec) ? "Accepted" : (rec.status || "Pending")).toLowerCase();
       badge.className   = "status-badge " + stKey;
       const labels = { pending: "Pendiente", accepted: "Aceptado", rejected: "Rechazado" };
       badge.textContent = labels[stKey] || rec.status;
@@ -2013,7 +2014,7 @@
     }
 
     /* ── Separar por estado ──────────────────────────────────── */
-    const acceptedRecs = visibleRecords.filter(r => r.status === "Accepted");
+    const acceptedRecs = visibleRecords.filter(isAcceptedRecord);
     const pendingRecs  = visibleRecords.filter(r => r.status === "Pending");
     const rejectedRecs = visibleRecords.filter(r => r.status === "Rejected");
 
@@ -2082,7 +2083,7 @@
     state.style.display = "none";
 
     const accepted = records
-      .filter(r => r.status === "Accepted")
+      .filter(isAcceptedRecord)
       .sort((a, b) => (Number(a.timeMs) || Infinity) - (Number(b.timeMs) || Infinity));
     const pending = records.filter(r => r.status === "Pending");
     const rejected = records.filter(r => r.status === "Rejected");
@@ -2194,14 +2195,14 @@
     footer.className = "lvl-card-footer";
     const left = document.createElement("div");
     left.className = "lvl-actions";
-    const status = (rec.status || "Pending").toLowerCase();
+    const status = (isAcceptedRecord(rec) ? "Accepted" : (rec.status || "Pending")).toLowerCase();
     const badge = document.createElement("span");
     badge.className = "status-badge " + status;
     badge.textContent = ({ pending: "Pendiente", accepted: "Aceptado", rejected: "Rechazado" })[status] || rec.status;
     left.appendChild(badge);
     const date = document.createElement("span");
     date.className = "status-date";
-    date.textContent = rec.status === "Accepted" ? "Aceptado: " + fmtDate(rec.acceptedAt)
+    date.textContent = isAcceptedRecord(rec) ? "Aceptado: " + fmtDate(rec.acceptedAt)
       : rec.status === "Rejected" ? "Rechazado: " + fmtDate(rec.updatedAt || rec.createdAt)
       : "Enviado: " + fmtDate(rec.createdAt);
     left.appendChild(date);

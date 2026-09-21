@@ -1239,7 +1239,7 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-     import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, resolveGddlTier, formatTier, TIERS, formatPoints, tierFromGddlRating } from "/points.js";
+     import { calculateClassicScores, computeGlobalPoints, DEFAULT_TIER, resolveTier, resolveGddlTier, formatTier, TIERS, formatPoints, tierFromGddlRating } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
     import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
     import { youtubeThumbnailFromVideo } from "/video-utils.js";
@@ -1476,7 +1476,7 @@
         const newPos    = i + 1;
         const score      = scoreById.get(lvl.id) || {
           tier: resolveTier(lvl, DEFAULT_TIER),
-          value: computeTierPoints(DEFAULT_TIER, 1, 1)
+          value: computeGlobalPoints(Number(lvl.position))
         };
         const newValue  = score.value;
         const original  = originalById.get(lvl.id) || {};
@@ -1534,7 +1534,7 @@
           `}
           <div class="level-info">
             <div class="level-title">#${pos} - ${nivel.name}</div>
-            <div class="level-author">By ${nivel.author} · ${nivel.value != null ? formatPoints(nivel.value) : "—"} pts · ${formatTier(resolveGddlTier(nivel))}</div>
+            <div class="level-author">By ${nivel.author} · ${formatPoints(computeGlobalPoints(pos))} pts · ${formatTier(resolveGddlTier(nivel))}</div>
             <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
             ${options.searchResult ? `<button type="button" class="list-jump-button">VER EN LISTA</button>` : ""}
           </div>
@@ -1847,7 +1847,7 @@
         const p = Number(inp.value);
         const tier = Number(tierInp.value) || DEFAULT_TIER;
         out.textContent = p > 0
-          ? `Puntos del Tier: ${computeTierPoints(tier, 1, 1)} máx. (se ajustan según niveles del Tier)`
+          ? `Puntos automáticos: ${computeGlobalPoints(p)} pts según la posición`
           : "Puntos automáticos: —";
       };
       inp.addEventListener("input", upd);
@@ -2401,7 +2401,7 @@
       setTags("edit", existingTags);
       document.getElementById("edit-points-preview").textContent =
         nivel.position
-          ? `Puntos del Tier: ${computeTierPoints(resolveGddlTier(nivel) || DEFAULT_TIER, 1, 1)} máx. (se ajustan según niveles del Tier)`
+          ? `Puntos automáticos: ${computeGlobalPoints(Number(nivel.position))} pts según la posición`
           : "Puntos automáticos: —";
       /* Aplicar bloqueo de min% según la posición actual */
       document.getElementById("edit-position").dispatchEvent(new Event("input"));
@@ -2537,7 +2537,7 @@
 
         /* Persistir el doc movido con todos sus campos editados + nueva pos/value */
         const scoreById = calculateClassicScores(ordered);
-        const newValue = scoreById.get(id)?.value || computeTierPoints(tier, 1, 1);
+        const newValue = scoreById.get(id)?.value || computeGlobalPoints(insertAt);
         await updateDoc(doc(db, "levels", id), {
           name, author, creators, thumbnail, background, video, glow, is2P,
           listType: DEMON_LIST_TYPE,

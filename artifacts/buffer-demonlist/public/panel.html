@@ -425,7 +425,7 @@
   </div>
 
   <!-- Sólo Owner: recalcular los valores de TODOS los niveles usando
-       computePoints para Demon List y computeLunas para PemonList. -->
+       la curva global de posición para Demon List y Lunas para PemonList. -->
   <div id="ownerToolsBox" style="display:none; margin: 18px 0 22px;">
     <div class="card" style="padding:16px 18px; border:1px solid rgba(199,255,59,0.30);">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -434,13 +434,13 @@
             🛠 Herramientas de Owner
           </div>
           <div style="font-size:.86rem; color:rgba(230,230,230,0.7); line-height:1.4;">
-            Recalcula el campo <code>value</code> de cada nivel usando Puntos
-            para Demon List y Lunas para PemonList.
+            Recalcula el campo <code>value</code> de cada nivel usando una
+            sola curva global de posición para Demon List y Lunas para PemonList.
           </div>
         </div>
         <button id="btnRecalcPoints" class="btn"
                 style="background:linear-gradient(90deg,#7fff3b,#ffd700); color:#0a1a00; font-weight:700;">
-          Recalcular valores de toda la lista
+          ACTUALIZAR PUNTOS DE TODOS LOS NIVELES
         </button>
       </div>
       <div id="recalcStatus" style="margin-top:10px; font-size:.85rem; color:rgba(230,230,230,0.75);"></div>
@@ -458,13 +458,13 @@
           <div id="refreshApiStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
         <div style="padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:10px;">
-          <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Actualizar Tiers y puntos</div>
+          <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Sincronizar clasificación GDDL</div>
           <div style="font-size:.78rem; color:rgba(230,230,230,.65); line-height:1.4; margin-bottom:9px;">
-            Consulta el Rating GDDL, calcula el GDDL Tier 1–39 y recalcula
-            los puntos. No modifica posiciones AREDL, videos ni records.
+            Consulta el Rating GDDL y guarda el Tier 1–39 correspondiente.
+            No modifica los puntos, posiciones AREDL, videos ni records.
           </div>
           <button id="btnUpdateTiers" class="btn" style="width:100%; background:rgba(199,255,59,.14); color:#c7ff3b; border:1px solid rgba(199,255,59,.35);">
-            Actualizar Tiers y puntos de toda la lista
+            Actualizar Tiers desde GDDL
           </button>
           <div id="tiersStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
@@ -718,7 +718,7 @@
     writeBatch, serverTimestamp, deleteField, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import {
-    calculateClassicScores, computeTierPoints, DEFAULT_PEMON_TIER, DEFAULT_TIER,
+    calculateClassicScores, computeGlobalPoints, DEFAULT_PEMON_TIER, DEFAULT_TIER,
     resolveTier, inferTierFromValue, TIERS, tierFromGddlRating, resolveGddlTier, formatTier
   } from "/points.js";
   import {
@@ -733,7 +733,8 @@
     bestAcceptedDemonRecords,
     bestAcceptedPemonRecords,
     buildScoredLevelMap,
-    computeRecordPoints
+    computeRecordPoints,
+    isAcceptedRecord
   } from "/record-scoring.js";
   import { youtubeThumbnailFromVideo } from "/video-utils.js";
   import { gdBgUrl } from "/level-visuals.js";
@@ -857,7 +858,7 @@
     const isPemonRecord = getListType(rec) === PEMON_LIST_TYPE ||
       lvl.listType === PEMON_LIST_TYPE;
     const isFull   = Number(rec.percent) === 100;
-    const earnedPoints = rec.status === "Accepted"
+    const earnedPoints = isAcceptedRecord(rec)
       ? computeRecordPoints(rec, lvl)
       : 0;
     const isClaim  = !!rec.isNewLevelClaim;
@@ -1502,7 +1503,7 @@
     $("alPointsPreview").textContent = (p > 0)
       ? (pemon
         ? `Lunas automáticas: ${computeLunas(p)} (posición #${p})`
-        : `Puntos del Tier: ${computeTierPoints(Number($("alTier").value) || DEFAULT_TIER, 1, 1)} máx. (se ajustan según niveles del Tier)`)
+        : `Puntos automáticos: ${computeGlobalPoints(p)} pts según la posición`)
       : `${pemon ? "Lunas" : "Puntos"} automáticos: —`;
     const isPemon = alContext?.rec?.listType === PEMON_LIST_TYPE ||
       getNewLevelType(alContext?.rec) === NEW_LEVEL_TYPE_PLATFORMER;
@@ -1634,7 +1635,7 @@
       const newPos   = insertAt;
       const newValue = targetListType === PEMON_LIST_TYPE
         ? computeLunas(newPos)
-        : computeTierPoints(pointTier, 1, 1);
+        : computeGlobalPoints(insertAt);
       const levelDoc = {
         name, author, creators,
         position: newPos, value: newValue, tier: pointTier,
@@ -1723,7 +1724,7 @@
           ? { tier: resolveTier(lvl, DEFAULT_PEMON_TIER), value: computeLunas(p) }
           : (finalScores.get(lvl.id) || {
               tier: resolveTier(lvl, DEFAULT_TIER),
-              value: computeTierPoints(DEFAULT_TIER, 1, 1)
+              value: computeGlobalPoints(Number(lvl.position))
             });
         const v = score.value;
         const orig = originalById.get(lvl.id) || {};
@@ -2316,8 +2317,8 @@
   /* ============================================================
   *  HERRAMIENTA OWNER: recalcular valores de toda la lista
    *  ----------------------------------------------------------
-   *  Para cada doc de /levels: lee `position`, calcula
-   *  `computePoints(position)` o `computeLunas(position)` y, si difiere del `value` actual,
+       *  Para cada doc de /levels: lee `position`, calcula la curva global
+       *  o `computeLunas(position)` y, si difiere del `value` actual,
    *  lo actualiza. Se hace en lotes de 400 con writeBatch para
    *  no romper el límite de 500 ops por batch de Firestore.
    *  Sólo el rol Owner puede usarlo (UI oculta + chequeo en JS;
@@ -2403,7 +2404,7 @@
       showToast("Error al recalcular: " + (err.message || err.code || "desconocido"), true);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Recalcular valores de toda la lista";
+       btn.textContent = "ACTUALIZAR PUNTOS DE TODOS LOS NIVELES";
     }
   }
   $("btnRecalcPoints").addEventListener("click", recalcAllPoints);
@@ -2707,7 +2708,7 @@
       showToast("Error al actualizar puntos: " + (error.message || error.code || "desconocido"), true);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Actualizar Tiers y puntos de toda la lista";
+      btn.textContent = "Actualizar Tiers desde GDDL";
     }
   }
 

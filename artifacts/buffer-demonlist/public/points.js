@@ -1,12 +1,12 @@
 /* ============================================================
- *  BFT Demon List — puntuación por Tier
+ *  BFT Demon List — clasificación por Tier + curva global de puntos
  *
- *  Los niveles Classic usan 39 Tiers. El valor indicado para cada Tier es
- *  su límite superior/base; dentro del Tier cada nivel recibe un valor
- *  individual según su posición relativa.
+ *  Los 39 Tiers describen dificultad y procedencia de clasificación. Los
+ *  puntos Classic se calculan únicamente con una curva global continua de
+ *  posición; el Tier nunca selecciona una curva propia.
  * ============================================================ */
 
-export const TIER_BASE_VALUES = [
+export const LEGACY_TIER_MAX_VALUES = [
   5, 40, 75, 100, 120, 143, 171, 204, 244, 291,
   348, 415, 496, 592, 707, 845, 1010, 1210, 1440, 1720,
   2060, 2460, 2940, 3510, 4190, 5000, 5980, 7150, 8550, 10200,
@@ -26,12 +26,13 @@ const TIER_LABELS = [
   "Extreme Demon", "Extreme Demon", "Extreme Demon"
 ];
 
-export const TIERS = TIER_BASE_VALUES.map((max, index) => ({
+/*
+ * Se conserva este umbral únicamente para inferir el Tier de documentos
+ * legacy que no guardaban `tier`. No participa en la curva actual.
+ */
+export const TIERS = TIER_LABELS.map((label, index) => ({
   id: index + 1,
-  label: TIER_LABELS[index] || "Demon",
-  min: index === 0 ? 1 : TIER_BASE_VALUES[index - 1] + 0.000001,
-  max,
-  curve: 0.92
+  label: label || "Demon"
 }));
 
 export const DEFAULT_TIER = 1;
@@ -51,8 +52,8 @@ export function getTier(tier) {
 export function inferTierFromValue(value, fallback = DEFAULT_TIER) {
   const points = Number(value);
   if (Number.isFinite(points)) {
-    const match = TIERS.find(tier => points >= tier.min && points <= tier.max);
-    if (match) return match.id;
+    const match = LEGACY_TIER_MAX_VALUES.findIndex(max => points <= max);
+    if (match >= 0) return match + 1;
   }
   return normalizeTier(fallback);
 }
@@ -67,7 +68,7 @@ export function resolveTier(level, fallback = DEFAULT_TIER) {
    * No lo reinterpretamos como Tier 39 antes de que el Owner ejecute la
    * actualización basada en GDDL/AREDL.
    */
-  const legacyTop = TIER_BASE_VALUES[TIER_BASE_VALUES.length - 1];
+  const legacyTop = LEGACY_TIER_MAX_VALUES[LEGACY_TIER_MAX_VALUES.length - 1];
   if (Number(level?.value) >= legacyTop) return normalizeTier(fallback);
   return inferTierFromValue(level?.value, fallback);
 }
@@ -109,49 +110,48 @@ export function formatPoints(value) {
   return Number.isFinite(points) ? points.toFixed(2) : "—";
 }
 
-/**
- * Calcula el valor de un nivel dentro de su Tier.
- * tierPosition es 1-indexed y tierCount es la cantidad total del Tier.
+/*
+ * Curva global calibrada con los puntos de referencia del producto:
+ *   P(pos) = 50000 · exp(-a · ln(pos)^b)
+ *
+ * Es continua y estrictamente decreciente para posiciones >= 1. La forma
+ * logarítmica conserva una diferencia clara entre el Top 1 y Top 10, mantiene
+ * valor en el Top 500 y reduce progresivamente hasta aproximadamente 5 pts
+ * en el puesto 10,000, sin crear bandas por Tier.
  */
-export function computeTierPoints(tier, tierPosition = 1, tierCount = 1) {
-  const definition = getTier(tier);
-  const count = Math.max(1, Math.floor(Number(tierCount) || 1));
-  const rank = Math.min(count, Math.max(1, Math.floor(Number(tierPosition) || 1)));
-  const progress = count === 1 ? 0 : (rank - 1) / (count - 1);
-  const curvedProgress = Math.pow(progress, definition.curve);
+export const GLOBAL_POINTS_TOP = 50000;
+export const GLOBAL_POINTS_DECAY = 0.08960423403542903;
+export const GLOBAL_POINTS_EXPONENT = 2.087;
+
+export function computeGlobalPoints(position) {
+  const rank = Number(position);
+  if (!Number.isFinite(rank) || rank < 1) return 0;
+  const logarithmicRank = Math.log(rank);
   return round2(
-    definition.max - (definition.max - definition.min) * curvedProgress
+    GLOBAL_POINTS_TOP *
+    Math.exp(-GLOBAL_POINTS_DECAY * Math.pow(logarithmicRank, GLOBAL_POINTS_EXPONENT))
   );
 }
 
+/*
+ * Compatibilidad para imports antiguos. El primer argumento ya no tiene
+ * efecto: mantener la firma evita romper páginas legacy, pero la única
+ * entrada real de puntos es la posición.
+ */
+export function computeTierPoints(_tier, tierPosition = 1) {
+  return computeGlobalPoints(tierPosition);
+}
+
 /**
- * Devuelve los valores Classic calculados para un conjunto de niveles.
- * Los niveles sin tier conservan compatibilidad mediante su valor anterior.
+ * Devuelve el valor individual de cada nivel Classic usando exclusivamente
+ * su posición. El Tier existente se conserva como metadata.
  */
 export function calculateClassicScores(levels) {
-  const groups = new Map();
-  levels.forEach((level, index) => {
-    const tier = resolveTier(level);
-    if (!groups.has(tier)) groups.set(tier, []);
-    groups.get(tier).push({ level, index, tier });
-  });
-
   const result = new Map();
-  groups.forEach((items, tier) => {
-    items.sort((a, b) => {
-      const positionA = Number(a.level.position);
-      const positionB = Number(b.level.position);
-      const validA = Number.isFinite(positionA) && positionA > 0;
-      const validB = Number.isFinite(positionB) && positionB > 0;
-      if (validA && validB && positionA !== positionB) return positionA - positionB;
-      if (validA !== validB) return validA ? -1 : 1;
-      return a.index - b.index;
-    });
-    items.forEach((entry, index) => {
-      result.set(entry.level.id, {
-        tier,
-        value: computeTierPoints(tier, index + 1, items.length),
-      });
+  (levels || []).forEach(level => {
+    result.set(level.id, {
+      tier: resolveTier(level),
+      value: computeGlobalPoints(level.position),
     });
   });
   return result;

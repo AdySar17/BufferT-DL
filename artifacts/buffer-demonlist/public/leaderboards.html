@@ -425,7 +425,7 @@
     import { onAuthChange, db, isStaff, mountAuthUI } from "/auth.js";
     import { DIFFICULTY_IMAGES } from "/difficulty.js";
     import { computeLunas, isDemon, isPemon } from "/list-utils.js";
-    import { aggregatePlayerStats } from "/record-scoring.js";
+    import { aggregatePlayerStats, isAcceptedRecord } from "/record-scoring.js";
     import { collection, getDocs, doc, getDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import { countryName as _cname, flagUrl as _cflag } from "/country-utils.js";
@@ -498,7 +498,7 @@
         const recsSnap = await getDocs(collection(db, "records"));
         const records = recsSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(r => r.status === "Accepted");
+          .filter(isAcceptedRecord);
 
         /* 2) Levels: traer TODOS de una sola colección (1 sola lectura tipo list) */
         const lvlSnap = await getDocs(collection(db, "levels"));

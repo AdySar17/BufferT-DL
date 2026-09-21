@@ -1,5 +1,5 @@
 - [Firebase Auth bootstrap](firebase-auth-bootstrap.md) — keep auth imports canonical and resolve persistence/redirect before the first auth-state decision.
-- [Tier scoring compatibility](tier-scoring-compatibility.md) — Tier points use each Tier’s range and intra-Tier order; legacy levels infer their Tier from stored value.
+- [Tier scoring compatibility](tier-scoring-compatibility.md) — 39 Tiers classify difficulty; Classic points use one continuous global position curve.
 - [GDDL API integration](gddl-api-integration.md) — query GDDL through the narrow API-server proxy because its browser CORS allows only gdladder.com.
 - [External sync manual priority](external-sync-manual-priority.md) — refreshes update source-owned metadata only; Staff-controlled fields and manual tiers remain authoritative.
 - [GDDL Tier source](gddl-tier-source.md) — displayed and scored Demon Tiers come from rounded GDDL Rating, with only the defined Extreme adjacency fallback.

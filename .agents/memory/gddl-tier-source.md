@@ -7,4 +7,4 @@ For Demon levels, GDDL Rating is the only source for a Tier: round it to the nea
 
 **Why:** The product replaced an older 10-Tier/difficulty classification with the 39-Tier GDDL model, and inconsistent fallback logic caused the list, detail page, and admin panel to disagree.
 
-**How to apply:** Use the shared GDDL Tier resolver and `TIER N` formatter in every Demon-facing view. Keep the 39-tier point curve unchanged, and preserve source-owned metadata when an external lookup fails.
+**How to apply:** Use the shared GDDL Tier resolver and `TIER N` formatter in every Demon-facing view. Keep GDDL/AREDl metadata authoritative for classification and position, while point values come from the separate global position curve. Preserve source-owned metadata when an external lookup fails.
