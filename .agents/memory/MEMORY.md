@@ -2,3 +2,4 @@
 - [Tier scoring compatibility](tier-scoring-compatibility.md) — Tier points use each Tier’s range and intra-Tier order; legacy levels infer their Tier from stored value.
 - [GDDL API integration](gddl-api-integration.md) — query GDDL through the narrow API-server proxy because its browser CORS allows only gdladder.com.
 - [External sync manual priority](external-sync-manual-priority.md) — refreshes update source-owned metadata only; Staff-controlled fields and manual tiers remain authoritative.
+- [GDDL Tier source](gddl-tier-source.md) — displayed and scored Demon Tiers come from rounded GDDL Rating, with only the defined Extreme adjacency fallback.

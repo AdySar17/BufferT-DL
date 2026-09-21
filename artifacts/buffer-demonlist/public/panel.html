@@ -458,13 +458,13 @@
           <div id="refreshApiStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
         <div style="padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:10px;">
-          <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Actualizar puntos por nivel</div>
+          <div style="font-weight:700; color:#c7ff3b; margin-bottom:4px;">Actualizar Tiers y puntos</div>
           <div style="font-size:.78rem; color:rgba(230,230,230,.65); line-height:1.4; margin-bottom:9px;">
-            Recalcula el valor individual de cada nivel usando su Tier actual
-            y su posición dentro de ese Tier. Los Tiers no se modifican.
+            Consulta el Rating GDDL, calcula el GDDL Tier 1–39 y recalcula
+            los puntos. No modifica posiciones AREDL, videos ni records.
           </div>
           <button id="btnUpdateTiers" class="btn" style="width:100%; background:rgba(199,255,59,.14); color:#c7ff3b; border:1px solid rgba(199,255,59,.35);">
-            Actualizar puntos de toda la lista
+            Actualizar Tiers y puntos de toda la lista
           </button>
           <div id="tiersStatus" style="margin-top:8px; font-size:.78rem; color:rgba(230,230,230,.75); min-height:18px;"></div>
         </div>
@@ -556,18 +556,9 @@
         </div>
       </div>
       <div>
-        <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Tier</label>
+         <label style="display:block; font-size:.75rem; color:rgba(230,230,230,0.7); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">GDDL Tier</label>
         <select id="alTier" class="al-input">
-          <option value="1">Tier 1 — Free Demons (5–100)</option>
-          <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
-          <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
-          <option value="4">Tier 4 — Medium Demon (401–750)</option>
-          <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
-          <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
-          <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
-          <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
-          <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
-          <option value="10" selected>Tier 10 — Extreme Demons (10001–50000)</option>
+           <option value="" selected>Seleccionar GDDL Tier</option>
         </select>
       </div>
       <div>
@@ -728,7 +719,7 @@
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import {
     calculateClassicScores, computeTierPoints, DEFAULT_PEMON_TIER, DEFAULT_TIER,
-    resolveTier, inferTierFromValue, TIERS, tierFromGddlRating
+    resolveTier, inferTierFromValue, TIERS, tierFromGddlRating, resolveGddlTier, formatTier
   } from "/points.js";
   import {
     computeLunas, getListType, getNewLevelType, getNewLevelSuffix,
@@ -761,11 +752,11 @@
     select.replaceChildren(...TIERS.map(tier => {
       const option = document.createElement("option");
       option.value = String(tier.id);
-      option.textContent = `Tier ${tier.id} — ${tier.label} (máx. ${tier.max})`;
+      option.textContent = formatTier(tier.id);
       return option;
     }));
     select.value = String(Number.isInteger(current) && current >= 1 && current <= TIERS.length
-      ? current : DEFAULT_TIER);
+      ? current : "");
   }
   populateTierSelects();
 
@@ -1214,6 +1205,42 @@
     status.style.color = isError ? "#ff9a9a" : "#9bdc4d";
   }
 
+  function readGddlRating(level) {
+    const rating = Number(
+      level?.gddlRating ??
+      level?.gddlScore ??
+      level?.gddlData?.rating ??
+      level?.gddlData?.score
+    );
+    return Number.isFinite(rating) && rating > 0 ? rating : null;
+  }
+
+  function adjacentExtremeGddlTier(level, levels) {
+    const targetPosition = Number(level?.position);
+    const candidates = levels
+      .filter(item =>
+        item.id !== level?.id &&
+        getListType(item) === DEMON_LIST_TYPE &&
+        String(item.difficulty || "").trim() === "Extreme Demon"
+      )
+      .map(item => ({ item, position: Number(item.position), tier: resolveGddlTier(item) }))
+      .filter(item =>
+        item.tier &&
+        Number.isFinite(item.position) &&
+        item.position > 0
+      )
+      .sort((a, b) => a.position - b.position);
+    if (!candidates.length) return null;
+    const below = candidates.find(item =>
+      Number.isFinite(targetPosition) && item.position > targetPosition
+    );
+    if (below) return below.tier;
+    const above = [...candidates].reverse().find(item =>
+      Number.isFinite(targetPosition) && item.position < targetPosition
+    );
+    return above?.tier || candidates[0].tier;
+  }
+
   async function lookupAlAredl() {
     const difficulty = $("alDifficulty").value;
     const source = difficulty === "Extreme Demon" ? "aredl"
@@ -1281,6 +1308,17 @@
       $("alGddlPosition").value = metadataLevel?.gddlPosition || "";
       _alGddlData = metadataLevel?.gddlData || null;
       if (suggestedPosition) $("alPosition").value = suggestedPosition;
+      const rating = readGddlRating(metadataLevel);
+      const gddlTier = rating != null
+        ? tierFromGddlRating(rating)
+        : source === "aredl"
+          ? adjacentExtremeGddlTier({
+              id: "",
+              difficulty: "Extreme Demon",
+              position: suggestedPosition
+            }, existing)
+          : null;
+      $("alTier").value = gddlTier ? String(gddlTier) : "";
       _alPrevGdId = $("alGdLevelId").value.trim();
       if (!$("alBackground").value.trim()) $("alBackground").value = gdBgUrl(_alPrevGdId);
       $("alPosition").dispatchEvent(new Event("input"));
@@ -1340,7 +1378,7 @@
       : '<option value="Extreme Demon">Extreme Demon</option><option value="Insane Demon">Insane Demon</option><option value="Hard Demon">Hard Demon</option><option value="Medium Demon">Medium Demon</option><option value="Easy Demon">Easy Demon</option>';
     $("alTier").value = targetListType === PEMON_LIST_TYPE
       ? String(DEFAULT_PEMON_TIER)
-      : String(DEFAULT_TIER);
+      : "";
     const claimedName = rec.claimedLevelName || "";
     $("alName").value       = normalizeNewLevelName(claimedName, claimType);
     $("alAuthor").value     = "";
@@ -1381,6 +1419,7 @@
     $("alGddlId").value = "";
     $("alGddlPosition").value = "";
     _alGddlData = null;
+    $("alTier").value = "";
     setAlAredlStatus("");
     $("alPointsPreview").textContent = "Puntos automáticos: —";
     /* Resetear IDs Custom */
@@ -1432,6 +1471,7 @@
       $("alGddlId").value = "";
       $("alGddlPosition").value = "";
       _alGddlData = null;
+      $("alTier").value = "";
       setAlAredlStatus("");
     }
   });
@@ -1442,6 +1482,7 @@
       $("alGddlId").value = "";
       $("alGddlPosition").value = "";
       _alGddlData = null;
+      $("alTier").value = "";
       setAlAredlStatus("");
     }
   });
@@ -1451,6 +1492,7 @@
     $("alGddlId").value = "";
     $("alGddlPosition").value = "";
     _alGddlData = null;
+    $("alTier").value = "";
     setAlAredlStatus("");
   });
 
@@ -1501,7 +1543,7 @@
     const author    = $("alAuthor").value.trim();
     const creators  = $("alCreators").value.split(",").map(s => s.trim()).filter(Boolean);
     const reqPos    = Math.max(1, Math.floor(Number($("alPosition").value) || 0));
-    const tier      = Number($("alTier").value) || DEFAULT_TIER;
+    let tier        = Number($("alTier").value) || null;
     const thumbnail   = youtubeThumbnailFromVideo($("alVideo").value);
     /* Si el staff borró el campo, restaurar automáticamente el URL generado */
     const background  = $("alBackground").value.trim()
@@ -1570,17 +1612,32 @@
       });
 
       const insertAt = Math.min(reqPos, ordered.length + 1);
-      const placeholder = { id: "__NEW__", name, author, tier, position: insertAt };
+      const gddlRating = readGddlRating(_alGddlData);
+      const gddlTier = !isPemonLevel && gddlRating != null
+        ? tierFromGddlRating(gddlRating)
+        : !isPemonLevel && difficulty === "Extreme Demon"
+          ? adjacentExtremeGddlTier({ id: "", difficulty, position: insertAt }, all)
+          : null;
+      if (!isPemonLevel && gddlTier) tier = gddlTier;
+      const pointTier = tier || DEFAULT_TIER;
+      const placeholder = {
+        id: "__NEW__",
+        name,
+        author,
+        tier: pointTier,
+        gddlTier,
+        position: insertAt
+      };
       ordered.splice(insertAt - 1, 0, placeholder);
 
       /* 2) Crear el doc del nivel en su posición pedida */
       const newPos   = insertAt;
       const newValue = targetListType === PEMON_LIST_TYPE
         ? computeLunas(newPos)
-        : computeTierPoints(tier, 1, 1);
+        : computeTierPoints(pointTier, 1, 1);
       const levelDoc = {
         name, author, creators,
-        position: newPos, value: newValue, tier,
+        position: newPos, value: newValue, tier: pointTier,
         listType: targetListType,
         levelType: claimType,
         thumbnail, background, video,
@@ -1602,13 +1659,11 @@
       if (Number.isFinite(gddlPosition) && gddlPosition > 0) {
         levelDoc.gddlPosition = gddlPosition;
       }
-      if (_alGddlData) {
-        const gddlRating = Number(_alGddlData.rating ?? _alGddlData.score);
-        const hasGddlRating = Number.isFinite(gddlRating) && gddlRating > 0;
+      if (!isPemonLevel) {
         levelDoc.gddlData = _alGddlData;
-        levelDoc.gddlRating = hasGddlRating ? gddlRating : null;
-        levelDoc.gddlScore = hasGddlRating ? gddlRating : null;
-        levelDoc.gddlTier = hasGddlRating ? tierFromGddlRating(gddlRating) : null;
+        levelDoc.gddlRating = gddlRating;
+        levelDoc.gddlScore = gddlRating;
+        levelDoc.gddlTier = gddlTier;
       }
       const newRef = await addDoc(collection(db, "levels"), levelDoc);
       placeholder.id = newRef.id;
@@ -2378,11 +2433,23 @@
     return current;
   }
 
-  function gddlFields(data) {
-    const rating = Number(data.gddlRating ?? data.gddlScore);
+  function gddlFields(data = {}, inheritedTier = null) {
+    const rating = Number(
+      data.gddlRating ??
+      data.gddlScore ??
+      data.gddlData?.rating ??
+      data.gddlData?.score
+    );
     const hasRating = Number.isFinite(rating) && rating > 0;
     const defaultRating = Number(data.gddlDefaultRating);
     const hasDefaultRating = Number.isFinite(defaultRating) && defaultRating > 0;
+    const gddlTier = hasRating
+      ? tierFromGddlRating(rating)
+      : Number.isInteger(Number(inheritedTier)) &&
+          Number(inheritedTier) >= 1 &&
+          Number(inheritedTier) <= TIERS.length
+        ? Number(inheritedTier)
+        : null;
     return {
       gddlId: data.gddlId || null,
       gddlScore: hasRating ? rating : null,
@@ -2392,7 +2459,8 @@
         ? Number(data.gddlRanking) : null,
       gddlPositionType: data.gddlPositionType || "rating",
       gddlRating: hasRating ? rating : null,
-      gddlTier: hasRating ? tierFromGddlRating(rating) : null,
+      gddlTier,
+      tier: gddlTier,
       gddlDefaultRating: hasDefaultRating ? defaultRating : null,
       gddlDifficulty: data.gddlDifficulty || "",
       gddlShowcase: data.gddlShowcase || "",
@@ -2467,9 +2535,19 @@
               console.warn("[panel] refresh GDDL lookup failed:", gddlError);
             }
           }
+          const payload = apiFieldsForLevel(level, source, data, extremeGddlData);
+          if (
+            source === "aredl" &&
+            extremeGddlData !== undefined &&
+            readGddlRating(extremeGddlData) == null
+          ) {
+            const inheritedTier = adjacentExtremeGddlTier(level, levels);
+            payload.gddlTier = inheritedTier;
+            payload.tier = inheritedTier || null;
+          }
           updates.push({
             id: level.id,
-            data: apiFieldsForLevel(level, source, data, extremeGddlData)
+            data: payload
           });
         } catch (error) {
           failures.push({
@@ -2520,12 +2598,13 @@
     const btn = $("btnUpdateTiers");
     const status = $("tiersStatus");
     if (!confirm(
-      "¿Recalcular los puntos individuales de todos los niveles?\n\n" +
-      "Se conservarán exactamente los Tiers actuales, videos, records y posiciones."
+      "¿Actualizar GDDL Rating, GDDL Tier y puntos de todos los niveles Demon?\n\n" +
+      "El Rating se redondeará al entero más cercano para obtener TIER 1–39. " +
+      "No se cambiarán posiciones AREDL, posiciones BufferList, videos ni records."
     )) return;
 
     btn.disabled = true;
-    btn.textContent = "Actualizando puntos…";
+    btn.textContent = "Actualizando Tiers y puntos…";
     status.style.color = "rgba(230,230,230,0.75)";
     status.textContent = "Leyendo niveles…";
     try {
@@ -2533,18 +2612,66 @@
       const levels = snap.docs
         .map(item => ({ id: item.id, ...item.data() }))
         .filter(level => getListType(level) === DEMON_LIST_TYPE);
-      const classicLevels = levels.filter(level => getListType(level) === DEMON_LIST_TYPE);
-      const classicScores = calculateClassicScores(classicLevels);
-      const changes = [];
-      for (const level of levels) {
-        const value = getListType(level) === PEMON_LIST_TYPE
-          ? computeLunas(level.position)
-          : classicScores.get(level.id)?.value;
-        if (!Number.isFinite(Number(value))) continue;
-        if (Number(level.value) !== Number(value)) {
-          changes.push({ id: level.id, value: Number(value), name: level.name });
+      const updatedLevels = [];
+      const failures = [];
+      for (let index = 0; index < levels.length; index += 1) {
+        const level = levels[index];
+        status.textContent =
+          `Consultando GDDL ${index + 1}/${levels.length}: ${level.name || level.id}…`;
+        try {
+          const data = await lookupGddlLevel({
+            gdLevelId: String(level.gdLevelId || ""),
+            name: level.name || ""
+          });
+          const rating = readGddlRating(data);
+          const inheritedTier = rating == null &&
+            String(level.difficulty || "") === "Extreme Demon"
+            ? adjacentExtremeGddlTier(level, levels)
+            : null;
+          const gddlTier = rating != null
+            ? tierFromGddlRating(rating)
+            : inheritedTier;
+          updatedLevels.push({
+            level,
+            data,
+            rating,
+            gddlTier,
+            tier: gddlTier || resolveTier(level, DEFAULT_TIER)
+          });
+        } catch (error) {
+          failures.push({
+            name: level.name || level.id,
+            message: error?.message || "consulta fallida"
+          });
+          updatedLevels.push({
+            level,
+            data: null,
+            rating: null,
+            gddlTier: resolveGddlTier(level),
+            tier: resolveTier(level, DEFAULT_TIER)
+          });
         }
       }
+
+      const classicScores = calculateClassicScores(
+        updatedLevels.map(item => ({ ...item.level, tier: item.tier }))
+      );
+      const changes = updatedLevels.map(item => {
+        const score = classicScores.get(item.level.id);
+        const fields = item.data
+          ? gddlFields(item.data, item.gddlTier)
+          : {};
+        return {
+          id: item.level.id,
+          name: item.level.name,
+          value: score?.value,
+          tier: score?.tier || item.tier,
+          data: {
+            ...fields,
+            tier: score?.tier || item.tier
+          }
+        };
+      }).filter(item => Number.isFinite(Number(item.value)));
 
       const CHUNK = 400;
       let written = 0;
@@ -2552,8 +2679,10 @@
         const batch = writeBatch(db);
         const chunk = changes.slice(index, index + CHUNK);
         chunk.forEach(item => {
-          /* Solo se actualiza value. El Tier actual permanece intacto. */
-          batch.update(doc(db, "levels", item.id), { value: item.value });
+          batch.update(doc(db, "levels", item.id), {
+            ...item.data,
+            value: item.value
+          });
         });
         await batch.commit();
         written += chunk.length;
@@ -2563,9 +2692,14 @@
 
       status.style.color = "#7fff3b";
       status.textContent =
-        `✔ Listo: ${written} valores individuales actualizados ` +
-        `de ${levels.length} niveles. Tiers conservados.`;
-      showToast(`Actualizados ${written} valores de puntos.`);
+        `✔ Listo: ${written} niveles actualizados con GDDL Tier y puntos` +
+        `${failures.length ? `; ${failures.length} consultas fallaron` : ""}.`;
+      if (failures.length) console.warn("[panel] updateAllTiers GDDL failures:", failures);
+      showToast(
+        failures.length
+          ? `Actualizados ${written}; ${failures.length} consultas fallaron.`
+          : `Actualizados ${written} Tiers y puntos.`
+      );
     } catch (error) {
       console.error("[panel] updateAllTiers error:", error);
       status.style.color = "#ff7a7a";
@@ -2573,7 +2707,7 @@
       showToast("Error al actualizar puntos: " + (error.message || error.code || "desconocido"), true);
     } finally {
       btn.disabled = false;
-      btn.textContent = "Actualizar puntos de toda la lista";
+      btn.textContent = "Actualizar Tiers y puntos de toda la lista";
     }
   }
 

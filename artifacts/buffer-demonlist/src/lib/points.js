@@ -46,6 +46,25 @@ export function resolveTier(level, fallback = DEFAULT_TIER) {
   return normalizeTier(level?.tier) || inferTierFromValue(level?.value, fallback);
 }
 
+export function resolveGddlTier(level, fallback = null) {
+  const rating = Number(
+    level?.gddlRating ??
+    level?.gddlScore ??
+    level?.gddlData?.rating ??
+    level?.gddlData?.score
+  );
+  if (Number.isFinite(rating) && rating > 0) {
+    return tierFromGddlRating(rating);
+  }
+  const stored = normalizeTier(level?.gddlTier);
+  return stored || normalizeTier(fallback);
+}
+
+export function formatTier(tier) {
+  const normalized = normalizeTier(tier);
+  return normalized ? `TIER ${normalized}` : "—";
+}
+
 function round1(value) {
   if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.round(value * 10) / 10;

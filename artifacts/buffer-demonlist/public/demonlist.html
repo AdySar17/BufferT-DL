@@ -946,16 +946,7 @@
         Puntos automáticos: —
       </div>
       <select id="inp-tier" aria-label="Tier del nivel">
-        <option value="1">Tier 1 — Free Demons (5–100)</option>
-        <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
-        <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
-        <option value="4">Tier 4 — Medium Demon (401–750)</option>
-        <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
-        <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
-        <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
-        <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
-        <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
-        <option value="10" selected>Tier 10 — Extreme Demons (10001–50000)</option>
+        <option value="" selected>Seleccionar GDDL Tier</option>
       </select>
       <input id="inp-thumbnail"  placeholder="URL Thumbnail">
       <input id="inp-background" placeholder="URL Fondo de la card">
@@ -1085,16 +1076,7 @@
         Puntos automáticos: —
       </div>
       <select id="edit-tier" aria-label="Tier del nivel">
-        <option value="1">Tier 1 — Free Demons (5–100)</option>
-        <option value="2">Tier 2 — Mid Easy Demons (101–200)</option>
-        <option value="3">Tier 3 — Easy Demon → Free Medium Demon (201–400)</option>
-        <option value="4">Tier 4 — Medium Demon (401–750)</option>
-        <option value="5">Tier 5 — Easy Hard Demon (751–1400)</option>
-        <option value="6">Tier 6 — Very Hard Demon (1401–2500)</option>
-        <option value="7">Tier 7 — Easy Insane Demon (2501–5000)</option>
-        <option value="8">Tier 8 — Insane Demon (5001–7500)</option>
-        <option value="9">Tier 9 — Hard Insane Demon → Easy Extreme Demon (7501–10000)</option>
-        <option value="10">Tier 10 — Extreme Demons (10001–50000)</option>
+        <option value="" selected>Seleccionar GDDL Tier</option>
       </select>
       <input id="edit-thumbnail"  placeholder="URL Thumbnail">
       <input id="edit-background" placeholder="URL Fondo de la card">
@@ -1257,7 +1239,7 @@
   <!-- FIREBASE -->
   <script type="module">
     import { db } from "/auth.js";
-     import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, TIERS, formatPoints, tierFromGddlRating } from "/points.js";
+     import { calculateClassicScores, computeTierPoints, DEFAULT_TIER, resolveTier, resolveGddlTier, formatTier, TIERS, formatPoints, tierFromGddlRating } from "/points.js";
     import { lookupAredlLevel, suggestBufferPosition, aredlStatusText } from "/aredl.js";
     import { lookupGddlLevel, suggestGddlBufferPosition, gddlStatusText } from "/gddl.js";
     import { youtubeThumbnailFromVideo } from "/video-utils.js";
@@ -1301,11 +1283,11 @@
         select.replaceChildren(...TIERS.map(tier => {
           const option = document.createElement("option");
           option.value = String(tier.id);
-          option.textContent = `Tier ${tier.id} — ${tier.label} (máx. ${tier.max})`;
+          option.textContent = formatTier(tier.id);
           return option;
         }));
         select.value = String(Number.isInteger(current) && current >= 1 && current <= TIERS.length
-          ? current : DEFAULT_TIER);
+           ? current : "");
       });
     }
     populateTierSelects();
@@ -1366,9 +1348,11 @@
       if (_gddlLookupUsed[prefix]) {
         const rating = Number(metadata.rating ?? metadata.score);
         const hasRating = Number.isFinite(rating) && rating > 0;
+        const gddlTier = hasRating ? tierFromGddlRating(rating) : null;
         payload.gddlRating = hasRating ? rating : null;
         payload.gddlScore = hasRating ? rating : null;
-        payload.gddlTier = hasRating ? tierFromGddlRating(rating) : null;
+        payload.gddlTier = gddlTier;
+        payload.tier = gddlTier;
       }
       if (metadata.difficulty) payload.gddlDifficulty = String(metadata.difficulty);
       if (_externalLookupUsed[prefix]) {
@@ -1550,7 +1534,7 @@
           `}
           <div class="level-info">
             <div class="level-title">#${pos} - ${nivel.name}</div>
-            <div class="level-author">By ${nivel.author} · ${nivel.value != null ? formatPoints(nivel.value) : "—"} pts · Tier ${resolveTier(nivel)}</div>
+            <div class="level-author">By ${nivel.author} · ${nivel.value != null ? formatPoints(nivel.value) : "—"} pts · ${formatTier(resolveGddlTier(nivel))}</div>
             <a href="level.html?id=${nivel.id}" class="level-button">Ver nivel</a>
             ${options.searchResult ? `<button type="button" class="list-jump-button">VER EN LISTA</button>` : ""}
           </div>
@@ -1979,6 +1963,19 @@
           document.getElementById(`${prefix}-gddl-position`).value = metadataLevel.gddlPosition || "";
           _sourceMetadata[prefix] = metadataLevel.gddlData || null;
           _gddlLookupUsed[prefix] = true;
+          const rating = Number(
+            metadataLevel.gddlRating ??
+            metadataLevel.gddlScore ??
+            metadataLevel.gddlData?.rating ??
+            metadataLevel.gddlData?.score
+          );
+          const gddlTier = Number.isFinite(rating) && rating > 0
+            ? tierFromGddlRating(rating)
+            : null;
+          if (gddlTier) {
+            document.getElementById(`${prefix}-tier`).value = String(gddlTier);
+            document.getElementById(`${prefix}-position`).dispatchEvent(new Event("input"));
+          }
         }
         _externalLookupUsed[prefix] = true;
         const metadataTags = metadataLevel?.tags || [];
@@ -2115,7 +2112,7 @@
          que los usuarios reclamen este nivel como "Nuevo" en submit. */
       const gdLevelId  = document.getElementById("inp-gdLevelId").value.trim();
       const reqPos     = Math.max(1, Math.floor(Number(document.getElementById("inp-position").value) || 0));
-      const tier       = Number(document.getElementById("inp-tier").value) || DEFAULT_TIER;
+      let tier         = Number(document.getElementById("inp-tier").value) || null;
       const thumbnail  = document.getElementById("inp-thumbnail").value.trim();
       /* Si el campo quedó vacío, restaurar automáticamente el URL generado */
       const background = document.getElementById("inp-background").value.trim()
@@ -2146,15 +2143,26 @@
         const originalById = new Map(allLvls.map(l => [l.id, { position: l.position, value: l.value }]));
         const ordered      = ordenarNiveles(allLvls);
         const insertAt     = Math.min(reqPos, ordered.length + 1);
-        const placeholder  = { id: "__NEW__", name, author, tier, position: insertAt };
+        const rating = Number(
+          _sourceMetadata.inp?.rating ??
+          _sourceMetadata.inp?.score ??
+          _sourceMetadata.inp?.gddlRating ??
+          _sourceMetadata.inp?.gddlScore
+        );
+        const gddlTier = Number.isFinite(rating) && rating > 0
+          ? tierFromGddlRating(rating)
+          : null;
+        if (gddlTier) tier = gddlTier;
+        const pointTier = tier || DEFAULT_TIER;
+        const placeholder  = { id: "__NEW__", name, author, tier: pointTier, position: insertAt };
         ordered.splice(insertAt - 1, 0, placeholder);
 
         /* 2. Crear el doc en Firestore con la posición y value calculados */
         const newPos   = insertAt;
-        const newValue = calculateClassicScores([{ id: "__NEW__", position: newPos, tier }])
+        const newValue = calculateClassicScores([{ id: "__NEW__", position: newPos, tier: pointTier }])
           .get("__NEW__").value;
         const _addPayload = {
-          name, author, creators, position: newPos, value: newValue, tier,
+          name, author, creators, position: newPos, value: newValue, tier: pointTier,
           listType: DEMON_LIST_TYPE,
           thumbnail, background, video, glow, is2P,
           description, difficulty, minPercent, tags,
@@ -2183,7 +2191,7 @@
         const newScore = finalScores.get(newRef.id);
         await updateDoc(doc(db, "levels", newRef.id), {
           value: newScore?.value || newValue,
-          tier: newScore?.tier || tier
+          tier: newScore?.tier || pointTier,
         });
         const updates = diffReorder(originalById, ordered).filter(u => u.id !== newRef.id);
         await commitInChunks(updates);
@@ -2370,7 +2378,7 @@
       document.getElementById("edit-gddl-position").value = nivel.gddlPosition || "";
       _sourceMetadata.edit = nivel.gddlData || null;
       document.getElementById("edit-position").value   = nivel.position   || "";
-      document.getElementById("edit-tier").value       = String(resolveTier(nivel, DEFAULT_TIER));
+      document.getElementById("edit-tier").value       = String(resolveGddlTier(nivel) || "");
       document.getElementById("edit-thumbnail").value  = nivel.thumbnail || "";
       /* Background Level: custom > auto-generado desde gdLevelId */
       _editPrevGdId = (nivel.gdLevelId || "").trim();
@@ -2393,7 +2401,7 @@
       setTags("edit", existingTags);
       document.getElementById("edit-points-preview").textContent =
         nivel.position
-          ? `Puntos del Tier: ${computeTierPoints(resolveTier(nivel), 1, 1)} máx. (se ajustan según niveles del Tier)`
+          ? `Puntos del Tier: ${computeTierPoints(resolveGddlTier(nivel) || DEFAULT_TIER, 1, 1)} máx. (se ajustan según niveles del Tier)`
           : "Puntos automáticos: —";
       /* Aplicar bloqueo de min% según la posición actual */
       document.getElementById("edit-position").dispatchEvent(new Event("input"));

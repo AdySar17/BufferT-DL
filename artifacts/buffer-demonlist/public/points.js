@@ -34,7 +34,7 @@ export const TIERS = TIER_BASE_VALUES.map((max, index) => ({
   curve: 0.92
 }));
 
-export const DEFAULT_TIER = 10;
+export const DEFAULT_TIER = 1;
 export const DEFAULT_PEMON_TIER = 1;
 
 const TIER_MAP = new Map(TIERS.map(tier => [tier.id, tier]));
@@ -78,6 +78,25 @@ export function tierFromGddlRating(rating, fallback = null) {
     return normalizeTier(fallback);
   }
   return Math.min(TIERS.length, Math.max(1, Math.round(value)));
+}
+
+export function resolveGddlTier(level, fallback = null) {
+  const rating = Number(
+    level?.gddlRating ??
+    level?.gddlScore ??
+    level?.gddlData?.rating ??
+    level?.gddlData?.score
+  );
+  if (Number.isFinite(rating) && rating > 0) {
+    return tierFromGddlRating(rating);
+  }
+  const stored = normalizeTier(level?.gddlTier);
+  return stored || normalizeTier(fallback);
+}
+
+export function formatTier(tier) {
+  const normalized = normalizeTier(tier);
+  return normalized ? `TIER ${normalized}` : "—";
 }
 
 function round2(value) {

@@ -415,11 +415,9 @@
       <!-- Stats -->
       <div class="card">
         <div class="stats">
-          <!-- Cuadro de TIER (sustituye a la antigua carita de dificultad).
-               El valor real se configurará por nivel más adelante; por ahora
-               siempre muestra "—". -->
-          <div class="stat-tier-box" title="Tier de la lista">
-            <div class="stat-tier-label">Tier de Lista</div>
+          <!-- Cuadro de TIER basado en el GDDL Tier almacenado. -->
+          <div class="stat-tier-box" title="GDDL Tier almacenado">
+            <div class="stat-tier-label">GDDL TIER</div>
             <div class="stat-tier-value" id="lvlTier">—</div>
           </div>
           <div class="stat-list">
@@ -617,7 +615,7 @@
   import { db } from "/auth.js";
   import { difficultyImage, difficultyName } from "/difficulty.js";
   import { isDemon } from "/list-utils.js";
-  import { resolveTier, DEFAULT_TIER, formatPoints, tierFromGddlRating } from "/points.js";
+  import { resolveGddlTier, formatTier, formatPoints } from "/points.js";
   import { doc, getDoc, collection, query, where, getDocs, orderBy }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { countryName, flagUrl } from "/country-utils.js";
@@ -661,12 +659,8 @@
       const gid = (nivel.gdLevelId || "").toString().trim();
       lvlGdIdEl.textContent = gid || "—";
     }
-    /* Tier persistido/calculado desde GDDL, no desde la posición de la lista. */
+    /* Ambas etiquetas leen exactamente el mismo GDDL Tier almacenado. */
     const lvlTierEl = document.getElementById("lvlTier");
-    if (lvlTierEl) {
-      const tier = resolveTier(nivel, DEFAULT_TIER);
-      lvlTierEl.textContent = tier ? `Tier ${tier}` : "—";
-    }
     const lvlGddlRatingEl = document.getElementById("lvlGddlRating");
     const lvlGddlTierEl = document.getElementById("lvlGddlTier");
     const gddlRating = Number(
@@ -679,12 +673,9 @@
     if (lvlGddlRatingEl) {
       lvlGddlRatingEl.textContent = hasGddlRating ? gddlRating.toFixed(2) : "—";
     }
-    if (lvlGddlTierEl) {
-      const gddlTier = hasGddlRating
-        ? (Number(nivel.gddlTier) || tierFromGddlRating(gddlRating))
-        : null;
-      lvlGddlTierEl.textContent = gddlTier ? `Tier ${gddlTier}` : "—";
-    }
+    const gddlTier = resolveGddlTier(nivel);
+    if (lvlTierEl) lvlTierEl.textContent = formatTier(gddlTier);
+    if (lvlGddlTierEl) lvlGddlTierEl.textContent = formatTier(gddlTier);
 
     /* Dificultad: imagen (cabecera) + texto en stat-list.
        Nota: ya no hay imagen de dificultad en el panel derecho (la
